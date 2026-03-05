@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase/admin";
 import { createLink, getUserLinks, deleteLink, countActiveLinksForUser } from "@/services/links";
+import { checkGuestLimit, recordGuestUsage } from "@/services/guest";
 import { logger } from "@/lib/utils/logger";
 
 // Expiration policy (milliseconds)
@@ -97,10 +98,26 @@ export async function POST(request: NextRequest) {
 
         // ── Server-side link-limit enforcement ──
         if (isGuest) {
-            const activeCount = await countActiveLinksForUser("anonymous");
-            if (activeCount >= GUEST_LINK_LIMIT) {
+            // Block custom alias for guests
+            if (customSlug) {
                 return NextResponse.json(
-                    { code: "GUEST_LIMIT", message: "Guest users can only create 1 link. Sign in to create more." },
+                    { code: "FORBIDDEN", message: "Guest users cannot create custom aliases. Please sign in." },
+                    { status: 403 }
+                );
+            }
+
+            // Extract device fingerprint from custom header
+            const fingerprint = request.headers.get("x-device-fingerprint") || undefined;
+            const guestStatus = await checkGuestLimit(ip, fingerprint);
+
+            if (!guestStatus.allowed) {
+                return NextResponse.json(
+                    {
+                        error: "guest_limit_reached",
+                        code: "GUEST_LIMIT",
+                        message: "Guest users can only create 1 link. Sign in to create more.",
+                        expiresIn: guestStatus.expiresIn
+                    },
                     { status: 403 }
                 );
             }
@@ -130,6 +147,12 @@ export async function POST(request: NextRequest) {
             title,
             expiresAt,
         });
+
+        // Record guest usage
+        if (isGuest) {
+            const fingerprint = request.headers.get("x-device-fingerprint") || undefined;
+            await recordGuestUsage(ip, fingerprint, result.slug, expiresAt);
+        }
 
         return NextResponse.json(result, { status: 201 });
     } catch (error) {

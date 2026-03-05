@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Copy, Check, Link2, Loader2, Lock, QrCode, AlertCircle } from "lucide-react";
 import QRCode from "react-qr-code";
+import { getDeviceFingerprint } from "@/lib/utils/fingerprint";
 
 export default function HomePage() {
     const [user, setUser] = useState<User | null>(null);
@@ -42,6 +43,8 @@ export default function HomePage() {
     const [preview, setPreview] = useState<{ title?: string, favicon?: string } | null>(null);
     const resultRef = useRef<HTMLDivElement>(null);
     const [quota, setQuota] = useState<{ created: number, limit: number } | null>(null);
+    const [guestExpiresAt, setGuestExpiresAt] = useState<number | null>(null);
+    const [countdown, setCountdown] = useState<string>("");
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -72,10 +75,53 @@ export default function HomePage() {
 
     useEffect(() => {
         if (typeof window !== "undefined") {
-            const used = localStorage.getItem("xurl_guest_used");
-            if (used) setGuestUsed(true);
+            const guestHistory = localStorage.getItem("xurl_guest_link_history");
+            if (guestHistory) {
+                try {
+                    const parsed = JSON.parse(guestHistory);
+                    if (parsed.expiresAt && parsed.expiresAt > Date.now()) {
+                        setGuestUsed(true);
+                        setGuestExpiresAt(parsed.expiresAt);
+                    } else {
+                        // Cleanup expired local storage entry
+                        localStorage.removeItem("xurl_guest_link_history");
+                    }
+                } catch (e) {
+                    console.error("Failed to parse guest history", e);
+                }
+            }
         }
     }, []);
+
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+
+        if (guestExpiresAt && !user) {
+            const updateCountdown = () => {
+                const now = Date.now();
+                if (guestExpiresAt <= now) {
+                    setGuestUsed(false);
+                    setGuestExpiresAt(null);
+                    localStorage.removeItem("xurl_guest_link_history");
+                    setCountdown("");
+                    return;
+                }
+
+                const remainingSeconds = Math.floor((guestExpiresAt - now) / 1000);
+                const h = Math.floor(remainingSeconds / 3600);
+                const m = Math.floor((remainingSeconds % 3600) / 60);
+                const s = remainingSeconds % 60;
+                setCountdown(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+            };
+
+            updateCountdown();
+            interval = setInterval(updateCountdown, 1000);
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [guestExpiresAt, user]);
 
     useEffect(() => {
         if (!alias.trim()) {
@@ -184,7 +230,10 @@ export default function HomePage() {
         setLoading(true);
 
         try {
-            const headers: Record<string, string> = { "Content-Type": "application/json" };
+            const headers: Record<string, string> = {
+                "Content-Type": "application/json",
+                "x-device-fingerprint": await getDeviceFingerprint(),
+            };
             if (user) {
                 headers["Authorization"] = `Bearer ${await user.getIdToken()}`;
             }
@@ -202,6 +251,15 @@ export default function HomePage() {
 
             if (!res.ok) {
                 setError(data.message || "Failed to create link. Please try again.");
+                if (data.error === "guest_limit_reached" && data.expiresIn) {
+                    setGuestUsed(true);
+                    const expiresAt = Date.now() + (data.expiresIn * 1000);
+                    setGuestExpiresAt(expiresAt);
+                    localStorage.setItem("xurl_guest_link_history", JSON.stringify({
+                        createdAt: Date.now(),
+                        expiresAt: expiresAt
+                    }));
+                }
                 return;
             }
 
@@ -217,8 +275,14 @@ export default function HomePage() {
             }
 
             if (!user) {
-                localStorage.setItem("xurl_guest_used", "true");
+                const newGuestExpiresAt = Date.now() + (2 * 60 * 60 * 1000);
+                localStorage.setItem("xurl_guest_link_history", JSON.stringify({
+                    slug: data.slug,
+                    createdAt: Date.now(),
+                    expiresAt: newGuestExpiresAt
+                }));
                 setGuestUsed(true);
+                setGuestExpiresAt(newGuestExpiresAt);
             } else {
                 // Refresh quota automatically
                 user.getIdToken().then(token => {
@@ -293,6 +357,13 @@ export default function HomePage() {
                                     <p className="text-sm text-muted-foreground max-w-[280px]">
                                         You have already claimed 1 free link as per our without login policy. Sign in to create more links.
                                     </p>
+
+                                    {countdown && (
+                                        <div className="mt-2 py-2 px-4 bg-muted/50 rounded-lg border border-border">
+                                            <p className="text-xs text-muted-foreground mb-1">Your temporary link expires in:</p>
+                                            <p className="font-mono text-xl font-medium tracking-wider text-foreground">{countdown}</p>
+                                        </div>
+                                    )}
                                 </motion.div>
                             ) : (
                                 <motion.div

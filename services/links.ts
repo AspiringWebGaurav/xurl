@@ -83,11 +83,13 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
 
     let slug: string;
 
-    // Reserved slugs that would shadow Next.js app routes
+    // Reserved slugs that would shadow Next.js app routes or admin routes
     const RESERVED_SLUGS = new Set([
         "api", "login", "expired", "_next", "not-found",
         "favicon.ico", "robots.txt", "sitemap.xml", "manifest.json",
         "sw.js", "workbox", "vercel", ".well-known",
+        "admin", "dashboard", "settings", "preview", "terms",
+        "privacy", "about", "contact", "help", "support", "docs"
     ]);
 
     if (input.customSlug) {
