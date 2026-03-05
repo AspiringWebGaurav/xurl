@@ -12,12 +12,24 @@ import { Input } from "@/components/ui/input";
 import { Copy, Check, Link2, Loader2, Lock, QrCode, AlertCircle } from "lucide-react";
 import QRCode from "react-qr-code";
 
-const SHORT_DOMAIN = env.NEXT_PUBLIC_SHORT_DOMAIN;
-
 export default function HomePage() {
     const [user, setUser] = useState<User | null>(null);
     const [url, setUrl] = useState("");
     const [isValidUrl, setIsValidUrl] = useState(false);
+    const [shortDomain, setShortDomain] = useState("xurl.eu.cc");
+
+    useEffect(() => {
+        // Hydrate the actual domain at runtime to avoid Next.js static build inlining bugs
+        if (typeof window !== "undefined") {
+            const envDomain = env.NEXT_PUBLIC_SHORT_DOMAIN;
+            // If the built bundle accidentally baked in "localhost:3000" but we are in production
+            if (envDomain.includes("localhost") && window.location.hostname !== "localhost") {
+                setShortDomain(window.location.host);
+            } else {
+                setShortDomain(envDomain);
+            }
+        }
+    }, []);
     const [showPasteHint, setShowPasteHint] = useState(false);
     const [alias, setAlias] = useState("");
     const [aliasStatus, setAliasStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
@@ -254,7 +266,7 @@ export default function HomePage() {
                                 : "border-border focus-within:ring-foreground"
                                 } ${(isDisabled || loading) ? "opacity-50 cursor-not-allowed bg-muted/50" : ""}`}>
                                 <span className="pl-3 pr-1 text-muted-foreground text-sm select-none pointer-events-none whitespace-nowrap">
-                                    {SHORT_DOMAIN} /
+                                    {shortDomain} /
                                 </span>
                                 <input
                                     type="text"
