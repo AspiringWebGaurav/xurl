@@ -404,27 +404,27 @@ export default function HomePage() {
 
                                     <div className="flex flex-col gap-1.5 border border-transparent focus-within:border-ring/20 rounded-lg transition-colors">
                                         <label className="text-xs font-medium text-foreground px-1 flex justify-between items-center">
-                                            <span>Custom Alias (Optional)</span>
+                                            <span>Custom Alias {!user ? <Lock className="inline w-3 h-3 ml-1 text-muted-foreground" /> : "(Optional)"}</span>
                                         </label>
                                         <div className={`relative flex items-center w-full h-12 bg-background shadow-sm rounded-lg border focus-within:ring-1 transition-all ${aliasStatus === "taken" || aliasStatus === "invalid"
                                             ? "border-red-200 focus-within:ring-red-500"
                                             : "border-border focus-within:ring-foreground"
-                                            } ${(isDisabled || loading) ? "opacity-50 cursor-not-allowed bg-muted/50" : ""}`}>
+                                            } ${(isDisabled || loading || !user) ? "opacity-50 cursor-not-allowed bg-muted/50" : ""}`}>
                                             <span className="pl-3 pr-1 text-muted-foreground text-sm select-none pointer-events-none whitespace-nowrap">
                                                 {shortDomain} /
                                             </span>
                                             <input
                                                 type="text"
-                                                placeholder="type-alias"
+                                                placeholder={!user ? "Sign in to use custom alias" : "type-alias"}
                                                 value={alias}
                                                 onChange={(e) => setAlias(e.target.value.replace(/[^a-zA-Z0-9-]/g, ""))}
-                                                disabled={isDisabled || loading}
-                                                onKeyDown={(e) => e.key === "Enter" && isValidUrl && handleShorten()}
+                                                disabled={isDisabled || loading || !user}
+                                                onKeyDown={(e) => e.key === "Enter" && !(!user) && isValidUrl && handleShorten()}
                                                 className={`flex-1 min-w-0 bg-transparent text-sm text-foreground focus:outline-none placeholder:text-muted-foreground h-full disabled:cursor-not-allowed ${alias.trim() ? "pr-[130px] sm:pr-[220px]" : "pr-3"
                                                     }`}
                                             />
                                             {alias.trim() && (
-                                                <div className={`absolute right-3 flex items-center select-none pointer-events-none pl-1 ${isDisabled || loading ? "bg-transparent" : "bg-background"}`}>
+                                                <div className={`absolute right-3 flex items-center select-none pointer-events-none pl-1 ${isDisabled || loading || !user ? "bg-transparent" : "bg-background"}`}>
                                                     {aliasStatus === "checking" && <span className="text-xs text-muted-foreground flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> checking...</span>}
                                                     {aliasStatus === "available" && <span className="text-xs text-emerald-600 flex items-center gap-1.5"><Check className="h-3.5 w-3.5" /> available</span>}
                                                     {aliasStatus === "taken" && <span className="text-xs text-red-500 flex items-center gap-1.5">already claimed — try another</span>}
@@ -433,7 +433,11 @@ export default function HomePage() {
                                             )}
                                         </div>
                                         <p className="text-[11px] text-muted-foreground px-1 mt-0.5">
-                                            You can create your own alias or leave it empty — the system will generate one.
+                                            {!user ? (
+                                                <span className="text-amber-600/90 font-medium tracking-tight">Custom aliases are only available for signed-in users.</span>
+                                            ) : (
+                                                "You can create your own alias or leave it empty — the system will generate one."
+                                            )}
                                         </p>
                                     </div>
 
