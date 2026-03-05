@@ -39,13 +39,13 @@ const validateEnv = () => {
             throw new Error("Missing or invalid environment variables. Cannot start in production.");
         }
 
-        // In development only, return permissive defaults
-        console.warn("⚠️ Invalid environment variables (using dev defaults):", error);
+        // In development only, or as a failsafe, return permissive defaults but NEVER localhost in prod
+        console.warn("⚠️ Invalid environment variables (using failsafe defaults):", error);
         return {
-            NEXT_PUBLIC_APP_URL: "http://localhost:3000",
-            NEXT_PUBLIC_SHORT_DOMAIN: "localhost:3000",
-            NEXT_PUBLIC_API_BASE: "http://localhost:3000/api",
-            NEXT_PUBLIC_ENVIRONMENT: "development" as const,
+            NEXT_PUBLIC_APP_URL: isProd ? "https://xurl.eu.cc" : "http://localhost:3000",
+            NEXT_PUBLIC_SHORT_DOMAIN: isProd ? "xurl.eu.cc" : "localhost:3000",
+            NEXT_PUBLIC_API_BASE: isProd ? "https://xurl.eu.cc/api" : "http://localhost:3000/api",
+            NEXT_PUBLIC_ENVIRONMENT: (isProd ? "production" : "development") as "production" | "development" | "test",
             NEXT_PUBLIC_FIREBASE_API_KEY: "dummy-api-key",
             NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "dummy-auth-domain",
             NEXT_PUBLIC_FIREBASE_PROJECT_ID: "dummy-project-id",
