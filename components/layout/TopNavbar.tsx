@@ -20,8 +20,34 @@ export function TopNavbar() {
     const [overlayMessage, setOverlayMessage] = useState<React.ReactNode>("Connecting to Google...");
     const [hasNewHistory, setHasNewHistory] = useState(false);
 
+    const [hasGuestHistory, setHasGuestHistory] = useState(false);
+
     useEffect(() => {
-        const handleLinkGenerated = () => setHasNewHistory(true);
+        const checkGuestHistory = () => {
+            const h = localStorage.getItem("xurl_guest_link_history");
+            if (h) {
+                try {
+                    const parsed = JSON.parse(h);
+                    if (parsed.expiresAt > Date.now()) {
+                        setHasGuestHistory(true);
+                    } else {
+                        setHasGuestHistory(false);
+                    }
+                } catch {
+                    setHasGuestHistory(false);
+                }
+            } else {
+                setHasGuestHistory(false);
+            }
+        };
+
+        checkGuestHistory(); // Initial check
+
+        const handleLinkGenerated = () => {
+            setHasNewHistory(true);
+            checkGuestHistory(); // Recheck when a link is generated
+        };
+
         window.addEventListener("linkGenerated", handleLinkGenerated);
         return () => window.removeEventListener("linkGenerated", handleLinkGenerated);
     }, []);
@@ -150,14 +176,30 @@ export function TopNavbar() {
                             </Button>
                         </>
                     ) : (
-                        <Button
-                            size="sm"
-                            onClick={handleGoogleLogin}
-                            disabled={isLoggingIn}
-                            className="h-9 px-4 text-xs font-medium rounded-lg shadow-sm bg-foreground text-background hover:bg-foreground/90 disabled:opacity-80"
-                        >
-                            {isLoggingIn ? "Connecting..." : "Login"}
-                        </Button>
+                        <>
+                            {hasGuestHistory && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => { setIsHistoryOpen(true); setHasNewHistory(false); }}
+                                    className="relative text-sm font-medium h-9 px-3 text-muted-foreground hover:text-foreground"
+                                >
+                                    <History className="h-4 w-4 mr-2" />
+                                    History
+                                    {hasNewHistory && (
+                                        <span className="absolute top-2 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-background animate-pulse" />
+                                    )}
+                                </Button>
+                            )}
+                            <Button
+                                size="sm"
+                                onClick={handleGoogleLogin}
+                                disabled={isLoggingIn}
+                                className="h-9 px-4 text-xs font-medium rounded-lg shadow-sm bg-foreground text-background hover:bg-foreground/90 disabled:opacity-80"
+                            >
+                                {isLoggingIn ? "Connecting..." : "Login"}
+                            </Button>
+                        </>
                     )
                 )}
             </div>
