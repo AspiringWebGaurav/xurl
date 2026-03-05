@@ -249,25 +249,25 @@ export default function HomePage() {
                             <label className="text-xs font-medium text-foreground px-1 flex justify-between items-center">
                                 <span>Custom Alias (Optional)</span>
                             </label>
-                            <div className="relative flex items-center w-full">
-                                <span className="absolute left-3 text-muted-foreground text-sm select-none pointer-events-none">
-                                    {SHORT_DOMAIN} /&nbsp;
+                            <div className={`relative flex items-center w-full h-12 bg-background shadow-sm rounded-lg border focus-within:ring-1 transition-all ${aliasStatus === "taken" || aliasStatus === "invalid"
+                                ? "border-red-200 focus-within:ring-red-500"
+                                : "border-border focus-within:ring-foreground"
+                                } ${(isDisabled || loading) ? "opacity-50 cursor-not-allowed bg-muted/50" : ""}`}>
+                                <span className="pl-3 pr-1 text-muted-foreground text-sm select-none pointer-events-none whitespace-nowrap">
+                                    {SHORT_DOMAIN} /
                                 </span>
-                                <Input
+                                <input
                                     type="text"
                                     placeholder="type-alias"
                                     value={alias}
                                     onChange={(e) => setAlias(e.target.value.replace(/[^a-zA-Z0-9-]/g, ""))}
                                     disabled={isDisabled || loading}
                                     onKeyDown={(e) => e.key === "Enter" && isValidUrl && handleShorten()}
-                                    className={`h-12 bg-background shadow-sm rounded-lg text-sm pl-[96px] ${alias.trim() ? "pr-[100px] sm:pr-[220px]" : ""
-                                        } focus-visible:ring-1 ${aliasStatus === "taken" || aliasStatus === "invalid"
-                                            ? "border-red-200 focus-visible:ring-red-500"
-                                            : "border-border focus-visible:ring-foreground"
+                                    className={`flex-1 min-w-0 bg-transparent text-sm text-foreground focus:outline-none placeholder:text-muted-foreground h-full disabled:cursor-not-allowed ${alias.trim() ? "pr-[130px] sm:pr-[220px]" : "pr-3"
                                         }`}
                                 />
                                 {alias.trim() && (
-                                    <div className="absolute right-3 flex items-center select-none pointer-events-none bg-background pl-1">
+                                    <div className={`absolute right-3 flex items-center select-none pointer-events-none pl-1 ${isDisabled || loading ? "bg-transparent" : "bg-background"}`}>
                                         {aliasStatus === "checking" && <span className="text-xs text-muted-foreground flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> checking...</span>}
                                         {aliasStatus === "available" && <span className="text-xs text-emerald-600 flex items-center gap-1.5"><Check className="h-3.5 w-3.5" /> available</span>}
                                         {aliasStatus === "taken" && <span className="text-xs text-red-500 flex items-center gap-1.5">already claimed — try another</span>}
