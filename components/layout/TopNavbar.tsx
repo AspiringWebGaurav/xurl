@@ -18,6 +18,13 @@ export function TopNavbar() {
     const [isLoggingIn, setIsLoggingIn] = useState(false);
     const [showOverlay, setShowOverlay] = useState(false);
     const [overlayMessage, setOverlayMessage] = useState<React.ReactNode>("Connecting to Google...");
+    const [hasNewHistory, setHasNewHistory] = useState(false);
+
+    useEffect(() => {
+        const handleLinkGenerated = () => setHasNewHistory(true);
+        window.addEventListener("linkGenerated", handleLinkGenerated);
+        return () => window.removeEventListener("linkGenerated", handleLinkGenerated);
+    }, []);
 
     const resetLoginState = () => {
         setIsLoggingIn(false);
@@ -118,9 +125,17 @@ export function TopNavbar() {
                 {!loading && (
                     user ? (
                         <>
-                            <Button variant="ghost" size="sm" onClick={() => setIsHistoryOpen(true)} className="text-sm font-medium h-9 px-3 text-muted-foreground hover:text-foreground">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => { setIsHistoryOpen(true); setHasNewHistory(false); }}
+                                className="relative text-sm font-medium h-9 px-3 text-muted-foreground hover:text-foreground"
+                            >
                                 <History className="h-4 w-4 mr-2" />
                                 History
+                                {hasNewHistory && (
+                                    <span className="absolute top-2 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-background animate-pulse" />
+                                )}
                             </Button>
                             <Button
                                 variant="outline"

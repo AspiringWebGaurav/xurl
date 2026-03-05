@@ -160,9 +160,14 @@ export async function GET(request: NextRequest) {
 
         const result = await getUserLinks(verifiedUid, pageSize);
 
+        const userDoc = await adminDb.collection("users").doc(verifiedUid).get();
+        const linksCreated = userDoc.exists ? (userDoc.data()?.linksCreated || 0) : 0;
+
         return NextResponse.json({
             links: result.links,
             hasMore: result.links.length === pageSize,
+            linksCreated,
+            limit: AUTH_LINK_LIMIT
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to fetch links.";
