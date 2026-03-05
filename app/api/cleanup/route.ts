@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
             expiredLinksDeactivated: 0,
             staleLinksDeleted: 0,
             oldAnalyticsPruned: 0,
+            guestUsagePruned: 0,
             rateLimitEntriesCleaned: true,
         };
 
@@ -119,7 +120,27 @@ export async function POST(request: NextRequest) {
         }
         results.oldAnalyticsPruned = analyticsPruned;
 
-        // ─── 4) Clean Rate Limiter Memory ─────────────────────────────────
+        // ─── 4) Prune Expired Guest Usage ─────────────────────────────────
+        let guestUsagePruned = 0;
+        while (guestUsagePruned < MAX_TOTAL) {
+            const guestSnap = await adminDb
+                .collection("guest_usage")
+                .where("expiresAt", "<=", now)
+                .limit(BATCH_SIZE)
+                .get();
+
+            if (guestSnap.empty) break;
+
+            const batch = adminDb.batch();
+            guestSnap.docs.forEach((d) => batch.delete(d.ref));
+            await batch.commit();
+            guestUsagePruned += guestSnap.size;
+
+            if (guestSnap.size < BATCH_SIZE) break;
+        }
+        results.guestUsagePruned = guestUsagePruned;
+
+        // ─── 5) Clean Rate Limiter Memory ─────────────────────────────────
         rateLimitCleanup();
 
         const durationMs = Date.now() - startTime;

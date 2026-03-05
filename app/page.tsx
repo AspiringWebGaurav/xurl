@@ -278,6 +278,7 @@ export default function HomePage() {
                 const newGuestExpiresAt = Date.now() + (2 * 60 * 60 * 1000);
                 localStorage.setItem("xurl_guest_link_history", JSON.stringify({
                     slug: data.slug,
+                    originalUrl: url.trim(),
                     createdAt: Date.now(),
                     expiresAt: newGuestExpiresAt
                 }));

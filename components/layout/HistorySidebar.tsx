@@ -26,7 +26,7 @@ export function HistorySidebar({ isOpen, onClose, userId }: HistorySidebarProps)
     const [copied, setCopied] = useState<string | null>(null);
 
     useEffect(() => {
-        if (isOpen && userId) {
+        if (isOpen) {
             fetchLinks();
         }
     }, [isOpen, userId]);
@@ -34,7 +34,7 @@ export function HistorySidebar({ isOpen, onClose, userId }: HistorySidebarProps)
     // Listen for new links generated in the background
     useEffect(() => {
         const handleLinkGenerated = () => {
-            if (userId) fetchLinks();
+            fetchLinks();
         };
 
         window.addEventListener("linkGenerated", handleLinkGenerated);
@@ -45,16 +45,42 @@ export function HistorySidebar({ isOpen, onClose, userId }: HistorySidebarProps)
         setLoading(true);
         try {
             const currentUser = auth.currentUser;
-            if (!currentUser) return;
+            let fetchedLinks: LinkItem[] = [];
 
-            const token = await currentUser.getIdToken();
-            const res = await fetch(`/api/links?pageSize=50`, {
-                headers: { "Authorization": `Bearer ${token}` },
-            });
-            const data = await res.json();
-            if (data.links) {
-                setLinks(data.links);
+            if (currentUser) {
+                const token = await currentUser.getIdToken();
+                const res = await fetch(`/api/links?pageSize=50`, {
+                    headers: { "Authorization": `Bearer ${token}` },
+                });
+                const data = await res.json();
+                if (data.links) {
+                    fetchedLinks = data.links;
+                }
             }
+
+            // Check for guest link in localStorage
+            if (typeof window !== "undefined") {
+                const guestHistory = localStorage.getItem("xurl_guest_link_history");
+                if (guestHistory) {
+                    try {
+                        const parsed = JSON.parse(guestHistory);
+                        // Prevent duplicates if user recently signed in but hasn't cleared localstorage
+                        const slugExists = fetchedLinks.some(l => l.slug === parsed.slug);
+                        if (parsed.slug && !slugExists) {
+                            fetchedLinks.unshift({
+                                slug: parsed.slug,
+                                originalUrl: parsed.originalUrl || "Original URL hidden for guests",
+                                createdAt: parsed.createdAt,
+                                expiresAt: parsed.expiresAt
+                            });
+                        }
+                    } catch (e) {
+                        console.error("Failed to parse guest history", e);
+                    }
+                }
+            }
+
+            setLinks(fetchedLinks);
         } catch (e) {
             console.error(e);
         } finally {
