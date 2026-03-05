@@ -5,13 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
 import { env } from "@/lib/env";
+import { buildShortUrl } from "@/lib/utils/url-builder";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Copy, Check, Link2, Loader2, Lock, QrCode, AlertCircle } from "lucide-react";
 import QRCode from "react-qr-code";
 
-const APP_URL = env.NEXT_PUBLIC_APP_URL;
 const SHORT_DOMAIN = env.NEXT_PUBLIC_SHORT_DOMAIN;
 
 export default function HomePage() {
@@ -163,7 +163,7 @@ export default function HomePage() {
                 return;
             }
 
-            const generated = `${APP_URL}/${data.slug}`;
+            const generated = buildShortUrl(data.slug);
             setShortUrl(generated);
 
             // Auto copy
@@ -251,7 +251,7 @@ export default function HomePage() {
                             </label>
                             <div className="relative flex items-center w-full">
                                 <span className="absolute left-3 text-muted-foreground text-sm select-none pointer-events-none">
-                                    {(SHORT_DOMAIN.includes("localhost") || !SHORT_DOMAIN) ? "xurl.eu.cc" : SHORT_DOMAIN} /&nbsp;
+                                    {SHORT_DOMAIN} /&nbsp;
                                 </span>
                                 <Input
                                     type="text"

@@ -19,7 +19,7 @@ import { negCacheInvalidate } from "@/lib/cache/negative-cache";
 import { rateLimitLinkCreation } from "@/lib/utils/rate-limiter";
 import { logger } from "@/lib/utils/logger";
 import type { LinkDocument, CreateLinkInput, CreateLinkResponse } from "@/types";
-import { env } from "@/lib/env";
+import { buildShortUrl } from "@/lib/utils/url-builder";
 
 // ─── Slug Generation (Atomic Counter) ───────────────────────────────────────
 
@@ -142,11 +142,9 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
 
     logger.linkCreated(slug, userId);
 
-    const shortDomain = env.NEXT_PUBLIC_SHORT_DOMAIN;
-
     return {
         slug,
-        shortUrl: `https://${shortDomain}/${slug}`,
+        shortUrl: buildShortUrl(slug),
         originalUrl: urlCheck.url,
         createdAt: now,
     };
