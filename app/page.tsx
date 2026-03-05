@@ -276,14 +276,14 @@ export default function HomePage() {
                     </div>
 
                     <AnimatePresence mode="wait">
-                        {!shortUrl && (
+                        {!shortUrl ? (
                             <motion.div
                                 key="form"
-                                initial={{ opacity: 0, y: 10 }}
+                                initial={{ opacity: 0, y: 15 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                transition={{ duration: 0.2 }}
-                                className="w-full bg-card border border-border rounded-xl p-5 sm:p-6 shadow-sm flex flex-col gap-4"
+                                exit={{ opacity: 0, y: -15, filter: "blur(4px)" }}
+                                transition={{ duration: 0.4, ease: "easeInOut" }}
+                                className="w-full bg-card border border-border rounded-xl p-5 sm:p-6 shadow-sm flex flex-col gap-4 min-h-[290px] justify-center relative overflow-hidden"
                             >
                                 <div className="flex flex-col gap-1.5 border border-transparent focus-within:border-ring/20 rounded-lg transition-colors">
                                     <div className="flex justify-between items-center px-1">
@@ -351,7 +351,7 @@ export default function HomePage() {
                                 <Button
                                     onClick={handleShorten}
                                     disabled={!isValidUrl || isDisabled || loading || aliasStatus === "taken" || aliasStatus === "invalid"}
-                                    className="w-full h-12 rounded-lg py-0 shadow-sm bg-foreground text-background hover:bg-foreground/90 font-medium mt-2 transition-all"
+                                    className="w-full h-12 rounded-lg py-0 shadow-sm bg-foreground text-background hover:bg-foreground/90 font-medium mt-2 transition-all relative overflow-hidden"
                                 >
                                     {loading ? (
                                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -359,56 +359,49 @@ export default function HomePage() {
                                         <Link2 className="h-4 w-4 mr-2" />
                                     )}
                                     {loading ? "Shortening..." : "Shorten"}
+                                    {error && !shortUrl && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: "100%" }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className="absolute inset-0 flex items-center justify-center bg-red-500 text-white font-medium"
+                                        >
+                                            {error}
+                                        </motion.div>
+                                    )}
                                 </Button>
                             </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    <AnimatePresence mode="popLayout">
-                        {error && !shortUrl && (
-                            <motion.p
-                                initial={{ opacity: 0, y: -4 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -4 }}
-                                className="text-sm text-red-500 text-center bg-red-50 p-3 rounded-lg border border-red-100"
-                            >
-                                {error}
-                            </motion.p>
-                        )}
-                    </AnimatePresence>
-
-                    <AnimatePresence mode="wait">
-                        {shortUrl && (
+                        ) : (
                             <motion.div
+                                key="result"
                                 ref={resultRef}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.96 }}
-                                className="w-full flex flex-col md:flex-row gap-4"
+                                initial={{ opacity: 0, y: 15, scale: 0.98 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -15 }}
+                                transition={{ duration: 0.4, ease: "easeInOut" }}
+                                className="w-full bg-card border border-emerald-500/30 rounded-xl p-5 sm:p-6 shadow-[0_4px_20px_-4px_rgba(16,185,129,0.1)] flex flex-col md:flex-row gap-6 items-center min-h-[290px] overflow-hidden"
                             >
-                                {/* Left Section: Link Details */}
-                                <div className="flex-1 bg-card border border-border rounded-xl p-5 shadow-sm flex flex-col justify-center space-y-4 min-w-0">
-                                    <div className="flex items-center justify-between">
+                                <div className="flex-1 w-full flex flex-col justify-center h-full">
+                                    <div className="flex items-center justify-between mb-4">
                                         <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
                                             Your short link
                                         </p>
-                                        <span className="text-[11px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-medium flex items-center gap-1.5 border border-emerald-100/50">
+                                        <span className="text-[11px] text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full font-medium flex items-center gap-1.5 border border-emerald-100/50">
                                             <Check className="h-3 w-3" /> Saved to History
                                         </span>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <code className="flex-1 text-sm font-mono text-foreground bg-muted px-4 py-3 rounded-lg truncate border border-border select-all">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <code className="flex-1 text-[15px] font-mono text-foreground bg-muted px-4 py-3.5 rounded-lg truncate border border-border select-all">
                                             {shortUrl}
                                         </code>
                                         <Button
                                             variant="outline"
                                             size="icon"
                                             onClick={() => handleCopy(shortUrl)}
-                                            className="shrink-0 h-11 w-11 border-border hover:bg-muted rounded-lg"
+                                            className="shrink-0 h-12 w-12 border-border hover:bg-muted rounded-lg shadow-sm"
                                             title="Copy link"
                                         >
                                             {copied ? (
-                                                <Check className="h-4 w-4 text-emerald-500" />
+                                                <Check className="h-5 w-5 text-emerald-500" />
                                             ) : (
                                                 <Copy className="h-4 w-4 text-muted-foreground" />
                                             )}
@@ -416,11 +409,7 @@ export default function HomePage() {
                                     </div>
 
                                     {preview && (
-                                        <motion.div
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border/50"
-                                        >
+                                        <div className="flex items-center gap-3 p-3 bg-muted/40 rounded-lg border border-border/50 mb-4">
                                             {preview.favicon ? (
                                                 <img src={preview.favicon} alt="" className="w-6 h-6 rounded-sm bg-background" />
                                             ) : (
@@ -431,33 +420,46 @@ export default function HomePage() {
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-medium text-foreground truncate">{preview.title || "Unknown Title"}</p>
                                             </div>
+                                        </div>
+                                    )}
+
+                                    <div className="mt-auto pt-4 flex justify-between items-center border-t border-border/60">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setShowQR(!showQR)}
+                                            className="text-xs text-muted-foreground hover:text-foreground -ml-2 h-8"
+                                        >
+                                            <QrCode className="h-3.5 w-3.5 mr-1.5" />
+                                            {showQR ? "Hide QR Code" : "Show QR Code"}
+                                        </Button>
+                                        <Button
+                                            onClick={handleReset}
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-xs text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 h-8 font-medium"
+                                        >
+                                            Create another
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <AnimatePresence>
+                                    {showQR && (
+                                        <motion.div
+                                            initial={{ width: 0, opacity: 0, scale: 0.8 }}
+                                            animate={{ width: "180px", opacity: 1, scale: 1 }}
+                                            exit={{ width: 0, opacity: 0, scale: 0.8 }}
+                                            transition={{ duration: 0.3, ease: "easeOut" }}
+                                            className="shrink-0 flex flex-col items-center justify-center"
+                                        >
+                                            <div className="bg-white p-3 rounded-xl border border-border/80 shadow-sm w-[160px] h-[160px] flex items-center justify-center mb-3 transition-transform hover:scale-105">
+                                                <QRCode value={shortUrl} size={140} className="w-full h-auto" />
+                                            </div>
+                                            <p className="text-[11px] font-medium text-muted-foreground text-center whitespace-nowrap">Scan or Download QR</p>
                                         </motion.div>
                                     )}
-                                </div>
-
-                                {/* Right Section: QR Code */}
-                                <div className="shrink-0 w-full md:w-[180px] bg-white border border-border rounded-xl p-5 shadow-sm flex flex-col items-center justify-center gap-3">
-                                    <QRCode value={shortUrl} size={140} className="w-full h-auto" />
-                                    <p className="text-[11px] font-medium text-muted-foreground text-center">Scan QR Code</p>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    <AnimatePresence>
-                        {shortUrl && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="flex justify-center mt-2"
-                            >
-                                <Button
-                                    onClick={handleReset}
-                                    variant="outline"
-                                    className="bg-background border-border shadow-sm text-foreground hover:bg-muted"
-                                >
-                                    Shorten another link
-                                </Button>
+                                </AnimatePresence>
                             </motion.div>
                         )}
                     </AnimatePresence>
