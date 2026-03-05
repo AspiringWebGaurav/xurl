@@ -14,8 +14,20 @@ import { env } from "@/lib/env";
  * - production  → https://xurl.eu.cc/{slug}
  */
 export function buildShortUrl(slug: string): string {
-    const domain = env.NEXT_PUBLIC_SHORT_DOMAIN;
-    const isDev = env.NEXT_PUBLIC_ENVIRONMENT === "development";
+    let domain = env.NEXT_PUBLIC_SHORT_DOMAIN;
+
+    // Failsafe: if the build statically injected "localhost:3000" but we're in a production environment
+    if (domain.includes("localhost")) {
+        if (typeof window !== "undefined" && window.location.hostname !== "localhost") {
+            // Client-side execution
+            domain = window.location.host;
+        } else if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
+            // Server-side execution in Vercel
+            domain = "xurl.eu.cc";
+        }
+    }
+
+    const isDev = domain.includes("localhost");
     const protocol = isDev ? "http" : "https";
     return `${protocol}://${domain}/${slug}`;
 }

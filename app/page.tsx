@@ -207,15 +207,15 @@ export default function HomePage() {
     const isDisabled = !user && guestUsed;
 
     return (
-        <div className="flex flex-col h-screen w-screen overflow-hidden bg-background">
+        <div className="flex flex-col min-h-screen bg-background">
             <TopNavbar />
 
-            <main className="flex-1 flex items-center justify-center px-6 md:px-8">
+            <main className="flex-1 flex flex-col w-full px-6 md:px-8 py-12 overflow-x-hidden">
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, ease: "easeOut" }}
-                    className="w-full max-w-xl flex flex-col gap-6"
+                    className="w-full max-w-xl flex flex-col gap-6 m-auto"
                 >
                     <div className="text-center">
                         <h1 className="text-3xl font-semibold tracking-tight text-foreground">
