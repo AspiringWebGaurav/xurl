@@ -277,99 +277,118 @@ export default function HomePage() {
 
                     <AnimatePresence mode="wait">
                         {!shortUrl ? (
-                            <motion.div
-                                key="form"
-                                initial={{ opacity: 0, y: 15 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -15, filter: "blur(4px)" }}
-                                transition={{ duration: 0.4, ease: "easeInOut" }}
-                                className="w-full bg-card border border-border rounded-xl p-5 sm:p-6 shadow-sm flex flex-col gap-4 min-h-[290px] justify-center relative overflow-hidden"
-                            >
-                                <div className="flex flex-col gap-1.5 border border-transparent focus-within:border-ring/20 rounded-lg transition-colors">
-                                    <div className="flex justify-between items-center px-1">
-                                        <label className="text-xs font-medium text-foreground">Destination URL</label>
-                                        <AnimatePresence>
-                                            {showPasteHint && isValidUrl && (
-                                                <motion.span
-                                                    initial={{ opacity: 0, y: -2 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0, scale: 0.95 }}
-                                                    className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5"
-                                                >
-                                                    Press <kbd className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded border border-border shadow-sm text-foreground">Enter</kbd> to shorten instantly
-                                                </motion.span>
-                                            )}
-                                        </AnimatePresence>
+                            isDisabled ? (
+                                <motion.div
+                                    key="limit"
+                                    initial={{ opacity: 0, y: 15 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -15, filter: "blur(4px)" }}
+                                    transition={{ duration: 0.4, ease: "easeInOut" }}
+                                    className="w-full bg-card border border-border rounded-xl p-5 sm:p-6 shadow-sm flex flex-col items-center justify-center gap-3 min-h-[290px] text-center"
+                                >
+                                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-2">
+                                        <Lock className="w-5 h-5 text-muted-foreground" />
                                     </div>
-                                    <Input
-                                        type="url"
-                                        placeholder="https://example.com/very-long-url"
-                                        value={url}
-                                        onChange={handleUrlChange}
-                                        onPaste={handleUrlPaste}
-                                        disabled={isDisabled || loading}
-                                        onKeyDown={(e) => e.key === "Enter" && isValidUrl && handleShorten()}
-                                        className="h-12 bg-background border-border shadow-sm rounded-lg text-sm focus-visible:ring-1 focus-visible:ring-foreground transition-all"
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-1.5 border border-transparent focus-within:border-ring/20 rounded-lg transition-colors">
-                                    <label className="text-xs font-medium text-foreground px-1 flex justify-between items-center">
-                                        <span>Custom Alias (Optional)</span>
-                                    </label>
-                                    <div className={`relative flex items-center w-full h-12 bg-background shadow-sm rounded-lg border focus-within:ring-1 transition-all ${aliasStatus === "taken" || aliasStatus === "invalid"
-                                        ? "border-red-200 focus-within:ring-red-500"
-                                        : "border-border focus-within:ring-foreground"
-                                        } ${(isDisabled || loading) ? "opacity-50 cursor-not-allowed bg-muted/50" : ""}`}>
-                                        <span className="pl-3 pr-1 text-muted-foreground text-sm select-none pointer-events-none whitespace-nowrap">
-                                            {shortDomain} /
-                                        </span>
-                                        <input
-                                            type="text"
-                                            placeholder="type-alias"
-                                            value={alias}
-                                            onChange={(e) => setAlias(e.target.value.replace(/[^a-zA-Z0-9-]/g, ""))}
+                                    <h3 className="text-lg font-semibold text-foreground tracking-tight">Guest Limit Reached</h3>
+                                    <p className="text-sm text-muted-foreground max-w-[280px]">
+                                        You have already claimed 1 free link as per our without login policy. Sign in to create more links.
+                                    </p>
+                                </motion.div>
+                            ) : (
+                                <motion.div
+                                    key="form"
+                                    initial={{ opacity: 0, y: 15 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -15, filter: "blur(4px)" }}
+                                    transition={{ duration: 0.4, ease: "easeInOut" }}
+                                    className="w-full bg-card border border-border rounded-xl p-5 sm:p-6 shadow-sm flex flex-col gap-4 min-h-[290px] justify-center relative overflow-hidden"
+                                >
+                                    <div className="flex flex-col gap-1.5 border border-transparent focus-within:border-ring/20 rounded-lg transition-colors">
+                                        <div className="flex justify-between items-center px-1">
+                                            <label className="text-xs font-medium text-foreground">Destination URL</label>
+                                            <AnimatePresence>
+                                                {showPasteHint && isValidUrl && (
+                                                    <motion.span
+                                                        initial={{ opacity: 0, y: -2 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        exit={{ opacity: 0, scale: 0.95 }}
+                                                        className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5"
+                                                    >
+                                                        Press <kbd className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded border border-border shadow-sm text-foreground">Enter</kbd> to shorten instantly
+                                                    </motion.span>
+                                                )}
+                                            </AnimatePresence>
+                                        </div>
+                                        <Input
+                                            type="url"
+                                            placeholder="https://example.com/very-long-url"
+                                            value={url}
+                                            onChange={handleUrlChange}
+                                            onPaste={handleUrlPaste}
                                             disabled={isDisabled || loading}
                                             onKeyDown={(e) => e.key === "Enter" && isValidUrl && handleShorten()}
-                                            className={`flex-1 min-w-0 bg-transparent text-sm text-foreground focus:outline-none placeholder:text-muted-foreground h-full disabled:cursor-not-allowed ${alias.trim() ? "pr-[130px] sm:pr-[220px]" : "pr-3"
-                                                }`}
+                                            className="h-12 bg-background border-border shadow-sm rounded-lg text-sm focus-visible:ring-1 focus-visible:ring-foreground transition-all"
                                         />
-                                        {alias.trim() && (
-                                            <div className={`absolute right-3 flex items-center select-none pointer-events-none pl-1 ${isDisabled || loading ? "bg-transparent" : "bg-background"}`}>
-                                                {aliasStatus === "checking" && <span className="text-xs text-muted-foreground flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> checking...</span>}
-                                                {aliasStatus === "available" && <span className="text-xs text-emerald-600 flex items-center gap-1.5"><Check className="h-3.5 w-3.5" /> available</span>}
-                                                {aliasStatus === "taken" && <span className="text-xs text-red-500 flex items-center gap-1.5">already claimed — try another</span>}
-                                                {aliasStatus === "invalid" && <span className="text-xs text-red-500 flex items-center gap-1.5">invalid format</span>}
-                                            </div>
-                                        )}
                                     </div>
-                                    <p className="text-[11px] text-muted-foreground px-1 mt-0.5">
-                                        You can create your own alias or leave it empty — the system will generate one.
-                                    </p>
-                                </div>
 
-                                <Button
-                                    onClick={handleShorten}
-                                    disabled={!isValidUrl || isDisabled || loading || aliasStatus === "taken" || aliasStatus === "invalid"}
-                                    className="w-full h-12 rounded-lg py-0 shadow-sm bg-foreground text-background hover:bg-foreground/90 font-medium mt-2 transition-all relative overflow-hidden"
-                                >
-                                    {loading ? (
-                                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                    ) : (
-                                        <Link2 className="h-4 w-4 mr-2" />
-                                    )}
-                                    {loading ? "Shortening..." : "Shorten"}
-                                    {error && !shortUrl && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: "100%" }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            className="absolute inset-0 flex items-center justify-center bg-red-500 text-white font-medium"
-                                        >
-                                            {error}
-                                        </motion.div>
-                                    )}
-                                </Button>
-                            </motion.div>
+                                    <div className="flex flex-col gap-1.5 border border-transparent focus-within:border-ring/20 rounded-lg transition-colors">
+                                        <label className="text-xs font-medium text-foreground px-1 flex justify-between items-center">
+                                            <span>Custom Alias (Optional)</span>
+                                        </label>
+                                        <div className={`relative flex items-center w-full h-12 bg-background shadow-sm rounded-lg border focus-within:ring-1 transition-all ${aliasStatus === "taken" || aliasStatus === "invalid"
+                                            ? "border-red-200 focus-within:ring-red-500"
+                                            : "border-border focus-within:ring-foreground"
+                                            } ${(isDisabled || loading) ? "opacity-50 cursor-not-allowed bg-muted/50" : ""}`}>
+                                            <span className="pl-3 pr-1 text-muted-foreground text-sm select-none pointer-events-none whitespace-nowrap">
+                                                {shortDomain} /
+                                            </span>
+                                            <input
+                                                type="text"
+                                                placeholder="type-alias"
+                                                value={alias}
+                                                onChange={(e) => setAlias(e.target.value.replace(/[^a-zA-Z0-9-]/g, ""))}
+                                                disabled={isDisabled || loading}
+                                                onKeyDown={(e) => e.key === "Enter" && isValidUrl && handleShorten()}
+                                                className={`flex-1 min-w-0 bg-transparent text-sm text-foreground focus:outline-none placeholder:text-muted-foreground h-full disabled:cursor-not-allowed ${alias.trim() ? "pr-[130px] sm:pr-[220px]" : "pr-3"
+                                                    }`}
+                                            />
+                                            {alias.trim() && (
+                                                <div className={`absolute right-3 flex items-center select-none pointer-events-none pl-1 ${isDisabled || loading ? "bg-transparent" : "bg-background"}`}>
+                                                    {aliasStatus === "checking" && <span className="text-xs text-muted-foreground flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> checking...</span>}
+                                                    {aliasStatus === "available" && <span className="text-xs text-emerald-600 flex items-center gap-1.5"><Check className="h-3.5 w-3.5" /> available</span>}
+                                                    {aliasStatus === "taken" && <span className="text-xs text-red-500 flex items-center gap-1.5">already claimed — try another</span>}
+                                                    {aliasStatus === "invalid" && <span className="text-xs text-red-500 flex items-center gap-1.5">invalid format</span>}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <p className="text-[11px] text-muted-foreground px-1 mt-0.5">
+                                            You can create your own alias or leave it empty — the system will generate one.
+                                        </p>
+                                    </div>
+
+                                    <Button
+                                        onClick={handleShorten}
+                                        disabled={!isValidUrl || isDisabled || loading || aliasStatus === "taken" || aliasStatus === "invalid"}
+                                        className="w-full h-12 rounded-lg py-0 shadow-sm bg-foreground text-background hover:bg-foreground/90 font-medium mt-2 transition-all relative overflow-hidden"
+                                    >
+                                        {loading ? (
+                                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                        ) : (
+                                            <Link2 className="h-4 w-4 mr-2" />
+                                        )}
+                                        {loading ? "Shortening..." : "Shorten"}
+                                        {error && !shortUrl && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: "100%" }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                className="absolute inset-0 flex items-center justify-center bg-red-500 text-white font-medium"
+                                            >
+                                                {error}
+                                            </motion.div>
+                                        )}
+                                    </Button>
+                                </motion.div>
+                            )
                         ) : (
                             <motion.div
                                 key="result"
@@ -463,18 +482,6 @@ export default function HomePage() {
                             </motion.div>
                         )}
                     </AnimatePresence>
-
-                    {/* Guest Lock Notice */}
-                    {isDisabled && !shortUrl && (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted p-3 rounded-lg"
-                        >
-                            <Lock className="h-4 w-4" />
-                            <span>Sign in to create more links.</span>
-                        </motion.div>
-                    )}
                 </motion.div>
             </main>
 
