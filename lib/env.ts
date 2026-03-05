@@ -31,13 +31,19 @@ const validateEnv = () => {
         });
         return env;
     } catch (error) {
-        console.error("❌ Invalid environment variables:", error);
-        // Return a dummy object so we don't break during build if vars are missing temporarily
+        // In production, crash loudly — never serve with localhost fallbacks
+        if (process.env.NODE_ENV === "production") {
+            console.error("❌ FATAL: Invalid environment variables in production:", error);
+            throw new Error("Missing or invalid environment variables. Cannot start in production.");
+        }
+
+        // In development only, return permissive defaults
+        console.warn("⚠️ Invalid environment variables (using dev defaults):", error);
         return {
             NEXT_PUBLIC_APP_URL: "http://localhost:3000",
             NEXT_PUBLIC_SHORT_DOMAIN: "localhost:3000",
             NEXT_PUBLIC_API_BASE: "http://localhost:3000/api",
-            NEXT_PUBLIC_ENVIRONMENT: "development",
+            NEXT_PUBLIC_ENVIRONMENT: "development" as const,
             NEXT_PUBLIC_FIREBASE_API_KEY: "dummy-api-key",
             NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "dummy-auth-domain",
             NEXT_PUBLIC_FIREBASE_PROJECT_ID: "dummy-project-id",

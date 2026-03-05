@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AppShell } from "@/components/layout/AppShell";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
-  title: "XURL - Modern SaaS URL Shortener",
-  description: "A premium, desktop-first link management platform.",
+  title: "XURL – URL Shortener",
+  description: "Shorten your URLs instantly.",
 };
 
 export default function RootLayout({
@@ -16,9 +15,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" style={{ colorScheme: "dark" }}>
+    <html lang="en">
       <body className={`${inter.className} bg-background text-foreground`}>
-        <AppShell>{children}</AppShell>
+        {children}
       </body>
     </html>
   );
