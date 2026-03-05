@@ -255,10 +255,26 @@ export default function HomePage() {
                     setGuestUsed(true);
                     const expiresAt = Date.now() + (data.expiresIn * 1000);
                     setGuestExpiresAt(expiresAt);
-                    localStorage.setItem("xurl_guest_link_history", JSON.stringify({
-                        createdAt: Date.now(),
-                        expiresAt: expiresAt
-                    }));
+
+                    if (data.slug && data.originalUrl) {
+                        localStorage.setItem("xurl_guest_link_history", JSON.stringify({
+                            slug: data.slug,
+                            originalUrl: data.originalUrl,
+                            createdAt: data.createdAt || Date.now(),
+                            expiresAt: expiresAt
+                        }));
+                        const generated = buildShortUrl(data.slug);
+                        setShortUrl(generated);
+                        // Trigger history update to show the sidebar button
+                        if (typeof window !== "undefined") {
+                            window.dispatchEvent(new Event("linkGenerated"));
+                        }
+                    } else {
+                        localStorage.setItem("xurl_guest_link_history", JSON.stringify({
+                            createdAt: Date.now(),
+                            expiresAt: expiresAt
+                        }));
+                    }
                 }
                 return;
             }
@@ -314,7 +330,7 @@ export default function HomePage() {
         }
     };
 
-    const isDisabled = !user && guestUsed;
+    const isDisabled = (!user && guestUsed) && !shortUrl;
 
     return (
         <div className="flex flex-col min-h-screen bg-background">

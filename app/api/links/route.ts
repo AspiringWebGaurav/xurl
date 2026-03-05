@@ -116,7 +116,10 @@ export async function POST(request: NextRequest) {
                         error: "guest_limit_reached",
                         code: "GUEST_LIMIT",
                         message: "Guest users can only create 1 link. Sign in to create more.",
-                        expiresIn: guestStatus.expiresIn
+                        expiresIn: guestStatus.expiresIn,
+                        slug: guestStatus.slug,
+                        originalUrl: guestStatus.originalUrl,
+                        createdAt: guestStatus.createdAt
                     },
                     { status: 403 }
                 );
@@ -149,12 +152,12 @@ export async function POST(request: NextRequest) {
         });
 
         // Record guest usage
-        if (isGuest) {
+        if (isGuest && result.slug) {
             const fingerprint = request.headers.get("x-device-fingerprint") || undefined;
-            await recordGuestUsage(ip, fingerprint, result.slug, expiresAt);
+            await recordGuestUsage(ip, fingerprint, result.slug, originalUrl, expiresAt);
         }
 
-        return NextResponse.json(result, { status: 201 });
+        return NextResponse.json({ success: true, link: result }, { status: 201 });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to create link.";
         logger.error("api_create_link", message);

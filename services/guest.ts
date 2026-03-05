@@ -7,6 +7,7 @@ export interface GuestUsageRecord {
     ipHash: string;
     fingerprintHash: string;
     slug: string;
+    originalUrl: string;
     expiresAt: number;
     createdAt: number;
 }
@@ -26,7 +27,7 @@ function hashData(data: string, salt: string = ""): string {
 export async function checkGuestLimit(
     ip: string,
     fingerprint: string | undefined
-): Promise<{ allowed: boolean; expiresIn?: number }> {
+): Promise<{ allowed: boolean; expiresIn?: number; slug?: string; originalUrl?: string; createdAt?: number }> {
     const ipHash = hashData(ip);
     const fingerprintHash = fingerprint ? hashData(fingerprint) : null;
     const now = Date.now();
@@ -45,7 +46,10 @@ export async function checkGuestLimit(
         const data = ipSnap.docs[0].data() as GuestUsageRecord;
         return {
             allowed: false,
-            expiresIn: Math.ceil((data.expiresAt - now) / 1000)
+            expiresIn: Math.ceil((data.expiresAt - now) / 1000),
+            slug: data.slug,
+            originalUrl: data.originalUrl,
+            createdAt: data.createdAt
         };
     }
 
@@ -62,7 +66,10 @@ export async function checkGuestLimit(
             const data = fpSnap.docs[0].data() as GuestUsageRecord;
             return {
                 allowed: false,
-                expiresIn: Math.ceil((data.expiresAt - now) / 1000)
+                expiresIn: Math.ceil((data.expiresAt - now) / 1000),
+                slug: data.slug,
+                originalUrl: data.originalUrl,
+                createdAt: data.createdAt
             };
         }
     }
@@ -77,6 +84,7 @@ export async function recordGuestUsage(
     ip: string,
     fingerprint: string | undefined,
     slug: string,
+    originalUrl: string,
     expiresAt: number
 ): Promise<void> {
     const ipHash = hashData(ip);
@@ -86,6 +94,7 @@ export async function recordGuestUsage(
         ipHash,
         fingerprintHash,
         slug,
+        originalUrl,
         expiresAt,
         createdAt: Date.now()
     };
