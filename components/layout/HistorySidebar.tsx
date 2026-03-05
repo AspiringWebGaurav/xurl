@@ -31,6 +31,16 @@ export function HistorySidebar({ isOpen, onClose, userId }: HistorySidebarProps)
         }
     }, [isOpen, userId]);
 
+    // Listen for new links generated in the background
+    useEffect(() => {
+        const handleLinkGenerated = () => {
+            if (userId) fetchLinks();
+        };
+
+        window.addEventListener("linkGenerated", handleLinkGenerated);
+        return () => window.removeEventListener("linkGenerated", handleLinkGenerated);
+    }, [userId]);
+
     const fetchLinks = async () => {
         setLoading(true);
         try {

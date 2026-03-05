@@ -181,6 +181,11 @@ export default function HomePage() {
             // Auto copy
             handleCopy(generated);
 
+            // Dispatch event to instantly sync the History Sidebar
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new Event("linkGenerated"));
+            }
+
             if (!user) {
                 localStorage.setItem("xurl_guest_used", "true");
                 setGuestUsed(true);
@@ -319,87 +324,68 @@ export default function HomePage() {
                         )}
                     </AnimatePresence>
 
-                    <AnimatePresence mode="popLayout">
+                    <AnimatePresence>
                         {shortUrl && (
                             <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.96 }}
-                                className="w-full bg-card border border-border rounded-xl p-5 shadow-sm space-y-4"
+                                className="w-full flex flex-col md:flex-row gap-4"
                             >
-                                <div className="flex items-center justify-between">
-                                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                                        Your short link
-                                    </p>
-                                    <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-                                        <Check className="h-3 w-3" /> Link copied
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <code className="flex-1 text-sm font-mono text-foreground bg-muted px-4 py-3 rounded-lg truncate border border-border select-all">
-                                        {shortUrl}
-                                    </code>
-                                    <Button
-                                        variant="outline"
-                                        size="icon"
-                                        onClick={() => handleCopy(shortUrl)}
-                                        className="shrink-0 h-11 w-11 border-border hover:bg-muted rounded-lg"
-                                        title="Copy link"
-                                    >
-                                        {copied ? (
-                                            <Check className="h-4 w-4 text-emerald-500" />
-                                        ) : (
-                                            <Copy className="h-4 w-4 text-muted-foreground" />
-                                        )}
-                                    </Button>
-                                </div>
-
-                                {preview && (
-                                    <motion.div
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border/50"
-                                    >
-                                        {preview.favicon ? (
-                                            <img src={preview.favicon} alt="" className="w-6 h-6 rounded-sm bg-background" />
-                                        ) : (
-                                            <div className="w-6 h-6 rounded-sm bg-border flex items-center justify-center">
-                                                <Link2 className="w-3 h-3 text-muted-foreground" />
-                                            </div>
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-foreground truncate">{preview.title || "Unknown Title"}</p>
-                                        </div>
-                                    </motion.div>
-                                )}
-
-                                <div className="pt-2 flex justify-between items-center border-t border-border">
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setShowQR(!showQR)}
-                                        className="text-xs text-muted-foreground hover:text-foreground -ml-2"
-                                    >
-                                        <QrCode className="h-4 w-4 mr-1.5" />
-                                        {showQR ? "Hide QR" : "Show QR"}
-                                    </Button>
-                                </div>
-
-                                <AnimatePresence>
-                                    {showQR && (
-                                        <motion.div
-                                            initial={{ opacity: 0, height: 0 }}
-                                            animate={{ opacity: 1, height: "auto" }}
-                                            exit={{ opacity: 0, height: 0 }}
-                                            className="overflow-hidden flex flex-col items-center gap-3 pt-2"
+                                {/* Left Section: Link Details */}
+                                <div className="flex-1 bg-card border border-border rounded-xl p-5 shadow-sm flex flex-col justify-center space-y-4 min-w-0">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                                            Your short link
+                                        </p>
+                                        <span className="text-[11px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-medium flex items-center gap-1.5 border border-emerald-100/50">
+                                            <Check className="h-3 w-3" /> Saved to History
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <code className="flex-1 text-sm font-mono text-foreground bg-muted px-4 py-3 rounded-lg truncate border border-border select-all">
+                                            {shortUrl}
+                                        </code>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={() => handleCopy(shortUrl)}
+                                            className="shrink-0 h-11 w-11 border-border hover:bg-muted rounded-lg"
+                                            title="Copy link"
                                         >
-                                            <div className="bg-white p-3 rounded-xl border border-border/50 shadow-sm">
-                                                <QRCode value={shortUrl} size={160} />
+                                            {copied ? (
+                                                <Check className="h-4 w-4 text-emerald-500" />
+                                            ) : (
+                                                <Copy className="h-4 w-4 text-muted-foreground" />
+                                            )}
+                                        </Button>
+                                    </div>
+
+                                    {preview && (
+                                        <motion.div
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border/50"
+                                        >
+                                            {preview.favicon ? (
+                                                <img src={preview.favicon} alt="" className="w-6 h-6 rounded-sm bg-background" />
+                                            ) : (
+                                                <div className="w-6 h-6 rounded-sm bg-border flex items-center justify-center shrink-0">
+                                                    <Link2 className="w-3 h-3 text-muted-foreground" />
+                                                </div>
+                                            )}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-foreground truncate">{preview.title || "Unknown Title"}</p>
                                             </div>
-                                            <p className="text-xs text-muted-foreground">Scan this QR code or download it.</p>
                                         </motion.div>
                                     )}
-                                </AnimatePresence>
+                                </div>
+
+                                {/* Right Section: QR Code */}
+                                <div className="shrink-0 w-full md:w-[180px] bg-white border border-border rounded-xl p-5 shadow-sm flex flex-col items-center justify-center gap-3">
+                                    <QRCode value={shortUrl} size={140} className="w-full h-auto" />
+                                    <p className="text-[11px] font-medium text-muted-foreground text-center">Scan QR Code</p>
+                                </div>
 
                             </motion.div>
                         )}
