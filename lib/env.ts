@@ -1,10 +1,12 @@
 import { z } from "zod";
 
+const isProd = process.env.NODE_ENV === "production";
+
 const envSchema = z.object({
-    NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
-    NEXT_PUBLIC_SHORT_DOMAIN: z.string().default("localhost:3000"),
-    NEXT_PUBLIC_API_BASE: z.string().url().default("http://localhost:3000/api"),
-    NEXT_PUBLIC_ENVIRONMENT: z.enum(["development", "production", "test"]).default("development"),
+    NEXT_PUBLIC_APP_URL: z.string().url().default(isProd ? "https://xurl.eu.cc" : "http://localhost:3000"),
+    NEXT_PUBLIC_SHORT_DOMAIN: z.string().default(isProd ? "xurl.eu.cc" : "localhost:3000"),
+    NEXT_PUBLIC_API_BASE: z.string().url().default(isProd ? "https://xurl.eu.cc/api" : "http://localhost:3000/api"),
+    NEXT_PUBLIC_ENVIRONMENT: z.enum(["development", "production", "test"]).default(isProd ? "production" : "development"),
 
     // Firebase configuration
     NEXT_PUBLIC_FIREBASE_API_KEY: z.string().min(1, "Firebase API Key is required"),
