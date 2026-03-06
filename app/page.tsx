@@ -24,8 +24,8 @@ export default function HomePage() {
         // Hydrate the actual domain at runtime to avoid Next.js static build inlining bugs
         if (typeof window !== "undefined") {
             const envDomain = env.NEXT_PUBLIC_SHORT_DOMAIN;
-            // If the built bundle accidentally baked in "localhost:3000" but we are in production
-            if (envDomain.includes("localhost") && window.location.hostname !== "localhost") {
+            // Unconditionally trust the browser's hostname in production (Vercel) over env vars
+            if (window.location.hostname !== "localhost") {
                 setShortDomain(window.location.host);
             } else {
                 setShortDomain(envDomain);

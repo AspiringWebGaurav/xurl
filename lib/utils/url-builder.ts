@@ -13,7 +13,18 @@ import { env } from "@/lib/env";
  * Always generates https://xurl.eu.cc/{slug} regardless of environment.
  */
 export function buildShortUrl(slug: string): string {
-    const domain = env.NEXT_PUBLIC_SHORT_DOMAIN || "xurl.eu.cc";
+    let domain = env.NEXT_PUBLIC_SHORT_DOMAIN || "xurl.eu.cc";
+
+    // Auto-correct if build baked in localhost or Vercel env is wrong but user is visiting production domain
+    if (typeof window !== "undefined") {
+        if (domain.includes("localhost") && window.location.hostname !== "localhost") {
+            domain = window.location.host;
+        } else if (!domain.includes("localhost") && window.location.hostname.includes("xurl")) {
+            // Force to current prod domain to be absolutely safe
+            domain = window.location.host;
+        }
+    }
+
     const protocol = domain.includes("localhost") ? "http" : "https";
     return `${protocol}://${domain}/${slug}`;
 }
