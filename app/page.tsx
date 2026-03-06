@@ -39,6 +39,7 @@ export default function HomePage() {
     const [error, setError] = useState("");
     const [copied, setCopied] = useState(false);
     const [guestUsed, setGuestUsed] = useState(false);
+    const [guestLoading, setGuestLoading] = useState(true);
     const [showQR, setShowQR] = useState(false);
     const [preview, setPreview] = useState<{ title?: string, favicon?: string } | null>(null);
     const resultRef = useRef<HTMLDivElement>(null);
@@ -75,9 +76,13 @@ export default function HomePage() {
 
     // ── Server-synced guest state (source of truth is Firestore, NOT localStorage) ──
     useEffect(() => {
-        if (user) return; // Only for guests
+        if (user) {
+            setGuestLoading(false);
+            return;
+        }
 
         let cancelled = false;
+        setGuestLoading(true);
 
         const syncGuestState = async () => {
             try {
@@ -107,6 +112,8 @@ export default function HomePage() {
                 }
             } catch (e) {
                 console.error("Failed to sync guest state", e);
+            } finally {
+                if (!cancelled) setGuestLoading(false);
             }
         };
 
@@ -379,7 +386,17 @@ export default function HomePage() {
                     </div>
 
                     <AnimatePresence mode="wait">
-                        {!shortUrl ? (
+                        {(!user && guestLoading) ? (
+                            <motion.div
+                                key="loading"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="w-full bg-card border border-border rounded-xl p-5 sm:p-6 shadow-sm flex flex-col items-center justify-center min-h-[290px]"
+                            >
+                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                            </motion.div>
+                        ) : !shortUrl ? (
                             isDisabled ? (
                                 <motion.div
                                     key="limit"
