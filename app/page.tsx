@@ -582,20 +582,20 @@ export default function HomePage() {
 
                                     <div className="mt-auto pt-4 flex justify-between items-center border-t border-border/60">
                                         <Button
-                                            variant="ghost"
+                                            variant="outline"
                                             size="sm"
                                             onClick={() => setShowQR(!showQR)}
-                                            className="text-xs text-muted-foreground hover:text-foreground -ml-2 h-8"
+                                            className={`text-[13px] h-9 px-4 rounded-lg font-medium transition-all duration-200 border-border shadow-sm ${showQR ? "bg-foreground text-background hover:bg-foreground/90 border-foreground" : "text-muted-foreground hover:text-foreground hover:border-foreground/30 hover:shadow-md"}`}
                                         >
-                                            <QrCode className="h-3.5 w-3.5 mr-1.5" />
-                                            {showQR ? "Hide QR Code" : "Show QR Code"}
+                                            <QrCode className="h-4 w-4 mr-2" />
+                                            {showQR ? "Hide QR" : "QR Code"}
                                         </Button>
                                         <Button
                                             onClick={handleReset}
-                                            variant="ghost"
                                             size="sm"
-                                            className="text-xs text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 h-8 font-medium"
+                                            className="text-[13px] h-9 px-4 rounded-lg font-medium bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm hover:shadow-md transition-all duration-200"
                                         >
+                                            <Link2 className="h-4 w-4 mr-2" />
                                             Create another
                                         </Button>
                                     </div>
