@@ -98,6 +98,10 @@ export default function HomePage() {
                     const expiresAt = Date.now() + (data.expiresIn * 1000);
                     setGuestExpiresAt(expiresAt);
 
+                    // Restore the success card so hard-refresh brings user back to their link
+                    setShortUrl(buildShortUrl(data.slug));
+                    if (data.originalUrl) setUrl(data.originalUrl);
+
                     // Write-through to localStorage (for HistorySidebar UX only — not trusted)
                     localStorage.setItem("xurl_guest_link_history", JSON.stringify({
                         slug: data.slug,
