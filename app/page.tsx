@@ -73,25 +73,47 @@ export default function HomePage() {
         }
     }, [shortUrl]);
 
+    // ── Server-synced guest state (source of truth is Firestore, NOT localStorage) ──
     useEffect(() => {
-        if (typeof window !== "undefined") {
-            const guestHistory = localStorage.getItem("xurl_guest_link_history");
-            if (guestHistory) {
-                try {
-                    const parsed = JSON.parse(guestHistory);
-                    if (parsed.expiresAt && parsed.expiresAt > Date.now()) {
-                        setGuestUsed(true);
-                        setGuestExpiresAt(parsed.expiresAt);
-                    } else {
-                        // Cleanup expired local storage entry
-                        localStorage.removeItem("xurl_guest_link_history");
-                    }
-                } catch (e) {
-                    console.error("Failed to parse guest history", e);
+        if (user) return; // Only for guests
+
+        let cancelled = false;
+
+        const syncGuestState = async () => {
+            try {
+                const fp = await getDeviceFingerprint();
+                const res = await fetch("/api/guest-status", {
+                    headers: { "x-device-fingerprint": fp },
+                });
+                if (cancelled) return;
+                const data = await res.json();
+
+                if (data.active && data.slug) {
+                    setGuestUsed(true);
+                    const expiresAt = Date.now() + (data.expiresIn * 1000);
+                    setGuestExpiresAt(expiresAt);
+
+                    // Write-through to localStorage (for HistorySidebar UX only — not trusted)
+                    localStorage.setItem("xurl_guest_link_history", JSON.stringify({
+                        slug: data.slug,
+                        originalUrl: data.originalUrl || "",
+                        createdAt: data.createdAt || Date.now(),
+                        expiresAt,
+                    }));
+                } else {
+                    setGuestUsed(false);
+                    setGuestExpiresAt(null);
+                    localStorage.removeItem("xurl_guest_link_history");
                 }
+            } catch (e) {
+                console.error("Failed to sync guest state", e);
             }
-        }
-    }, []);
+        };
+
+        syncGuestState();
+
+        return () => { cancelled = true; };
+    }, [user]);
 
     useEffect(() => {
         let interval: NodeJS.Timeout;
