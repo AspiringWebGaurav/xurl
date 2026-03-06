@@ -392,9 +392,16 @@ export default function HomePage() {
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                className="w-full bg-card border border-border rounded-xl p-5 sm:p-6 shadow-sm flex flex-col items-center justify-center min-h-[290px]"
+                                transition={{ duration: 0.2 }}
+                                className="w-full bg-card border border-border rounded-xl p-5 sm:p-6 shadow-sm flex flex-col items-center justify-center min-h-[290px] gap-4"
                             >
-                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                <div className="relative w-10 h-10">
+                                    <svg className="animate-[spin_0.8s_linear_infinite]" viewBox="0 0 40 40" fill="none">
+                                        <circle cx="20" cy="20" r="16" stroke="currentColor" strokeWidth="3" className="text-border" />
+                                        <circle cx="20" cy="20" r="16" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="80" strokeDashoffset="60" className="text-foreground/60" />
+                                    </svg>
+                                </div>
+                                <p className="text-xs text-muted-foreground font-medium tracking-tight">Checking your session...</p>
                             </motion.div>
                         ) : !shortUrl ? (
                             isDisabled ? (
