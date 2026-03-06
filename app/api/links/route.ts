@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
             await recordGuestUsage(ip, fingerprint, result.slug, originalUrl, expiresAt);
         }
 
-        return NextResponse.json({ success: true, link: result }, { status: 201 });
+        return NextResponse.json(result, { status: 201 });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to create link.";
         logger.error("api_create_link", message);
