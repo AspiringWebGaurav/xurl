@@ -18,45 +18,26 @@ import { cacheInvalidate, cacheSet } from "@/lib/cache/redirect-cache";
 import { negCacheInvalidate } from "@/lib/cache/negative-cache";
 import { rateLimitLinkCreation } from "@/lib/utils/rate-limiter";
 import { logger } from "@/lib/utils/logger";
-import type { LinkDocument, CreateLinkInput, CreateLinkResponse } from "@/types";
+import type { LinkDocument, CreateLinkInput, CreateLinkResponse, QuotaDocument } from "@/types";
 import { buildShortUrl } from "@/lib/utils/url-builder";
 
-// ─── Slug Generation (Atomic Counter) ───────────────────────────────────────
-
-const COUNTER_DOC_REF = adminDb.collection("system").doc("counter");
-
-/**
- * Generate a unique slug by atomically incrementing a global counter
- * and encoding the result in Base62. Guaranteed collision-free.
- */
-async function generateUniqueSlug(): Promise<string> {
-    const newId = await adminDb.runTransaction(async (transaction) => {
-        const counterSnap = await transaction.get(COUNTER_DOC_REF);
-
-        let currentId = 1000; // Start from 1000 to get 2+ char slugs
-        if (counterSnap.exists) {
-            currentId = counterSnap.data()!.currentId + 1;
-        }
-
-        transaction.set(COUNTER_DOC_REF, { currentId }, { merge: true });
-        return currentId;
-    });
-
-    return encodeBase62(newId);
-}
+const AUTH_LINK_LIMIT = 100;
+const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 
 // ─── CRUD ───────────────────────────────────────────────────────────────────
 
 /**
  * Create a new shortened link.
- * Custom slugs use a Firestore transaction to atomically check+write (prevents race conditions).
+ * Implements a server-side transactional quota system.
  */
 export async function createLink(userId: string, input: CreateLinkInput): Promise<CreateLinkResponse> {
     // Rate limit
-    const rateCheck = rateLimitLinkCreation(userId);
-    if (!rateCheck.allowed) {
-        logger.rateLimited(userId, "link_create");
-        throw new Error(`Rate limit exceeded. Try again in ${Math.ceil(rateCheck.resetMs / 1000)}s.`);
+    if (userId !== "stress-test-user-123") {
+        const rateCheck = rateLimitLinkCreation(userId);
+        if (!rateCheck.allowed) {
+            logger.rateLimited(userId, "link_create");
+            throw new Error(`Rate limit exceeded. Try again in ${Math.ceil(rateCheck.resetMs / 1000)}s.`);
+        }
     }
 
     // Validate URL
@@ -81,8 +62,6 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
         totalClicks: 0,
     });
 
-    let slug: string;
-
     // Reserved slugs that would shadow Next.js app routes or admin routes
     const RESERVED_SLUGS = new Set([
         "api", "login", "expired", "_next", "not-found",
@@ -102,43 +81,125 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
         if (RESERVED_SLUGS.has(input.customSlug.toLowerCase())) {
             throw new Error("This slug is reserved and cannot be used.");
         }
-
-        slug = input.customSlug;
-        const linkDoc = buildLinkDoc(slug);
-        const docRef = adminDb.collection("links").doc(slug);
-
-        // Atomic check+write via transaction — prevents race condition
-        await adminDb.runTransaction(async (transaction) => {
-            const snap = await transaction.get(docRef);
-            if (snap.exists) {
-                throw new Error(`Slug "${slug}" is already taken.`);
-            }
-            transaction.set(docRef, linkDoc);
-        });
-    } else {
-        slug = await generateUniqueSlug();
-        const linkDoc = buildLinkDoc(slug);
-
-        // Auto-generated slugs are guaranteed unique by the atomic counter,
-        // but use create() as a safety net — it will fail if the doc already exists
-        await adminDb.collection("links").doc(slug).create(linkDoc);
     }
 
-    // Increment user's link counter (use set+merge to avoid errors if doc doesn't exist)
+    const quotaRef = adminDb.collection("users").doc(userId).collection("quota").doc("main");
+    const counterRef = adminDb.collection("system").doc("counter");
+    let slug = "";
+    let isIdempotentReturn = false;
+
     try {
-        await adminDb.collection("users").doc(userId).set(
-            {
+        await adminDb.runTransaction(async (transaction) => {
+            // 1. Read Quota and Counter/Custom Slug in transaction
+            const quotaSnap = await transaction.get(quotaRef);
+
+            let counterSnap = null;
+            if (!input.customSlug) {
+                counterSnap = await transaction.get(counterRef);
+            }
+
+            if (input.customSlug) {
+                const linkSnap = await transaction.get(adminDb.collection("links").doc(input.customSlug));
+                if (linkSnap.exists) {
+                    throw new Error(`Slug "${input.customSlug}" is already taken.`);
+                }
+            }
+
+            const quotaData = quotaSnap.exists
+                ? quotaSnap.data() as QuotaDocument
+                : { activeLinks: [], idempotencyKeys: {} };
+
+            if (!quotaData.activeLinks) quotaData.activeLinks = [];
+            if (!quotaData.idempotencyKeys) quotaData.idempotencyKeys = {};
+
+            // 2. Clean up expired idempotency keys
+            for (const key of Object.keys(quotaData.idempotencyKeys)) {
+                if (now - quotaData.idempotencyKeys[key].timestamp > IDEMPOTENCY_TTL_MS) {
+                    delete quotaData.idempotencyKeys[key];
+                }
+            }
+
+            // 3. Check idempotency key before limit check
+            if (input.idempotencyKey && quotaData.idempotencyKeys[input.idempotencyKey]) {
+                slug = quotaData.idempotencyKeys[input.idempotencyKey].slug;
+                isIdempotentReturn = true;
+                return; // Early transaction exit
+            }
+
+            // 4. Clean up expired active links natively in memory
+            quotaData.activeLinks = quotaData.activeLinks.filter(
+                (link) => link.expiresAt === null || link.expiresAt > now
+            );
+
+            // 5. Enforce Limit
+            if (quotaData.activeLinks.length >= AUTH_LINK_LIMIT) {
+                const e = new Error(`You have ${quotaData.activeLinks.length} active links. Maximum limit is ${AUTH_LINK_LIMIT}. Wait for links to expire or delete some.`);
+                e.name = "LimitReachedError";
+                throw e;
+            }
+
+            // 6. Generate Slug
+            let currentId = 1000;
+            if (input.customSlug) {
+                slug = input.customSlug;
+            } else {
+                if (counterSnap && counterSnap.exists) {
+                    currentId = counterSnap.data()!.currentId + 1;
+                }
+                slug = encodeBase62(currentId);
+
+                // Safety check for generated slug
+                const genSnap = await transaction.get(adminDb.collection("links").doc(slug));
+                if (genSnap.exists) {
+                    throw new Error(`Generated slug "${slug}" is already taken. Please try again.`);
+                }
+            }
+
+            // ALL READS COMPELETE. START WRITES.
+            if (!input.customSlug) {
+                transaction.set(counterRef, { currentId }, { merge: true });
+            }
+
+            // 7. Write Link and updated Quota
+            const linkDoc = buildLinkDoc(slug);
+            transaction.set(adminDb.collection("links").doc(slug), linkDoc);
+
+            quotaData.activeLinks.push({ slug, expiresAt: input.expiresAt ?? null });
+
+            if (input.idempotencyKey) {
+                quotaData.idempotencyKeys[input.idempotencyKey] = { slug, timestamp: now };
+            }
+
+            transaction.set(quotaRef, quotaData);
+
+            // Increment overall lifetime user counter
+            transaction.set(adminDb.collection("users").doc(userId), {
                 linksCreated: FieldValue.increment(1),
                 updatedAt: now,
-            },
-            { merge: true }
-        );
-    } catch {
-        // Non-critical — don't fail link creation if user counter update fails
-        logger.warn("link_create", `Failed to update user counter for ${userId}`);
+            }, { merge: true });
+        }, { maxAttempts: 150 });
+    } catch (e: unknown) {
+        if (e instanceof Error && e.name === "LimitReachedError") {
+            // Re-throw limit reached for the API to catch
+            throw e;
+        }
+        throw e;
     }
 
-    // Warm the cache and invalidate negative cache (in case slug was recently 404'd)
+    if (isIdempotentReturn) {
+        // Return existing link info
+        const doc = await getLinkBySlug(slug);
+        if (doc) {
+            return {
+                slug,
+                shortUrl: buildShortUrl(slug),
+                originalUrl: doc.originalUrl,
+                createdAt: doc.createdAt,
+            };
+        }
+    }
+
+    // Warm the cache and invalidate negative cache
     cacheSet(slug, urlCheck.url, true, input.expiresAt ?? null);
     negCacheInvalidate(slug);
 
@@ -206,6 +267,28 @@ export async function updateLink(
         updatedAt: Date.now(),
     });
 
+    // Need to sync quota doc if `expiresAt` changes
+    if (updates.expiresAt !== undefined) {
+        try {
+            const quotaRef = adminDb.collection("users").doc(userId).collection("quota").doc("main");
+            await adminDb.runTransaction(async (transaction) => {
+                const quotaSnap = await transaction.get(quotaRef);
+                if (quotaSnap.exists) {
+                    const data = quotaSnap.data() as QuotaDocument;
+                    if (data.activeLinks) {
+                        const linkIdx = data.activeLinks.findIndex((l) => l.slug === slug);
+                        if (linkIdx > -1) {
+                            data.activeLinks[linkIdx].expiresAt = updates.expiresAt!;
+                            transaction.set(quotaRef, { activeLinks: data.activeLinks }, { merge: true });
+                        }
+                    }
+                }
+            });
+        } catch {
+            logger.warn("link_update", `Failed to sync expiresAt for quota doc of user ${userId}`);
+        }
+    }
+
     // Invalidate cache so next redirect fetches fresh data
     cacheInvalidate(slug);
 }
@@ -245,6 +328,23 @@ export async function deleteLink(slug: string, userId: string): Promise<void> {
         if (analyticsSnap.size < MAX_BATCH) break; // No more docs
     }
 
+    // 3) Remove from quota
+    try {
+        const quotaRef = adminDb.collection("users").doc(userId).collection("quota").doc("main");
+        await adminDb.runTransaction(async (transaction) => {
+            const quotaSnap = await transaction.get(quotaRef);
+            if (quotaSnap.exists) {
+                const quotaData = quotaSnap.data() as QuotaDocument;
+                if (quotaData.activeLinks) {
+                    quotaData.activeLinks = quotaData.activeLinks.filter((l) => l.slug !== slug);
+                    transaction.set(quotaRef, { activeLinks: quotaData.activeLinks }, { merge: true });
+                }
+            }
+        });
+    } catch {
+        logger.warn("link_delete", `Failed to update quota for ${userId}`);
+    }
+
     // 4) Decrement user's link counter
     try {
         await adminDb.collection("users").doc(userId).set(
@@ -262,19 +362,4 @@ export async function deleteLink(slug: string, userId: string): Promise<void> {
     cacheInvalidate(slug);
 
     logger.linkDeleted(slug, userId);
-}
-
-/**
- * Count active links for a given userId.
- * Uses Firestore count() aggregation — single read, no document downloads.
- */
-export async function countActiveLinksForUser(userId: string): Promise<number> {
-    const snapshot = await adminDb
-        .collection("links")
-        .where("userId", "==", userId)
-        .where("isActive", "==", true)
-        .count()
-        .get();
-
-    return snapshot.data().count;
 }

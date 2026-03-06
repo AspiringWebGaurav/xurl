@@ -71,5 +71,18 @@
             ]
         }
     ],
-    "fieldOverrides": []
+    "fieldOverrides": [
+        {
+            "collectionGroup": "links",
+            "fieldPath": "expiresAt",
+            "indexes": [],
+            "ttlConfig": {}
+        },
+        {
+            "collectionGroup": "guest_usage",
+            "fieldPath": "expiresAt",
+            "indexes": [],
+            "ttlConfig": {}
+        }
+    ]
 }

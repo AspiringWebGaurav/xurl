@@ -76,6 +76,7 @@ export interface CreateLinkInput {
     expiresAt?: number | null;
     password?: string | null;
     tags?: string[];
+    idempotencyKey?: string;
 }
 
 export interface CreateLinkResponse {
@@ -106,4 +107,17 @@ export interface CacheEntry {
     cachedAt: number;
     ttl: number;           // milliseconds
     hitCount: number;       // for adaptive TTL
+}
+
+/**
+ * Quota and Indempotency document for authenticated users.
+ * Collection: `users/{userId}/quota`
+ * Document ID: `main`
+ */
+export interface QuotaDocument {
+    // Stores only active link references to accurately determine quota limit 
+    // despite Firestore TTL deletion delays.
+    activeLinks: { slug: string; expiresAt: number | null }[];
+    // Idempotency keys used by this user to prevent duplicate creations
+    idempotencyKeys: Record<string, { slug: string; timestamp: number }>;
 }

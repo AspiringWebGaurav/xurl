@@ -11,15 +11,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase/admin";
-import { createLink, getUserLinks, deleteLink, countActiveLinksForUser } from "@/services/links";
+import { createLink, getUserLinks, deleteLink } from "@/services/links";
 import { checkGuestLimit, recordGuestUsage } from "@/services/guest";
 import { logger } from "@/lib/utils/logger";
 
 // Expiration policy (milliseconds)
 const GUEST_EXPIRATION_MS = 2 * 60 * 60 * 1000;    // 2 hours
 const AUTH_EXPIRATION_MS = 12 * 60 * 60 * 1000;     // 12 hours
-const GUEST_LINK_LIMIT = 1;
-const AUTH_LINK_LIMIT = 1000;
+const AUTH_LINK_LIMIT = 100;
 
 // ─── Per-IP Rate Limiter for POST requests ──────────────────────────────────
 // Separate from the per-user rate limiter in services/links.ts.
@@ -83,6 +82,7 @@ export async function POST(request: NextRequest) {
 
         const body = await request.json();
         const { originalUrl, customSlug, title } = body;
+        const idempotencyKey = request.headers.get("x-idempotency-key") || request.headers.get("idempotency-key") || undefined;
 
         // Determine authenticated user
         const verifiedUid = await verifyAuth(request);
@@ -125,17 +125,7 @@ export async function POST(request: NextRequest) {
                 );
             }
         } else {
-            // Check auth user maximum limit
-            const userDoc = await adminDb.collection("users").doc(userId).get();
-            if (userDoc.exists) {
-                const data = userDoc.data()!;
-                if (data.linksCreated >= AUTH_LINK_LIMIT) {
-                    return NextResponse.json(
-                        { code: "LIMIT_REACHED", message: "Maximum limit of 1000 links reached for this account." },
-                        { status: 403 }
-                    );
-                }
-            }
+            // Check auth user maximum limit is now handled natively in createLink mega-transaction
         }
 
         // ── Enforce expiration policy (server is source of truth) ──
@@ -149,6 +139,7 @@ export async function POST(request: NextRequest) {
             customSlug,
             title,
             expiresAt,
+            idempotencyKey,
         });
 
         // Record guest usage

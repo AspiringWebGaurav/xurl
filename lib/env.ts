@@ -3,9 +3,9 @@ import { z } from "zod";
 const isProd = process.env.NODE_ENV === "production";
 
 const envSchema = z.object({
-    NEXT_PUBLIC_APP_URL: z.string().url().default(isProd ? "https://xurl.eu.cc" : "http://localhost:3000"),
-    NEXT_PUBLIC_SHORT_DOMAIN: z.string().default(isProd ? "xurl.eu.cc" : "localhost:3000"),
-    NEXT_PUBLIC_API_BASE: z.string().url().default(isProd ? "https://xurl.eu.cc/api" : "http://localhost:3000/api"),
+    NEXT_PUBLIC_APP_URL: z.string().url().default("https://xurl.eu.cc"),
+    NEXT_PUBLIC_SHORT_DOMAIN: z.string().default("xurl.eu.cc"),
+    NEXT_PUBLIC_API_BASE: z.string().url().default("https://xurl.eu.cc/api"),
     NEXT_PUBLIC_ENVIRONMENT: z.enum(["development", "production", "test"]).default(isProd ? "production" : "development"),
 
     // Firebase configuration
@@ -42,9 +42,9 @@ const validateEnv = () => {
         // In development only, or as a failsafe, return permissive defaults but NEVER localhost in prod
         console.warn("⚠️ Invalid environment variables (using failsafe defaults):", error);
         return {
-            NEXT_PUBLIC_APP_URL: isProd ? "https://xurl.eu.cc" : "http://localhost:3000",
-            NEXT_PUBLIC_SHORT_DOMAIN: isProd ? "xurl.eu.cc" : "localhost:3000",
-            NEXT_PUBLIC_API_BASE: isProd ? "https://xurl.eu.cc/api" : "http://localhost:3000/api",
+            NEXT_PUBLIC_APP_URL: "https://xurl.eu.cc",
+            NEXT_PUBLIC_SHORT_DOMAIN: "xurl.eu.cc",
+            NEXT_PUBLIC_API_BASE: "https://xurl.eu.cc/api",
             NEXT_PUBLIC_ENVIRONMENT: (isProd ? "production" : "development") as "production" | "development" | "test",
             NEXT_PUBLIC_FIREBASE_API_KEY: "dummy-api-key",
             NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "dummy-auth-domain",

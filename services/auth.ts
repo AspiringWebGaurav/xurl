@@ -36,18 +36,19 @@ export const signInWithGoogle = async () => {
         const result = await signInWithPopup(auth, googleProvider);
         releasePopupLock();
         return { user: result.user, error: null };
-    } catch (error: any) {
+    } catch (error: unknown) {
         releasePopupLock();
+        const err = error as { code?: string };
         if (
-            error.code === "auth/popup-closed-by-user" ||
-            error.code === "auth/cancelled-popup-request" ||
-            error.code === "auth/popup-blocked"
+            err.code === "auth/popup-closed-by-user" ||
+            err.code === "auth/cancelled-popup-request" ||
+            err.code === "auth/popup-blocked"
         ) {
-            return { user: null, error: error.code };
+            return { user: null, error: err.code };
         }
 
         console.error("Error signing in with Google:", error);
-        return { user: null, error: error.code || "unknown-error" };
+        return { user: null, error: err.code || "unknown-error" };
     }
 };
 

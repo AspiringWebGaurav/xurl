@@ -25,7 +25,7 @@ export async function getDeviceFingerprint(): Promise<string> {
         const hashHex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
 
         return hashHex;
-    } catch (e) {
+    } catch {
         // Fallback if Crypto API is unavailable
         return "fallback-fingerprint";
     }

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "deploy:ttl": "firebase deploy --only firestore:indexes --non-interactive"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

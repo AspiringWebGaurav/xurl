@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ExternalLink, Copy, Calendar, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
 import { auth } from "@/lib/firebase/config";
+import { getDeviceFingerprint } from "@/lib/utils/fingerprint";
 
 interface HistorySidebarProps {
     isOpen: boolean;
@@ -56,27 +56,21 @@ export function HistorySidebar({ isOpen, onClose, userId }: HistorySidebarProps)
                 if (data.links) {
                     fetchedLinks = data.links;
                 }
-            }
+            } else {
+                // Fetch live server state for unauthenticated guest
+                const fp = await getDeviceFingerprint();
+                const res = await fetch("/api/guest-status", {
+                    headers: { "x-device-fingerprint": fp },
+                });
+                const data = await res.json();
 
-            // Check for guest link in localStorage
-            if (typeof window !== "undefined") {
-                const guestHistory = localStorage.getItem("xurl_guest_link_history");
-                if (guestHistory) {
-                    try {
-                        const parsed = JSON.parse(guestHistory);
-                        // Prevent duplicates if user recently signed in but hasn't cleared localstorage
-                        const slugExists = fetchedLinks.some(l => l.slug === parsed.slug);
-                        if (parsed.slug && !slugExists) {
-                            fetchedLinks.unshift({
-                                slug: parsed.slug,
-                                originalUrl: parsed.originalUrl || "Original URL hidden for guests",
-                                createdAt: parsed.createdAt,
-                                expiresAt: parsed.expiresAt
-                            });
-                        }
-                    } catch (e) {
-                        console.error("Failed to parse guest history", e);
-                    }
+                if (data.active && data.slug) {
+                    fetchedLinks.push({
+                        slug: data.slug,
+                        originalUrl: data.originalUrl || "Original URL hidden for guests",
+                        createdAt: data.createdAt || Date.now(),
+                        expiresAt: Date.now() + (data.expiresIn * 1000)
+                    });
                 }
             }
 
