@@ -6,6 +6,7 @@ import { auth } from "@/lib/firebase/config";
 import { signInWithGoogle } from "@/services/auth";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/ui/Logo";
 import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
@@ -49,9 +50,7 @@ export default function LoginPage() {
     return (
         <div className="flex h-screen w-screen items-center justify-center bg-background">
             <div className="w-full max-w-sm flex flex-col items-center gap-6 p-8 bg-card border border-border shadow-sm rounded-2xl">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-foreground text-background font-bold text-xl shadow-sm">
-                    X
-                </div>
+                <Logo size="lg" />
                 <div className="text-center">
                     <h1 className="text-2xl font-semibold tracking-tight text-foreground">Sign in to XURL</h1>
                     <p className="text-sm text-muted-foreground mt-2">Create custom links and track your history.</p>

@@ -6,12 +6,17 @@ import { auth } from "@/lib/firebase/config";
 import { signOut, signInWithGoogle, releasePopupLock } from "@/services/auth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/ui/Logo";
 import { History, LogOut, Loader2, Plus } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { HistorySidebar } from "./HistorySidebar";
 
-export function TopNavbar() {
+interface TopNavbarProps {
+    isCreateDisabled?: boolean;
+}
+
+export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -166,24 +171,20 @@ export function TopNavbar() {
     return (
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-6">
             <div className="flex items-center gap-6">
-                <Link href="/" className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-background font-bold text-sm">
-                        X
-                    </div>
-                    <span className="font-semibold tracking-tight text-[15px] text-foreground hidden sm:inline-block">XURL</span>
-                </Link>
+                <Logo size="md" />
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
                 <div className="hidden sm:flex items-center">
                     <button
                         onClick={() => window.dispatchEvent(new Event("focusUrlInput"))}
-                        className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+                        disabled={isCreateDisabled}
+                        className={`text-[13px] font-medium transition-colors flex items-center gap-1.5 ${isCreateDisabled ? "text-slate-400/50 cursor-not-allowed" : "text-slate-600 hover:text-slate-900"}`}
                     >
                         Create link
                     </button>
                 </div>
-                <div className="hidden sm:block w-px h-5 bg-border mx-1" />
+                <div className="hidden sm:block w-px h-4 bg-slate-200 mx-1" />
                 {!loading && (
                     user ? (
                         <>
@@ -191,13 +192,26 @@ export function TopNavbar() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => { setIsHistoryOpen(true); setHasNewHistory(false); }}
-                                className={`relative text-sm font-medium h-9 px-3 transition-colors ${linkCount !== null && linkCount > 0 ? "text-emerald-700 bg-emerald-50/50 hover:bg-emerald-100 hover:text-emerald-800" : "text-muted-foreground hover:text-foreground"
-                                    } ${pulseBadge ? "scale-105" : "scale-100"} transition-transform duration-150`}
+                                className={`relative text-[13px] font-medium h-8 px-2.5 rounded-md border transition-all ${linkCount !== null && linkCount > 0 ? "border-emerald-200/80 shadow-sm text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/80 hover:border-emerald-300" : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/50 hover:border-slate-200"
+                                    } transition-transform duration-150`}
                             >
-                                <History className="h-4 w-4 mr-2" />
-                                {linkCount !== null && linkCount > 0 ? `History [${linkCount}]` : "History"}
+                                <History className="h-3.5 w-3.5 mr-1.5" />
+                                History
+                                <AnimatePresence>
+                                    {linkCount !== null && linkCount > 0 && (
+                                        <motion.div
+                                            key={linkCount}
+                                            initial={{ scale: 0.5, opacity: 0 }}
+                                            animate={{ scale: pulseBadge ? 1.2 : 1, opacity: 1 }}
+                                            transition={{ duration: 0.2, type: "spring", stiffness: 300, damping: 15 }}
+                                            className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 ring-2 ring-background shadow-sm"
+                                        >
+                                            {linkCount > 99 ? '99+' : linkCount}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                                 {hasNewHistory && (
-                                    <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-background animate-pulse" />
+                                    <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
                                 )}
                             </Button>
                             <Button
@@ -206,9 +220,9 @@ export function TopNavbar() {
                                 onClick={async () => {
                                     await signOut();
                                 }}
-                                className="h-9 px-3 text-xs bg-transparent text-red-500 hover:text-red-600 hover:bg-red-50/50"
+                                className="h-8 px-2.5 rounded-md text-[13px] font-medium bg-transparent text-red-500 hover:text-red-600 hover:bg-red-50/60 transition-colors"
                             >
-                                <LogOut className="h-4 w-4 mr-2" />
+                                <LogOut className="h-3.5 w-3.5 mr-1.5" />
                                 Sign out
                             </Button>
                         </>
@@ -219,13 +233,26 @@ export function TopNavbar() {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => { setIsHistoryOpen(true); setHasNewHistory(false); }}
-                                    className={`relative text-sm font-medium h-9 px-3 transition-colors ${linkCount !== null && linkCount > 0 ? "text-emerald-700 bg-emerald-50/50 hover:bg-emerald-100 hover:text-emerald-800" : "text-muted-foreground hover:text-foreground"
-                                        } ${pulseBadge ? "scale-105" : "scale-100"} transition-transform duration-150`}
+                                    className={`relative text-[13px] font-medium h-8 px-2.5 rounded-md border transition-all ${linkCount !== null && linkCount > 0 ? "border-emerald-200/80 shadow-sm text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/80 hover:border-emerald-300" : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/50 hover:border-slate-200"
+                                        } transition-transform duration-150`}
                                 >
-                                    <History className="h-4 w-4 mr-2" />
-                                    {linkCount !== null && linkCount > 0 ? `History [${linkCount}]` : "History"}
+                                    <History className="h-3.5 w-3.5 mr-1.5" />
+                                    History
+                                    <AnimatePresence>
+                                        {linkCount !== null && linkCount > 0 && (
+                                            <motion.div
+                                                key={linkCount}
+                                                initial={{ scale: 0.5, opacity: 0 }}
+                                                animate={{ scale: pulseBadge ? 1.2 : 1, opacity: 1 }}
+                                                transition={{ duration: 0.2, type: "spring", stiffness: 300, damping: 15 }}
+                                                className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 ring-2 ring-background shadow-sm"
+                                            >
+                                                {linkCount > 99 ? '99+' : linkCount}
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                     {hasNewHistory && (
-                                        <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-background animate-pulse" />
+                                        <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
                                     )}
                                 </Button>
                             )}
@@ -233,7 +260,7 @@ export function TopNavbar() {
                                 size="sm"
                                 onClick={handleGoogleLogin}
                                 disabled={isLoggingIn}
-                                className="h-9 px-4 text-xs font-medium rounded-lg shadow-sm bg-foreground text-background hover:bg-foreground/90 disabled:opacity-80"
+                                className="h-8 px-3.5 rounded-md text-[13px] font-medium shadow-sm bg-slate-900 text-slate-50 hover:bg-slate-800 disabled:opacity-80 transition-colors"
                             >
                                 {isLoggingIn ? "Connecting..." : "Login"}
                             </Button>

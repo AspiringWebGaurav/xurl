@@ -153,6 +153,8 @@ export default function HomePage() {
                     setGuestExpiresAt(null);
                     setShortUrl("");
                     setViewingPastLink(false);
+                    setUrl("");
+                    setIsValidUrl(false);
                 }
             } catch (e) {
                 console.error("Failed to sync guest state", e);
@@ -178,6 +180,8 @@ export default function HomePage() {
                     setShortUrl("");
                     setViewingPastLink(false);
                     setCountdown("");
+                    setUrl("");
+                    setIsValidUrl(false);
                     return;
                 }
 
@@ -401,7 +405,7 @@ export default function HomePage() {
 
     return (
         <div className="flex flex-col min-h-screen bg-background">
-            <TopNavbar />
+            <TopNavbar isCreateDisabled={isDisabled} />
 
             <main className="flex-1 flex flex-col w-full px-6 md:px-8 py-12 overflow-x-hidden">
                 <motion.div
@@ -733,8 +737,17 @@ export default function HomePage() {
                 )}
             </AnimatePresence>
 
-            <footer className="shrink-0 text-center py-4 text-xs text-muted-foreground border-t border-border bg-background">
-                XURL &middot; Minimal URL Shortener
+            <footer className="shrink-0 flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground border-t border-border bg-background">
+                <div className="flex items-center gap-2 opacity-80 hover:opacity-100 transition-opacity">
+                    <div className="flex h-[20px] w-[20px] items-center justify-center rounded-[5px] bg-foreground text-background font-semibold text-[10px] tracking-tight transition-colors">
+                        X
+                    </div>
+                    <div className="flex items-center text-[12px] font-semibold tracking-[0.16em] text-foreground uppercase">
+                        URL
+                    </div>
+                </div>
+                <span className="mx-2 opacity-50">&middot;</span>
+                Minimal URL Shortener
             </footer>
         </div>
     );
