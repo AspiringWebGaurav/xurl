@@ -15,7 +15,9 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
         pathname === '/favicon.ico' ||
         pathname === '/' ||
         pathname === '/login' ||
-        pathname === '/expired'
+        pathname === '/expired' ||
+        pathname === '/r' ||
+        request.nextUrl.searchParams.has('dest')
     ) {
         return NextResponse.next();
     }
@@ -45,8 +47,12 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
                 }).catch(err => console.error("Edge Analytics Dispatch Error", err))
             );
 
-            const response = NextResponse.redirect(redirectUrl, 302);
-            response.headers.set("Cache-Control", "public, max-age=300, s-maxage=300");
+            const redirectPageUrl = request.nextUrl.clone();
+            redirectPageUrl.pathname = '/r';
+            redirectPageUrl.searchParams.set("dest", redirectUrl);
+
+            const response = NextResponse.redirect(redirectPageUrl, 302);
+            response.headers.set("Cache-Control", "public, max-age=0, s-maxage=300, must-revalidate");
             response.headers.set("X-Edge-Cache", "HIT");
             return response;
         } else {
@@ -87,8 +93,12 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
                         }).catch(err => console.error("Edge Analytics Dispatch Error", err))
                     );
 
-                    const response = NextResponse.redirect(redirectUrl, 302);
-                    response.headers.set("Cache-Control", "public, max-age=300, s-maxage=300");
+                    const redirectPageUrl = request.nextUrl.clone();
+                    redirectPageUrl.pathname = '/r';
+                    redirectPageUrl.searchParams.set("dest", redirectUrl);
+
+                    const response = NextResponse.redirect(redirectPageUrl, 302);
+                    response.headers.set("Cache-Control", "public, max-age=0, s-maxage=300, must-revalidate");
                     response.headers.set("X-Edge-Cache", "MISS");
                     return response;
                 }
@@ -104,6 +114,6 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
 
 export const config = {
     matcher: [
-        '/((?!_next/static|_next/image|favicon.ico|api|login|expired).*)',
+        '/((?!_next/static|_next/image|favicon.ico|api|login|expired|r).*)',
     ],
 };

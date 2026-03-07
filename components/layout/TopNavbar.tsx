@@ -6,7 +6,7 @@ import { auth } from "@/lib/firebase/config";
 import { signOut, signInWithGoogle, releasePopupLock } from "@/services/auth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { History, LogOut, Loader2 } from "lucide-react";
+import { History, LogOut, Loader2, Plus } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { HistorySidebar } from "./HistorySidebar";
@@ -19,8 +19,9 @@ export function TopNavbar() {
     const [showOverlay, setShowOverlay] = useState(false);
     const [overlayMessage, setOverlayMessage] = useState<React.ReactNode>("Connecting to Google...");
     const [hasNewHistory, setHasNewHistory] = useState(false);
-
     const [hasGuestHistory, setHasGuestHistory] = useState(false);
+    const [linkCount, setLinkCount] = useState<number | null>(null);
+    const [pulseBadge, setPulseBadge] = useState(false);
 
     useEffect(() => {
         const checkGuestHistory = () => {
@@ -30,14 +31,18 @@ export function TopNavbar() {
                     const parsed = JSON.parse(h);
                     if (parsed.expiresAt > Date.now()) {
                         setHasGuestHistory(true);
+                        setLinkCount(prev => prev === null ? 1 : prev);
                     } else {
                         setHasGuestHistory(false);
+                        setLinkCount(prev => prev === null ? 0 : prev);
                     }
                 } catch {
                     setHasGuestHistory(false);
+                    setLinkCount(prev => prev === null ? 0 : prev);
                 }
             } else {
                 setHasGuestHistory(false);
+                setLinkCount(prev => prev === null ? 0 : prev);
             }
         };
 
@@ -46,6 +51,9 @@ export function TopNavbar() {
         const handleLinkGenerated = () => {
             setHasNewHistory(true);
             checkGuestHistory(); // Recheck when a link is generated
+            setLinkCount(prev => prev !== null ? prev + 1 : 1);
+            setPulseBadge(true);
+            setTimeout(() => setPulseBadge(false), 200);
         };
 
         window.addEventListener("linkGenerated", handleLinkGenerated);
@@ -135,19 +143,47 @@ export function TopNavbar() {
         const unsubscribe = onAuthStateChanged(auth, (u) => {
             setUser(u);
             setLoading(false);
+            if (u) {
+                u.getIdToken().then(token => {
+                    fetch("/api/links?pageSize=1", { headers: { "Authorization": `Bearer ${token}` } })
+                        .then(r => r.json())
+                        .then(d => {
+                            if (d.linksCreated !== undefined) {
+                                setLinkCount(d.linksCreated);
+                            }
+                        })
+                        .catch(console.error);
+                });
+            } else {
+                // If not logged in, we rely on the localStorage check to set linkCount for guest
+                const h = localStorage.getItem("xurl_guest_link_history");
+                setLinkCount(h ? 1 : 0);
+            }
         });
         return () => unsubscribe();
     }, []);
 
     return (
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-6">
-            <Link href="/" className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-background font-bold text-sm">
-                    X
+            <div className="flex items-center gap-6">
+                <Link href="/" className="flex items-center gap-2">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-background font-bold text-sm">
+                        X
+                    </div>
+                    <span className="font-semibold tracking-tight text-[15px] text-foreground hidden sm:inline-block">XURL</span>
+                </Link>
+            </div>
+
+            <div className="flex items-center gap-2 sm:gap-3">
+                <div className="hidden sm:flex items-center">
+                    <button
+                        onClick={() => window.dispatchEvent(new Event("focusUrlInput"))}
+                        className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+                    >
+                        Create link
+                    </button>
                 </div>
-                <span className="font-semibold tracking-tight text-[15px] text-foreground">XURL</span>
-            </Link>
-            <div className="flex items-center gap-3">
+                <div className="hidden sm:block w-px h-5 bg-border mx-1" />
                 {!loading && (
                     user ? (
                         <>
@@ -155,21 +191,22 @@ export function TopNavbar() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => { setIsHistoryOpen(true); setHasNewHistory(false); }}
-                                className="relative text-sm font-medium h-9 px-3 text-muted-foreground hover:text-foreground"
+                                className={`relative text-sm font-medium h-9 px-3 transition-colors ${linkCount !== null && linkCount > 0 ? "text-emerald-700 bg-emerald-50/50 hover:bg-emerald-100 hover:text-emerald-800" : "text-muted-foreground hover:text-foreground"
+                                    } ${pulseBadge ? "scale-105" : "scale-100"} transition-transform duration-150`}
                             >
                                 <History className="h-4 w-4 mr-2" />
-                                History
+                                {linkCount !== null && linkCount > 0 ? `History [${linkCount}]` : "History"}
                                 {hasNewHistory && (
-                                    <span className="absolute top-2 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-background animate-pulse" />
+                                    <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-background animate-pulse" />
                                 )}
                             </Button>
                             <Button
-                                variant="outline"
+                                variant="ghost"
                                 size="sm"
                                 onClick={async () => {
                                     await signOut();
                                 }}
-                                className="h-9 px-3 text-xs bg-background"
+                                className="h-9 px-3 text-xs bg-transparent text-red-500 hover:text-red-600 hover:bg-red-50/50"
                             >
                                 <LogOut className="h-4 w-4 mr-2" />
                                 Sign out
@@ -182,12 +219,13 @@ export function TopNavbar() {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => { setIsHistoryOpen(true); setHasNewHistory(false); }}
-                                    className="relative text-sm font-medium h-9 px-3 text-muted-foreground hover:text-foreground"
+                                    className={`relative text-sm font-medium h-9 px-3 transition-colors ${linkCount !== null && linkCount > 0 ? "text-emerald-700 bg-emerald-50/50 hover:bg-emerald-100 hover:text-emerald-800" : "text-muted-foreground hover:text-foreground"
+                                        } ${pulseBadge ? "scale-105" : "scale-100"} transition-transform duration-150`}
                                 >
                                     <History className="h-4 w-4 mr-2" />
-                                    History
+                                    {linkCount !== null && linkCount > 0 ? `History [${linkCount}]` : "History"}
                                     {hasNewHistory && (
-                                        <span className="absolute top-2 right-1.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-background animate-pulse" />
+                                        <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-background animate-pulse" />
                                     )}
                                 </Button>
                             )}
@@ -226,4 +264,3 @@ export function TopNavbar() {
         </header>
     );
 }
-

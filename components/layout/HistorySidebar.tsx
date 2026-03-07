@@ -6,6 +6,7 @@ import { X, ExternalLink, Copy, Calendar, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/firebase/config";
 import { getDeviceFingerprint } from "@/lib/utils/fingerprint";
+import { buildShortUrl } from "@/lib/utils/url-builder";
 
 interface HistorySidebarProps {
     isOpen: boolean;
@@ -126,22 +127,32 @@ export function HistorySidebar({ isOpen, onClose, userId }: HistorySidebarProps)
                             ) : (
                                 <div className="flex flex-col gap-4">
                                     {links.map((link) => {
-                                        const shortUrl = `${window.location.host}/${link.slug}`;
+                                        const fullShortUrl = buildShortUrl(link.slug);
+                                        const shortUrlDisplay = fullShortUrl.replace(/^https?:\/\//, '');
                                         const isExpired = link.expiresAt && link.expiresAt < Date.now();
 
                                         return (
-                                            <div key={link.slug} className={`p-4 rounded-xl border ${isExpired ? 'border-red-100 bg-red-50/50 opacity-75' : 'border-border bg-background'}`}>
+                                            <div key={link.slug} className={`group relative p-4 rounded-xl border transition-all duration-200 hover:shadow-md ${isExpired ? 'border-red-100 bg-red-50/50 opacity-75' : 'border-border bg-background hover:bg-muted/30 hover:border-foreground/20'}`}>
                                                 <div className="flex items-center justify-between mb-2">
-                                                    <a href={`/${link.slug}`} target="_blank" rel="noreferrer" className="text-sm font-semibold text-foreground hover:underline truncate mr-2">
-                                                        {shortUrl}
+                                                    <a href={`/${link.slug}`} target="_blank" rel="noreferrer" className="text-sm font-semibold text-foreground truncate mr-2 transition-colors group-hover:text-emerald-600">
+                                                        {shortUrlDisplay}
                                                     </a>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => handleCopy(link.slug)}>
-                                                        {copied === link.slug ? <span className="text-[10px] text-emerald-500 font-bold">✓</span> : <Copy className="h-3.5 w-3.5 text-muted-foreground" />}
-                                                    </Button>
+                                                    <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Button variant="outline" size="icon" className="h-7 w-7 bg-background shadow-sm hover:bg-muted" asChild>
+                                                            <a href={`/${link.slug}`} target="_blank" rel="noreferrer" title="Open link">
+                                                                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                                                            </a>
+                                                        </Button>
+                                                        <Button variant="outline" size="icon" className="h-7 w-7 bg-background shadow-sm hover:bg-muted" onClick={() => handleCopy(link.slug)}>
+                                                            {copied === link.slug ? <span className="text-[10px] text-emerald-500 font-bold">✓</span> : <Copy className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />}
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                                 <div className="flex items-center text-xs text-muted-foreground gap-1.5 mb-2 truncate">
                                                     <ExternalLink className="h-3 w-3 shrink-0" />
-                                                    <span className="truncate">{link.originalUrl}</span>
+                                                    <a href={`/r?dest=${encodeURIComponent(link.originalUrl)}`} target="_blank" rel="noreferrer" className="truncate text-foreground/70 transition-colors hover:text-foreground">
+                                                        {link.originalUrl}
+                                                    </a>
                                                 </div>
                                                 <div className="flex items-center justify-between text-[11px] text-muted-foreground/80 mt-3 border-t border-border/50 pt-2">
                                                     <span className="flex items-center gap-1">

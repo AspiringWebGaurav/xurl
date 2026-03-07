@@ -45,6 +45,8 @@ export default function HomePage() {
     const [preview, setPreview] = useState<{ title?: string, favicon?: string } | null>(null);
     const [faviconError, setFaviconError] = useState(false);
     const resultRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [highlightInput, setHighlightInput] = useState(false);
     const [quota, setQuota] = useState<{ created: number, limit: number } | null>(null);
     const [guestExpiresAt, setGuestExpiresAt] = useState<number | null>(null);
     const [countdown, setCountdown] = useState<string>("");
@@ -91,6 +93,33 @@ export default function HomePage() {
             }, 150);
         }
     }, [shortUrl]);
+
+    // ── Keyboard shortcut & Programmatic Focus ──
+    useEffect(() => {
+        const handleFocus = () => {
+            if (inputRef.current) {
+                inputRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+                inputRef.current.focus();
+                setHighlightInput(true);
+                setTimeout(() => setHighlightInput(false), 250);
+            }
+        };
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Only trigger if not typing in another input
+            if (e.key === "/" && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+                e.preventDefault();
+                handleFocus();
+            }
+        };
+
+        window.addEventListener("focusUrlInput", handleFocus as EventListener);
+        window.addEventListener("keydown", handleKeyDown);
+        return () => {
+            window.removeEventListener("focusUrlInput", handleFocus as EventListener);
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, []);
 
     // ── Server-synced guest state (source of truth is Firestore, NOT localStorage) ──
     useEffect(() => {
@@ -611,6 +640,7 @@ export default function HomePage() {
                                         </AnimatePresence>
                                     </div>
                                     <Input
+                                        ref={inputRef}
                                         type="url"
                                         placeholder="https://example.com/very-long-url"
                                         value={url}
@@ -618,7 +648,8 @@ export default function HomePage() {
                                         onPaste={handleUrlPaste}
                                         disabled={isDisabled || loading}
                                         onKeyDown={(e) => e.key === "Enter" && isValidUrl && handleShorten()}
-                                        className="h-12 bg-background border-border shadow-sm rounded-lg text-sm focus-visible:ring-1 focus-visible:ring-foreground transition-all"
+                                        className={`h-12 bg-background border-border shadow-sm rounded-lg text-sm focus-visible:ring-1 focus-visible:ring-foreground transition-all duration-200 ${highlightInput ? "ring-2 ring-emerald-500 border-emerald-500 bg-emerald-50/10" : ""
+                                            }`}
                                     />
                                 </div>
 
