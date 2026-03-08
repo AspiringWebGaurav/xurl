@@ -118,8 +118,27 @@ export default function PricingPage() {
                 }
             })
             .catch(console.error);
+
+        // Hide scrollbar globally for the pricing page
+        document.documentElement.style.setProperty('scrollbar-width', 'none');
+        document.body.style.setProperty('scrollbar-width', 'none');
+        const style = document.createElement('style');
+        style.id = 'hide-scrollbar-style';
+        style.innerHTML = `
+            ::-webkit-scrollbar {
+                display: none !important;
+            }
+        `;
+        document.head.appendChild(style);
+
         return () => {
             mounted = false;
+            document.documentElement.style.removeProperty('scrollbar-width');
+            document.body.style.removeProperty('scrollbar-width');
+            const styleElement = document.getElementById('hide-scrollbar-style');
+            if (styleElement) {
+                styleElement.remove();
+            }
         };
     }, []);
 
