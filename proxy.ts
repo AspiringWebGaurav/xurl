@@ -15,6 +15,7 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
         pathname === '/favicon.ico' ||
         pathname === '/' ||
         pathname === '/login' ||
+        pathname === '/pricing' ||
         pathname === '/expired' ||
         pathname === '/r' ||
         request.nextUrl.searchParams.has('dest')
@@ -114,6 +115,6 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
 
 export const config = {
     matcher: [
-        '/((?!_next/static|_next/image|favicon.ico|api|login|expired|r).*)',
+        '/((?!_next/static|_next/image|favicon.ico|api|login|pricing|expired|r).*)',
     ],
 };

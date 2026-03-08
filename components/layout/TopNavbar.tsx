@@ -175,7 +175,13 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-                <div className="hidden sm:flex items-center">
+                <div className="hidden sm:flex items-center gap-3">
+                    <Link
+                        href="/pricing"
+                        className="text-[13px] font-medium transition-colors flex items-center gap-1.5 h-8 px-3 rounded-md border border-primary/20 bg-primary/5 text-primary shadow-[0_0_15px_rgba(0,0,0,0.1)] hover:bg-primary/10 hover:border-primary/30"
+                    >
+                        Pricing
+                    </Link>
                     <button
                         onClick={() => window.dispatchEvent(new Event("focusUrlInput"))}
                         disabled={isCreateDisabled}
