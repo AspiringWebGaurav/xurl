@@ -79,3 +79,6 @@ ui-debug.log
 tmp/
 temp/
 *~
+
+# Project Specific
+scripts/

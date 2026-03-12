@@ -24,7 +24,10 @@ interface LinkItem {
 export function HistorySidebar({ isOpen, onClose, userId }: HistorySidebarProps) {
     const [links, setLinks] = useState<LinkItem[]>([]);
     const [loading, setLoading] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [hasMore, setHasMore] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
+    const [userPlan, setUserPlan] = useState<string | null>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -34,52 +37,74 @@ export function HistorySidebar({ isOpen, onClose, userId }: HistorySidebarProps)
 
     // Listen for new links generated in the background
     useEffect(() => {
-        const handleLinkGenerated = () => {
-            fetchLinks();
-        };
+        const handleLinkGenerated = () => fetchLinks(false);
 
         window.addEventListener("linkGenerated", handleLinkGenerated);
         return () => window.removeEventListener("linkGenerated", handleLinkGenerated);
     }, [userId]);
 
-    const fetchLinks = async () => {
-        setLoading(true);
+    const fetchLinks = async (isLoadMore = false) => {
+        if (isLoadMore) {
+            setLoadingMore(true);
+        } else {
+            setLoading(true);
+        }
         try {
             const currentUser = auth.currentUser;
             let fetchedLinks: LinkItem[] = [];
+            let fetchedHasMore = false;
+
+            const cursorParam = isLoadMore && links.length > 0 ? `&cursor=${links[links.length - 1].createdAt}` : "";
 
             if (currentUser) {
                 const token = await currentUser.getIdToken();
-                const res = await fetch(`/api/links?pageSize=50`, {
+                const res = await fetch(`/api/links?pageSize=25${cursorParam}`, {
                     headers: { "Authorization": `Bearer ${token}` },
                 });
                 const data = await res.json();
                 if (data.links) {
                     fetchedLinks = data.links;
                 }
+                if (data.hasMore !== undefined) {
+                    fetchedHasMore = data.hasMore;
+                }
+                if (data.plan) {
+                    setUserPlan(data.plan);
+                } else {
+                    setUserPlan("free");
+                }
             } else {
-                // Fetch live server state for unauthenticated guest
-                const fp = await getDeviceFingerprint();
-                const res = await fetch("/api/guest-status", {
-                    headers: { "x-device-fingerprint": fp },
-                });
-                const data = await res.json();
-
-                if (data.active && data.slug) {
-                    fetchedLinks.push({
-                        slug: data.slug,
-                        originalUrl: data.originalUrl || "Original URL hidden for guests",
-                        createdAt: data.createdAt || Date.now(),
-                        expiresAt: Date.now() + (data.expiresIn * 1000)
+                if (!isLoadMore) {
+                    // Fetch live server state for unauthenticated guest
+                    setUserPlan("guest");
+                    const fp = await getDeviceFingerprint();
+                    const res = await fetch("/api/guest-status", {
+                        headers: { "x-device-fingerprint": fp },
                     });
+                    const data = await res.json();
+
+                    if (data.active && data.slug) {
+                        fetchedLinks.push({
+                            slug: data.slug,
+                            originalUrl: data.originalUrl || "Original URL hidden for guests",
+                            createdAt: data.createdAt || Date.now(),
+                            expiresAt: Date.now() + (data.expiresIn * 1000)
+                        });
+                    }
                 }
             }
 
-            setLinks(fetchedLinks);
+            if (isLoadMore) {
+                setLinks(prev => [...prev, ...fetchedLinks]);
+            } else {
+                setLinks(fetchedLinks);
+            }
+            setHasMore(fetchedHasMore);
         } catch (e) {
             console.error(e);
         } finally {
             setLoading(false);
+            setLoadingMore(false);
         }
     };
 
@@ -115,14 +140,46 @@ export function HistorySidebar({ isOpen, onClose, userId }: HistorySidebarProps)
                             </Button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-5">
+                        <div className="flex-1 overflow-y-auto p-5 scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                             {loading ? (
                                 <div className="flex justify-center items-center h-full">
                                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                                 </div>
                             ) : links.length === 0 ? (
-                                <div className="text-center text-muted-foreground mt-10 text-sm">
-                                    No links found.
+                                <div className="flex flex-col items-center justify-center h-full text-center">
+                                    <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-4 border border-slate-100">
+                                        <ExternalLink className="w-8 h-8 text-slate-300" />
+                                    </div>
+                                    <h3 className="text-base font-semibold text-slate-900 mb-1">
+                                        {userPlan === "guest" ? "No links found" : 
+                                         userPlan === "free" ? "Ready to create?" : 
+                                         "Your dashboard is empty"}
+                                    </h3>
+                                    <p className="text-sm text-slate-500 mb-6 max-w-[200px]">
+                                        {userPlan === "guest" ? "Guests can create 1 free temporary link. Try it out!" :
+                                         userPlan === "free" ? "You have 1 free permanent link available. Create it now!" :
+                                         `Make the most of your ${userPlan} plan by creating your first custom link!`}
+                                    </p>
+                                    <Button 
+                                        onClick={() => {
+                                            onClose();
+                                            // Handle cross-page navigation focus vs same-page focus
+                                            if (window.location.pathname !== "/") {
+                                                window.location.href = "/?focus=true";
+                                            } else {
+                                                window.dispatchEvent(new Event("focusUrlInput"));
+                                            }
+                                        }}
+                                        className={`rounded-lg shadow-sm font-medium ${
+                                            userPlan === "guest" ? "bg-amber-100 hover:bg-amber-200 text-amber-900" :
+                                            userPlan === "free" ? "bg-slate-900 hover:bg-slate-800 text-white" :
+                                            "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                        }`}
+                                    >
+                                        {userPlan === "guest" ? "Create your free link" :
+                                         userPlan === "free" ? "Create 1 free link" :
+                                         `Create ${userPlan} link`}
+                                    </Button>
                                 </div>
                             ) : (
                                 <div className="flex flex-col gap-4">
@@ -168,6 +225,21 @@ export function HistorySidebar({ isOpen, onClose, userId }: HistorySidebarProps)
                                             </div>
                                         );
                                     })}
+                                    
+                                    {hasMore && (
+                                        <div className="pt-2 pb-6 flex justify-center">
+                                            <Button 
+                                                variant="outline" 
+                                                className="w-full bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 font-medium disabled:opacity-50"
+                                                onClick={() => fetchLinks(true)}
+                                                disabled={loadingMore}
+                                            >
+                                                {loadingMore ? (
+                                                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading...</>
+                                                ) : "Load More"}
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

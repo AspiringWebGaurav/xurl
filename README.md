@@ -1,36 +1,35 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# XURL — Minimal & Fast URL Shortener
 
-## Getting Started
+XURL is a modern, blazing-fast, and edge-ready URL shortener designed to be vastly cheaper and more performant than enterprise alternatives.
 
-First, run the development server:
+## 🚀 Main Features
+- **Instant Shortening**: Drop a long link, get a short one instantly.
+- **Custom Aliases**: Claim memorable slugs (e.g. `xurl.eu.cc/my-campaign`).
+- **QR Codes**: Auto-generated QR codes available for every link you create.
+- **Link History & Analytics**: Logged-in users can track their historical links.
+- **Progressive Plans**:
+  - **Guest (No Login)**: 1 Free link (5-minute expiry).
+  - **Free Tier**: 5 Links (1-hour expiry). 
+  - **Starter & Pro**: Up to 50 active links (12–24 hour TTL).
+  - **Business & Enterprise**: Up to Unlimited links, lasting forever.
+- **Cumulative Quotas**: Renewing or upgrading plans additively expands your link capacity!
+- **Integrated Payments**: Fully automated Razorpay integration for seamless upgrades.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 💰 Why is it cheaper than alternatives?
+Traditional URL shorteners run expensive, always-on servers. XURL is built on a modern, scale-to-zero serverless architecture:
+1. **Next.js App Router**: Runs on serverless functions that only charge per actual request.
+2. **Upstash Redis**: Handles rate-limiting and quota checking at the edge with microsecond latency, costing fractions of a cent per million reads.
+3. **Firebase Firestore**: Stores long-term data like user plans and transaction logs cleanly and securely, leveraging generous free tiers.
+4. **No Idle Server Costs**: You don't pay for idle time, making the operational cost nearly zero for low traffic, and perfectly linear for high traffic.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠 Tech Stack
+- **Framework**: Next.js 14 App Router + React
+- **Styling**: Tailwind CSS + Framer Motion
+- **Database**: Firebase Firestore (users, transactions)
+- **Caching/Rate-Limiting**: Upstash Redis (links, quotas)
+- **Auth**: Firebase Auth (Google Sign-In)
+- **Payments**: Razorpay Node SDK
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+> **Note**: For full terms, privacy, and acceptable use policies, please refer to the live application's footer. Documentation is kept exclusively in this repository.

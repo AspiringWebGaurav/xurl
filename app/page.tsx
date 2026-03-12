@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
@@ -9,9 +9,28 @@ import { buildShortUrl } from "@/lib/utils/url-builder";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Check, Link2, Loader2, Lock, QrCode, Clock, ExternalLink } from "lucide-react";
+import { Copy, Check, Link2, Loader2, Lock, QrCode, Clock, ExternalLink, ArrowRight } from "lucide-react";
 import QRCode from "react-qr-code";
+import Link from "next/link";
 import { getDeviceFingerprint } from "@/lib/utils/fingerprint";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import { signInWithGoogle } from "@/services/auth";
+import { RateLimitModal } from "@/components/ui/rate-limit-modal";
+
+import { useRouter, useSearchParams } from "next/navigation";
+
+/** Reads ?focus=true from the URL — must be wrapped in <Suspense>. */
+function SearchParamsHandler({ onFocus }: { onFocus: () => void }) {
+    const searchParams = useSearchParams();
+    useEffect(() => {
+        if (searchParams.get("focus") === "true") {
+            onFocus();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
+    return null;
+}
 
 export default function HomePage() {
     const [user, setUser] = useState<User | null>(null);
@@ -19,8 +38,10 @@ export default function HomePage() {
     const [url, setUrl] = useState("");
     const [isValidUrl, setIsValidUrl] = useState(false);
     const [shortDomain, setShortDomain] = useState("xurl.eu.cc");
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
+        setMounted(true);
         // Hydrate the actual domain at runtime to avoid Next.js static build inlining bugs
         if (typeof window !== "undefined") {
             const envDomain = env.NEXT_PUBLIC_SHORT_DOMAIN;
@@ -37,6 +58,7 @@ export default function HomePage() {
     const [aliasStatus, setAliasStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
     const [shortUrl, setShortUrl] = useState("");
     const [loading, setLoading] = useState(false);
+    const [loadingText, setLoadingText] = useState("");
     const [error, setError] = useState("");
     const [copied, setCopied] = useState(false);
     const [guestUsed, setGuestUsed] = useState(false);
@@ -47,10 +69,13 @@ export default function HomePage() {
     const resultRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const [highlightInput, setHighlightInput] = useState(false);
-    const [quota, setQuota] = useState<{ created: number, limit: number } | null>(null);
+    const [quota, setQuota] = useState<{ freeLinksCreated: number, paidLinksCreated: number, limit: number, plan: string, planRenewals?: number, planTtlHours?: number | "Unlimited", expiredLinksCount?: number, totalLinksEver?: number } | null>(null);
     const [guestExpiresAt, setGuestExpiresAt] = useState<number | null>(null);
     const [countdown, setCountdown] = useState<string>("");
     const [viewingPastLink, setViewingPastLink] = useState(false);
+    const [focusTriggered, setFocusTriggered] = useState(false);
+    const [isRateLimited, setIsRateLimited] = useState(false);
+    const router = useRouter();
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -74,7 +99,7 @@ export default function HomePage() {
                     fetch("/api/links?pageSize=1", { headers: { "Authorization": `Bearer ${token}` } })
                         .then(r => r.json())
                         .then(d => {
-                            if (d.limit) setQuota({ created: d.linksCreated, limit: d.limit });
+                            if (d.limit) setQuota({ freeLinksCreated: d.freeLinksCreated, paidLinksCreated: d.paidLinksCreated, limit: d.limit, plan: d.plan || "free", planRenewals: d.planRenewals, planTtlHours: d.planTtlHours, expiredLinksCount: d.expiredLinksCount, totalLinksEver: d.totalLinksEver });
                         })
                         .catch(console.error);
                 });
@@ -121,6 +146,22 @@ export default function HomePage() {
         };
     }, []);
 
+    // ── Handle Auto-Focus from Navigation ──
+    useEffect(() => {
+        if (focusTriggered) {
+            // Small delay to ensure the DOM is ready and animated
+            setTimeout(() => {
+                window.dispatchEvent(new Event("focusUrlInput"));
+            }, 100);
+
+            // Clean up the URL
+            const url = new URL(window.location.href);
+            url.searchParams.delete("focus");
+            window.history.replaceState({}, '', url.toString());
+            setFocusTriggered(false);
+        }
+    }, [focusTriggered]);
+
     // ── Server-synced guest state (source of truth is Firestore, NOT localStorage) ──
     useEffect(() => {
         if (user) {
@@ -144,6 +185,7 @@ export default function HomePage() {
                     setGuestUsed(true);
                     const expiresAt = Date.now() + (data.expiresIn * 1000);
                     setGuestExpiresAt(expiresAt);
+                    localStorage.setItem("xurl_guest_link_history", JSON.stringify({ slug: data.slug, expiresAt }));
 
                     // Restore the success card data but don't show it immediately
                     setShortUrl(buildShortUrl(data.slug));
@@ -258,6 +300,9 @@ export default function HomePage() {
     const handleCopy = async (textToCopy: string) => {
         await navigator.clipboard.writeText(textToCopy);
         setCopied(true);
+        toast.success("Link copied to clipboard", {
+            position: "bottom-center",
+        });
         setTimeout(() => setCopied(false), 2000);
     };
 
@@ -312,7 +357,12 @@ export default function HomePage() {
             return;
         }
 
+        setLoadingText("");
         setLoading(true);
+
+        const checkSecurityTimeout = setTimeout(() => {
+            setLoadingText("Checking request security...");
+        }, 500);
 
         try {
             const headers: Record<string, string> = {
@@ -332,14 +382,25 @@ export default function HomePage() {
                 }),
             });
 
+            clearTimeout(checkSecurityTimeout);
+            setLoadingText("");
+
             const data = await res.json();
 
             if (!res.ok) {
+                if (res.status === 429 && data.code === "RATE_LIMITED") {
+                    setIsRateLimited(true);
+                    return;
+                }
+
                 setError(data.message || "Failed to create link. Please try again.");
                 if (data.error === "guest_limit_reached" && data.expiresIn) {
                     setGuestUsed(true);
                     const expiresAt = Date.now() + (data.expiresIn * 1000);
                     setGuestExpiresAt(expiresAt);
+                    if (data.slug) {
+                        localStorage.setItem("xurl_guest_link_history", JSON.stringify({ slug: data.slug, expiresAt }));
+                    }
 
                     if (data.slug && data.originalUrl) {
                         const generated = buildShortUrl(data.slug);
@@ -362,25 +423,26 @@ export default function HomePage() {
             // Auto copy
             handleCopy(generated);
 
-            // Dispatch event to instantly sync the History Sidebar
-            if (typeof window !== "undefined") {
-                window.dispatchEvent(new Event("linkGenerated"));
-            }
-
             if (!user) {
-                const newGuestExpiresAt = Date.now() + (2 * 60 * 60 * 1000);
+                const newGuestExpiresAt = Date.now() + (5 * 60 * 1000);
                 setGuestUsed(true);
                 setGuestExpiresAt(newGuestExpiresAt);
+                localStorage.setItem("xurl_guest_link_history", JSON.stringify({ slug: data.slug, expiresAt: newGuestExpiresAt }));
             } else {
                 // Refresh quota automatically
                 user.getIdToken().then(token => {
                     fetch("/api/links?pageSize=1", { headers: { "Authorization": `Bearer ${token}` } })
                         .then(r => r.json())
                         .then(d => {
-                            if (d.limit) setQuota({ created: d.linksCreated, limit: d.limit });
+                            if (d.limit) setQuota({ freeLinksCreated: d.freeLinksCreated, paidLinksCreated: d.paidLinksCreated, limit: d.limit, plan: d.plan || "free", planRenewals: d.planRenewals, planTtlHours: d.planTtlHours, expiredLinksCount: d.expiredLinksCount, totalLinksEver: d.totalLinksEver });
                         })
                         .catch(console.error);
                 });
+            }
+
+            // Dispatch event to instantly sync the History Sidebar
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new Event("linkGenerated"));
             }
 
             // Fetch preview metadata
@@ -395,19 +457,26 @@ export default function HomePage() {
 
         } catch (err) {
             console.error(err);
+            clearTimeout(checkSecurityTimeout);
+            setLoadingText("");
             setError("Failed to create link. Please try again.");
         } finally {
             setLoading(false);
         }
     };
 
-    const isDisabled = (!user && guestUsed);
+    // Determine if the user has reached their quota limit
+    const isOverQuota = !!(user && quota && (quota.plan === "free" ? quota.freeLinksCreated >= quota.limit : quota.paidLinksCreated >= quota.limit));
+    const isDisabled = (!user && guestUsed) || isOverQuota;
 
     return (
-        <div className="flex flex-col min-h-screen bg-background">
+        <div className="flex flex-col h-[100dvh] overflow-hidden bg-background">
+            <Suspense fallback={null}>
+                <SearchParamsHandler onFocus={() => setFocusTriggered(true)} />
+            </Suspense>
             <TopNavbar isCreateDisabled={isDisabled} />
 
-            <main className="flex-1 flex flex-col w-full px-6 md:px-8 py-12 overflow-x-hidden">
+            <main className="flex-1 flex flex-col w-full px-6 md:px-8 overflow-y-auto overflow-x-hidden">
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -421,51 +490,81 @@ export default function HomePage() {
                         {!authLoading && (
                             <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
                                 {user ? (
-                                    <>
-                                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200/60 text-blue-700 text-xs font-semibold tracking-wide shadow-sm">
-                                            <Clock className="w-3.5 h-3.5" />
-                                            Links expire in 12h
-                                        </div>
-                                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200/60 text-emerald-700 text-xs font-semibold tracking-wide shadow-sm">
-                                            <Link2 className="w-3.5 h-3.5" />
-                                            {quota ? `${quota.created} / ${quota.limit} links created` : "Up to 1000 links"}
-                                        </div>
-                                    </>
+                                    quota ? (
+                                        <>
+                                            {/* Free Plan Status */}
+                                            <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-indigo-50 border border-indigo-200/80 text-indigo-700 text-xs font-semibold tracking-wide shadow-sm hover:shadow-md transition-shadow">
+                                                <Link2 className="w-3.5 h-3.5 text-indigo-500" />
+                                                {quota.freeLinksCreated} / 1 free link
+                                                <span className="text-indigo-300 mx-0.5">|</span>
+                                                <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                                                Expires in 10m
+                                            </div>
+
+                                            {/* Paid Plan Status (if any) */}
+                                            {quota.plan !== "free" && (
+                                                <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-xs font-semibold tracking-wide shadow-sm hover:shadow-md transition-shadow">
+                                                    <Link2 className="w-3.5 h-3.5 text-emerald-500" />
+                                                    {quota.paidLinksCreated} / {quota.limit} {quota.plan} links
+                                                    {quota.planRenewals && quota.planRenewals > 1 ? ` (×${quota.planRenewals})` : ""}
+                                                    <span className="text-emerald-300 mx-0.5">|</span>
+                                                    <Clock className="w-3.5 h-3.5 text-emerald-500" />
+                                                    Expires in {quota.planTtlHours === "Unlimited" ? "never" : (quota.planTtlHours !== undefined && quota.planTtlHours < 1 ? `${Math.round(quota.planTtlHours * 60)}m` : `${quota.planTtlHours || 12}h`)}
+                                                </div>
+                                            )}
+
+                                            {/* Expired Links Warning */}
+                                            {quota.expiredLinksCount !== undefined && quota.expiredLinksCount > 0 && (
+                                                <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-amber-50 border border-amber-200/80 text-amber-700 text-xs font-semibold tracking-wide shadow-sm hover:shadow-md transition-shadow" title={`${quota.expiredLinksCount} links have expired`}>
+                                                    <Clock className="w-3.5 h-3.5 text-amber-500" />
+                                                    {quota.expiredLinksCount} expired history
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Skeleton className="h-[28px] w-[110px] rounded-full bg-blue-50/50" />
+                                            <Skeleton className="h-[28px] w-[140px] rounded-full bg-emerald-50/50" />
+                                        </>
+                                    )
                                 ) : (
-                                    <>
-                                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200/60 text-amber-700 text-xs font-semibold tracking-wide shadow-sm">
-                                            <Clock className="w-3.5 h-3.5" />
-                                            Guest link expires in 2h
-                                        </div>
-                                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold tracking-wide shadow-sm">
-                                            <Lock className="w-3.5 h-3.5 text-slate-500" />
-                                            1 free link limit
-                                        </div>
-                                    </>
+
+                                    <Link href="/guest-policy" target="_blank" className="group flex items-center px-4 py-1.5 rounded-full bg-amber-50/80 border border-amber-300/40 text-amber-700 hover:bg-amber-100/80 hover:border-amber-400/50 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 text-xs font-semibold tracking-wide cursor-pointer">
+                                        <Lock className="w-3.5 h-3.5 mr-1.5 text-amber-600/80 group-hover:text-amber-700 transition-colors" />
+                                        <span>1 free link for no login policy</span>
+                                        <span className="mx-2 text-amber-300">—</span>
+                                        <Clock className="w-3.5 h-3.5 mr-1.5 text-amber-600/80 group-hover:text-amber-700 transition-colors" />
+                                        <span>Expires in 5m</span>
+                                        <ArrowRight className="w-3.5 h-3.5 ml-1.5 text-amber-500/80 group-hover:text-amber-700 group-hover:translate-x-0.5 transition-all" />
+                                    </Link>
                                 )}
                             </div>
                         )}
                     </div>
 
                     <AnimatePresence mode="wait">
-                        {(authLoading || (!user && guestLoading)) ? (
+                        {(authLoading || (!user && guestLoading) || !mounted) ? (
                             <motion.div
                                 key="loading"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.2 }}
-                                className="w-full bg-card border border-border rounded-xl p-5 sm:p-6 shadow-sm flex flex-col items-center justify-center min-h-[290px] gap-4"
+                                className="w-full bg-card border border-border rounded-xl p-5 sm:p-6 shadow-sm flex flex-col min-h-[290px] justify-center gap-4 relative overflow-hidden"
                             >
-                                <div className="relative w-10 h-10">
-                                    <svg className="animate-[spin_0.8s_linear_infinite]" viewBox="0 0 40 40" fill="none">
-                                        <circle cx="20" cy="20" r="16" stroke="currentColor" strokeWidth="3" className="text-border" />
-                                        <circle cx="20" cy="20" r="16" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="80" strokeDashoffset="60" className="text-foreground/60" />
-                                    </svg>
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex justify-between items-center px-1">
+                                        <Skeleton className="h-4 w-28 bg-muted/60" />
+                                    </div>
+                                    <Skeleton className="h-12 w-full rounded-lg bg-muted/40" />
                                 </div>
-                                <p className="text-xs text-muted-foreground font-medium tracking-tight">Checking your session...</p>
+                                <div className="flex flex-col gap-2 mt-1">
+                                    <Skeleton className="h-4 w-24 bg-muted/60 px-1" />
+                                    <Skeleton className="h-12 w-full rounded-lg bg-muted/40" />
+                                </div>
+                                <Skeleton className="h-12 w-full rounded-lg bg-muted/60 mt-2" />
                             </motion.div>
-                        ) : (isDisabled && !viewingPastLink) ? (
+                        ) : (!user && guestUsed && !viewingPastLink) ? (
                             <motion.div
                                 key="limit"
                                 initial={{ opacity: 0, y: 15 }}
@@ -488,6 +587,21 @@ export default function HomePage() {
                                         <p className="font-mono text-xl font-medium tracking-wider text-foreground">{countdown}</p>
                                     </div>
                                 )}
+
+                                <Button
+                                    onClick={async () => {
+                                        toast.loading("Connecting to Google...", { id: "google-login" });
+                                        const { error } = await signInWithGoogle();
+                                        if (error) {
+                                            toast.error("Failed to sign in. Please try again.", { id: "google-login" });
+                                        } else {
+                                            toast.success("Signed in successfully!", { id: "google-login" });
+                                        }
+                                    }}
+                                    className="mt-2 w-full max-w-[280px] bg-foreground text-background shadow-sm hover:bg-foreground/90 font-medium"
+                                >
+                                    Sign In / Sign Up
+                                </Button>
 
                                 {shortUrl && (
                                     <Button
@@ -627,7 +741,7 @@ export default function HomePage() {
                                 transition={{ duration: 0.4, ease: "easeInOut" }}
                                 className="w-full bg-card border border-border rounded-xl p-5 sm:p-6 shadow-sm flex flex-col gap-4 min-h-[290px] justify-center relative overflow-hidden"
                             >
-                                <div className="flex flex-col gap-1.5 border border-transparent focus-within:border-ring/20 rounded-lg transition-colors">
+                                <div className={`flex flex-col gap-1.5 ${isOverQuota ? 'opacity-50 pointer-events-none' : ''}`}>
                                     <div className="flex justify-between items-center px-1">
                                         <label className="text-xs font-medium text-foreground">Destination URL</label>
                                         <AnimatePresence>
@@ -657,23 +771,48 @@ export default function HomePage() {
                                     />
                                 </div>
 
-                                <div className="flex flex-col gap-1.5 border border-transparent focus-within:border-ring/20 rounded-lg transition-colors">
-                                    <label className="text-xs font-medium text-foreground px-1 flex justify-between items-center">
-                                        <span>Custom Alias {!user ? <Lock className="inline w-3 h-3 ml-1 text-muted-foreground" /> : "(Optional)"}</span>
+                                <div className={`flex flex-col gap-1.5 ${isOverQuota ? 'opacity-50 pointer-events-none' : ''}`}>
+                                    <label className="text-xs font-medium text-foreground px-1 flex items-center gap-2">
+                                        <span>Custom Alias</span>
+                                        {(() => {
+                                            // Dynamic badge based on user state
+                                            if (!user) {
+                                                // Guest: show that a paid plan is needed
+                                                return (
+                                                    <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-sm border border-amber-200/50">
+                                                        <Lock className="w-2.5 h-2.5" /> Paid Plan
+                                                    </span>
+                                                );
+                                            }
+                                            if (quota && quota.plan !== 'free') {
+                                                // Paid user: show their current plan name
+                                                return (
+                                                    <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-sm border border-emerald-200/50">
+                                                        <Check className="w-2.5 h-2.5" /> {quota.plan}
+                                                    </span>
+                                                );
+                                            }
+                                            // Free plan user: show upgrade hint
+                                            return (
+                                                <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-sm border border-slate-200/50">
+                                                    <Lock className="w-2.5 h-2.5" /> Starter+
+                                                </span>
+                                            );
+                                        })()}
                                     </label>
                                     <div className={`relative flex items-center w-full h-12 bg-background shadow-sm rounded-lg border focus-within:ring-1 transition-all ${aliasStatus === "taken" || aliasStatus === "invalid"
                                         ? "border-red-200 focus-within:ring-red-500"
                                         : "border-border focus-within:ring-foreground"
-                                        } ${(isDisabled || loading || !user) ? "opacity-50 cursor-not-allowed bg-muted/50" : ""}`}>
+                                        } ${(isDisabled || loading || !user || (quota && quota.plan === 'free')) ? "bg-muted/50 cursor-not-allowed" : ""}`}>
                                         <span className="pl-3 pr-1 text-muted-foreground text-sm select-none pointer-events-none whitespace-nowrap">
                                             {shortDomain} /
                                         </span>
                                         <input
                                             type="text"
-                                            placeholder={!user ? "Sign in to use custom alias" : "type-alias"}
+                                            placeholder={!user ? "Sign in with a paid plan" : (quota && quota.plan === 'free') ? "Upgrade to Starter+ to unlock" : "type-alias"}
                                             value={alias}
                                             onChange={(e) => setAlias(e.target.value.replace(/[^a-zA-Z0-9-]/g, ""))}
-                                            disabled={isDisabled || loading || !user}
+                                            disabled={isDisabled || loading || !user || (quota != null && quota.plan === 'free')}
                                             onKeyDown={(e) => e.key === "Enter" && !(!user) && isValidUrl && aliasStatus !== "checking" && aliasStatus !== "taken" && aliasStatus !== "invalid" && handleShorten()}
                                             className={`flex-1 min-w-0 bg-transparent text-sm text-foreground focus:outline-none placeholder:text-muted-foreground h-full disabled:cursor-not-allowed ${alias.trim() ? "pr-[130px] sm:pr-[220px]" : "pr-3"
                                                 }`}
@@ -689,55 +828,79 @@ export default function HomePage() {
                                     </div>
                                     <p className="text-[11px] text-muted-foreground px-1 mt-0.5">
                                         {!user ? (
-                                            <span className="text-amber-600/90 font-medium tracking-tight">Custom aliases are only available for signed-in users.</span>
+                                            <span className="text-amber-600/90 font-medium tracking-tight">Sign in with a paid plan to create custom aliases.</span>
+                                        ) : quota && quota.plan === 'free' ? (
+                                            <span className="text-amber-600/90 font-medium tracking-tight">Upgrade to Starter or above to unlock custom aliases.</span>
                                         ) : (
                                             "You can create your own alias or leave it empty — the system will generate one."
                                         )}
                                     </p>
                                 </div>
 
-                                <Button
-                                    onClick={handleShorten}
-                                    disabled={!isValidUrl || isDisabled || loading || aliasStatus === "checking" || aliasStatus === "taken" || aliasStatus === "invalid"}
-                                    className="w-full h-12 rounded-lg py-0 shadow-sm bg-foreground text-background hover:bg-foreground/90 font-medium mt-2 transition-all relative overflow-hidden"
-                                >
-                                    {loading ? (
-                                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                    ) : (
-                                        <Link2 className="h-4 w-4 mr-2" />
-                                    )}
-                                    {loading ? "Shortening..." : "Shorten"}
-                                    {error && !shortUrl && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: "100%" }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            className="absolute inset-0 flex items-center justify-center bg-red-500 text-white font-medium"
-                                        >
-                                            {error}
-                                        </motion.div>
-                                    )}
-                                </Button>
+                                {isOverQuota && quota ? (
+                                    <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center rounded-xl p-6 text-center shadow-[inset_0_4px_24px_rgba(0,0,0,0.02)]">
+                                        <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mb-3 ring-4 ring-emerald-50/50">
+                                            <Lock className="w-5 h-5 text-emerald-600" />
+                                        </div>
+                                        <h3 className="text-lg font-semibold tracking-tight text-foreground mb-1.5 capitalize">{quota.plan} Plan Limit Reached</h3>
+                                        <p className="text-[13px] text-muted-foreground max-w-[280px] mb-5 leading-relaxed">
+                                            You&apos;ve reached your maximum capacity of {quota.limit} active links on the {quota.plan} plan. {(quota.plan === "enterprise" || quota.plan === "bigenterprise") ? 'Contact our sales team to increase your limits.' : `Upgrade to Business for up to 100 links at just ₹199.`}
+                                        </p>
+                                        {(quota.plan === "enterprise" || quota.plan === "bigenterprise") ? (
+                                            <Button
+                                                asChild
+                                                className="w-full max-w-[240px] h-11 bg-emerald-600 text-white hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all rounded-lg font-medium tracking-wide"
+                                            >
+                                                <a href="mailto:support@xurl.eu.cc" className="flex items-center justify-center">
+                                                    Contact Support <ExternalLink className="w-4 h-4 ml-2" />
+                                                </a>
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                asChild
+                                                className="w-full max-w-[240px] h-11 bg-emerald-600 text-white hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all rounded-lg font-medium tracking-wide"
+                                            >
+                                                <Link href="/pricing" className="flex items-center justify-center">
+                                                    Upgrade Workspace <ArrowRight className="w-4 h-4 ml-2" />
+                                                </Link>
+                                            </Button>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <Button
+                                        onClick={handleShorten}
+                                        disabled={!isValidUrl || isDisabled || loading || aliasStatus === "checking" || aliasStatus === "taken" || aliasStatus === "invalid"}
+                                        className="w-full h-12 rounded-lg py-0 shadow-sm bg-foreground text-background hover:bg-foreground/90 font-medium mt-2 transition-all relative overflow-hidden"
+                                    >
+                                        {loading ? (
+                                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                        ) : (
+                                            <Link2 className="h-4 w-4 mr-2" />
+                                        )}
+                                        {loading ? (loadingText || "Shortening...") : "Shorten"}
+                                        {error && !shortUrl && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: "100%" }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                className="absolute inset-0 flex items-center justify-center bg-red-500 text-white font-medium"
+                                            >
+                                                {error}
+                                            </motion.div>
+                                        )}
+                                    </Button>
+                                )}
                             </motion.div>
                         )}
                     </AnimatePresence>
                 </motion.div>
             </main>
 
-            <AnimatePresence>
-                {copied && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20, x: "-50%" }}
-                        animate={{ opacity: 1, y: 0, x: "-50%" }}
-                        exit={{ opacity: 0, y: 20, x: "-50%" }}
-                        className="fixed bottom-8 left-1/2 z-50 bg-foreground text-background text-sm px-4 py-3 rounded-full shadow-xl flex items-center gap-2 font-medium"
-                    >
-                        <Check className="h-4 w-4 text-emerald-400" />
-                        Link copied to clipboard
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <RateLimitModal
+                isOpen={isRateLimited}
+                onClose={() => setIsRateLimited(false)}
+            />
 
-            <footer className="shrink-0 flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground border-t border-border bg-background">
+            <footer className="shrink-0 flex items-center justify-center gap-4 py-6 text-xs text-muted-foreground border-t border-border bg-background flex-wrap px-4">
                 <div className="flex items-center gap-2 opacity-80 hover:opacity-100 transition-opacity">
                     <div className="flex h-[20px] w-[20px] items-center justify-center rounded-[5px] bg-foreground text-background font-semibold text-[10px] tracking-tight transition-colors">
                         X
@@ -746,8 +909,15 @@ export default function HomePage() {
                         URL
                     </div>
                 </div>
-                <span className="mx-2 opacity-50">&middot;</span>
-                Minimal URL Shortener
+                <span className="hidden sm:inline mx-1 opacity-40">&middot;</span>
+                <span className="opacity-80">Minimal URL Shortener</span>
+                
+                <div className="w-full sm:w-auto flex items-center justify-center gap-4 mt-2 sm:mt-0">
+                    <span className="hidden sm:inline mx-1 opacity-40">&middot;</span>
+                    <Link href="/terms" className="hover:text-foreground transition-colors hover:underline underline-offset-4">Terms</Link>
+                    <Link href="/privacy" className="hover:text-foreground transition-colors hover:underline underline-offset-4">Privacy</Link>
+                    <Link href="/acceptable-use" className="hover:text-foreground transition-colors hover:underline underline-offset-4">Acceptable Use</Link>
+                </div>
             </footer>
         </div>
     );

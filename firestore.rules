@@ -17,6 +17,9 @@ service cloud.firestore {
     }
 
     // ─── Analytics ────────────────────────────────────────────────────
+    // Read access requires authentication. Write access is admin SDK only.
+    // Note: Server-side API routes use admin SDK which bypasses these rules.
+    // Client reads are scoped by the API layer (getLinkAnalytics checks ownership).
     match /analytics/{docId} {
       allow read: if request.auth != null;
       allow write: if false; // All writes via admin SDK

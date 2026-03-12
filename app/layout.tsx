@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { DesktopOnlyOverlay } from "@/components/layout/DesktopOnlyOverlay";
+import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
@@ -21,6 +22,7 @@ export default function RootLayout({
         <DesktopOnlyOverlay>
           {children}
         </DesktopOnlyOverlay>
+        <Toaster />
       </body>
     </html>
   );

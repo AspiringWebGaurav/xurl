@@ -17,7 +17,9 @@ const BASE = CHARSET.length; // 62
  * Encode a positive integer to a Base62 string.
  */
 export function encodeBase62(num: number): string {
-    if (num < 0) throw new Error("Base62 encoding requires a non-negative integer.");
+    if (!Number.isFinite(num) || num < 0 || !Number.isInteger(num)) {
+        throw new Error("Base62 encoding requires a non-negative integer.");
+    }
     if (num === 0) return CHARSET[0];
 
     let encoded = "";

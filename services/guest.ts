@@ -77,29 +77,3 @@ export async function checkGuestLimit(
     return { allowed: true };
 }
 
-/**
- * Records a new guest link creation.
- */
-export async function recordGuestUsage(
-    ip: string,
-    fingerprint: string | undefined,
-    slug: string,
-    originalUrl: string,
-    expiresAt: number
-): Promise<void> {
-    const ipHash = hashData(ip);
-    const fingerprintHash = fingerprint ? hashData(fingerprint) : "none";
-
-    const record: GuestUsageRecord = {
-        ipHash,
-        fingerprintHash,
-        slug,
-        originalUrl,
-        expiresAt,
-        createdAt: Date.now()
-    };
-
-    // Store the record. We don't necessarily need a specific ID, 
-    // but using the slug makes it easy to look up/delete if needed.
-    await adminDb.collection(GUEST_USAGE_COLLECTION).doc(slug).set(record);
-}

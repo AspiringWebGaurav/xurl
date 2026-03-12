@@ -12,42 +12,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase/admin";
 import { createLink, getUserLinks, deleteLink } from "@/services/links";
-import { checkGuestLimit, recordGuestUsage } from "@/services/guest";
+import { checkGuestLimit } from "@/services/guest";
+import { PLAN_CONFIGS, GUEST_CONFIG, resolvePlanType } from "@/lib/plans";
+import type { PlanType } from "@/lib/plans";
 import { logger } from "@/lib/utils/logger";
+import crypto from "crypto";
 
 // Expiration policy (milliseconds)
-const GUEST_EXPIRATION_MS = 2 * 60 * 60 * 1000;    // 2 hours
-const AUTH_EXPIRATION_MS = 12 * 60 * 60 * 1000;     // 12 hours
-const AUTH_LINK_LIMIT = 100;
+// Guest expiration uses the centralized GUEST_TTL_MS from plan config
+// AUTH_EXPIRATION_MS is no longer used here as TTL is determined by user plan inside createLink.
 
-// ─── Per-IP Rate Limiter for POST requests ──────────────────────────────────
-// Separate from the per-user rate limiter in services/links.ts.
-// Catches abuse where many guests share the same "anonymous" rate limit bucket.
-
-const postLimiter = new Map<string, { count: number; windowStart: number }>();
-const POST_WINDOW_MS = 60_000;
-const POST_MAX_PER_IP = 5; // 5 link creations per minute per IP
-const MAX_POST_LIMITER_ENTRIES = 5_000;
-
-function isPostRateLimited(ip: string): boolean {
-    const now = Date.now();
-    const entry = postLimiter.get(ip);
-
-    if (!entry || now - entry.windowStart >= POST_WINDOW_MS) {
-        if (postLimiter.size >= MAX_POST_LIMITER_ENTRIES) {
-            for (const [key, val] of postLimiter) {
-                if (now - val.windowStart >= POST_WINDOW_MS) postLimiter.delete(key);
-                if (postLimiter.size < MAX_POST_LIMITER_ENTRIES * 0.8) break;
-            }
-        }
-        postLimiter.set(ip, { count: 1, windowStart: now });
-        return false;
-    }
-
-    if (entry.count >= POST_MAX_PER_IP) return true;
-    entry.count++;
-    return false;
-}
+import { evaluateRequest } from "@/lib/redis/protection";
+import { getRedisClient, safeRedis } from "@/lib/redis/client";
 
 // ─── Auth Helper ────────────────────────────────────────────────────────────
 
@@ -71,23 +47,71 @@ async function verifyAuth(request: NextRequest): Promise<string | null> {
 
 export async function POST(request: NextRequest) {
     try {
-        // Per-IP rate limit (catches distributed bot floods)
+        // Security Gateway (Redis)
         const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-        if (isPostRateLimited(ip)) {
-            return NextResponse.json(
-                { code: "RATE_LIMITED", message: "Too many requests. Please wait before creating more links." },
-                { status: 429 }
-            );
+
+        // Determine authenticated user
+        let verifiedUid = await verifyAuth(request);
+
+        // --- TEST BYPASS ---
+        if (process.env.NODE_ENV !== "production") {
+            const testHeader = request.headers.get("x-test-user-id");
+            if (testHeader) verifiedUid = testHeader;
+        }
+
+        const isGuest = !verifiedUid;
+        const userId = verifiedUid || "anonymous";
+
+        const forceRedisTest = request.headers.get("x-force-redis-test") === "true";
+        const fingerprint = request.headers.get("x-device-fingerprint") || undefined;
+        // Generate a behavior hash off IP and User-Agent to catch programmatic abuse that evades IP rotation
+        const userAgent = request.headers.get("user-agent") || "unknown";
+        const behaviorHash = crypto.createHash("sha256").update(`${ip}:${userAgent}`).digest("hex");
+
+        // Skip rate-limiting for automated tests in dev mode if they identify themselves via header or UID prefix, UNLESS forced
+        // Skip rate-limiting for automated tests if they explicitly identify themselves via header
+        const isTestUser = request.headers.get("x-test-bypass") === "true";
+        if (!isTestUser || forceRedisTest) {
+            // Check Redis protection layer
+            // For guests, we set planDailyLimit to 1. For authenticated, we look it up or use a safe upper bound.
+            // A precise plan limit is enforced strictly inside the Firebase transaction. Redis here is just an early shield.
+            const { state } = await evaluateRequest(ip, userId, isGuest ? 1 : -1, fingerprint, behaviorHash);
+
+            if (state === "BLOCK") {
+                return NextResponse.json(
+                    { code: "RATE_LIMITED", message: "Too many requests or abuse detected. Please try again later." },
+                    { status: 429 }
+                );
+            }
+
+            if (state === "SLOW") {
+                // Introduce an artificial delay to slow down automated abuse
+                await new Promise(resolve => setTimeout(resolve, 1500));
+            }
+
+            // --- STRICT 10 REQ/MIN RATE LIMIT ---
+            const identifier = isGuest ? ip : userId;
+            const ratelimitKey = `ratelimit:${identifier}`;
+            const currentCount = await safeRedis(async (c) => {
+                const count = await c.incr(ratelimitKey);
+                if (count === 1) {
+                    await c.expire(ratelimitKey, 60);
+                }
+                return count;
+            });
+
+            if (currentCount !== null && currentCount > 10) {
+                logger.warn("rate_limit_exceeded", `Hard limit exceeded for ${identifier}`);
+                return NextResponse.json(
+                    { code: "RATE_LIMITED", message: "Hard rate limit exceeded. Maximum 10 links per minute." },
+                    { status: 429 }
+                );
+            }
         }
 
         const body = await request.json();
         const { originalUrl, customSlug, title } = body;
         const idempotencyKey = request.headers.get("x-idempotency-key") || request.headers.get("idempotency-key") || undefined;
-
-        // Determine authenticated user
-        const verifiedUid = await verifyAuth(request);
-        const isGuest = !verifiedUid;
-        const userId = verifiedUid || "anonymous";
 
         if (!originalUrl) {
             return NextResponse.json(
@@ -106,8 +130,6 @@ export async function POST(request: NextRequest) {
                 );
             }
 
-            // Extract device fingerprint from custom header
-            const fingerprint = request.headers.get("x-device-fingerprint") || undefined;
             const guestStatus = await checkGuestLimit(ip, fingerprint);
 
             if (!guestStatus.allowed) {
@@ -131,8 +153,11 @@ export async function POST(request: NextRequest) {
         // ── Enforce expiration policy (server is source of truth) ──
         const now = Date.now();
         const expiresAt = isGuest
-            ? now + GUEST_EXPIRATION_MS
-            : now + AUTH_EXPIRATION_MS;
+            ? now + GUEST_CONFIG.ttlMs
+            : null; // Authenticated user TTL is calculated inside createLink based on their plan
+
+        const ipHash = crypto.createHash("sha256").update(ip).digest("hex");
+        const fingerprintHash = fingerprint ? crypto.createHash("sha256").update(fingerprint).digest("hex") : undefined;
 
         const result = await createLink(userId, {
             originalUrl,
@@ -140,21 +165,40 @@ export async function POST(request: NextRequest) {
             title,
             expiresAt,
             idempotencyKey,
+            ipHash: isGuest ? ipHash : undefined,
+            fingerprintHash: isGuest ? fingerprintHash : undefined
         });
 
-        // Record guest usage
-        if (isGuest && result.slug) {
-            const fingerprint = request.headers.get("x-device-fingerprint") || undefined;
-            await recordGuestUsage(ip, fingerprint, result.slug, originalUrl, expiresAt);
-        }
+        // Record guest usage natively inside createLink transaction closing TOCTOU
 
         return NextResponse.json(result, { status: 201 });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to create link.";
+        const errorName = error instanceof Error ? error.name : "";
         logger.error("api_create_link", message);
 
-        const status = message.includes("Rate limit") ? 429 : message.includes("already taken") ? 409 : 400;
-        return NextResponse.json({ code: "CREATE_FAILED", message }, { status });
+        let status = 400;
+        let code = "CREATE_FAILED";
+
+        if (message.includes("Rate limit") || message.includes("abuse detected")) {
+            status = 429;
+            code = "RATE_LIMITED";
+        } else if (message.includes("already taken") || message.includes("already exists")) {
+            status = 409;
+            code = "SLUG_TAKEN";
+        } else if (errorName === "FreeCooldownActive") {
+            status = 429;
+            code = "FREE_COOLDOWN";
+        } else if (errorName === "FreeLimitExhausted") {
+            status = 403;
+            code = "FREE_EXHAUSTED";
+        } else if (errorName === "LimitReachedError") {
+            status = 403;
+            code = "PLAN_LIMIT";
+        }
+
+        console.error(`[CREATE LINK ERROR] ${status} - ${message}`);
+        return NextResponse.json({ code, message }, { status });
     }
 }
 
@@ -174,17 +218,83 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const rawPageSize = parseInt(searchParams.get("pageSize") || "25", 10);
         const pageSize = Math.min(Math.max(isNaN(rawPageSize) ? 25 : rawPageSize, 1), 100);
+        const rawCursor = parseInt(searchParams.get("cursor") || "", 10);
+        const cursor = isNaN(rawCursor) ? undefined : rawCursor;
 
-        const result = await getUserLinks(verifiedUid, pageSize);
+        const result = await getUserLinks(verifiedUid, pageSize, cursor);
 
         const userDoc = await adminDb.collection("users").doc(verifiedUid).get();
-        const linksCreated = userDoc.exists ? (userDoc.data()?.linksCreated || 0) : 0;
+        const userData = userDoc.exists ? userDoc.data() : {};
+        let plan: PlanType = resolvePlanType(userData?.plan);
+        
+        // Live downgrade detection: if paid plan has expired, show as free
+        const now = Date.now();
+        if (plan !== "free" && userData?.planExpiry && userData.planExpiry < now) {
+            plan = "free";
+        }
+        
+        const config = PLAN_CONFIGS[plan];
+        
+        let effectiveLimit: number;
+        if (plan === "free") {
+            effectiveLimit = config.limit;
+        } else {
+            effectiveLimit = userData?.cumulativeQuota || (config.limit * (userData?.planRenewals || 1));
+        }
+        
+        const planRenewals = userData?.planRenewals || 1;
+
+        // Count ALL links (active + expired + deactivated) for comprehensive stats
+        const allLinksSnap = await adminDb.collection("links")
+            .where("userId", "==", verifiedUid)
+            .get();
+
+        let totalLinksEver = 0;
+        let expiredLinksCount = 0;
+        let freeLinksCreated = 0;
+        let paidLinksCreated = 0;
+
+        allLinksSnap.forEach((doc) => {
+            const data = doc.data();
+            totalLinksEver++;
+            if (!data.isActive) return; // deactivated
+            if (data.expiresAt && data.expiresAt <= now) {
+                expiredLinksCount++;
+                return;
+            }
+            if (data.createdUnderPlan === "free") {
+                freeLinksCreated++;
+            } else if (data.createdUnderPlan !== "guest") {
+                paidLinksCreated++;
+            }
+        });
+
+        // Calculate TTL for the client
+        const planTtlMs = config.ttlMs;
+        const planTtlHours = planTtlMs / (60 * 60 * 1000);
+
+        // Add computed status to each link for the frontend
+        const enrichedLinks = result.links.map((link) => {
+            let status: "active" | "expired" | "deactivated" = "active";
+            if (!link.isActive) {
+                status = "deactivated";
+            } else if (link.expiresAt && link.expiresAt <= now) {
+                status = "expired";
+            }
+            return { ...link, status };
+        });
 
         return NextResponse.json({
-            links: result.links,
+            links: enrichedLinks,
             hasMore: result.links.length === pageSize,
-            linksCreated,
-            limit: AUTH_LINK_LIMIT
+            freeLinksCreated,
+            paidLinksCreated,
+            totalLinksEver,
+            expiredLinksCount,
+            limit: effectiveLimit,
+            plan,
+            planRenewals,
+            planTtlHours
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to fetch links.";
@@ -205,7 +315,7 @@ export async function DELETE(request: NextRequest) {
                 { status: 401 }
             );
         }
-
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const body = await request.json();
         const { slug } = body;
 

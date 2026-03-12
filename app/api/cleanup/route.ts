@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { rateLimitCleanup } from "@/lib/utils/rate-limiter";
 import { logger } from "@/lib/utils/logger";
+import { flushRedisClicks } from "@/services/analytics";
 
 export async function POST(request: NextRequest) {
     const startTime = Date.now();
@@ -38,6 +39,7 @@ export async function POST(request: NextRequest) {
         const results = {
             oldAnalyticsPruned: 0,
             rateLimitEntriesCleaned: true,
+            clicksFlushed: 0,
         };
 
         const BATCH_SIZE = 200;
@@ -69,6 +71,14 @@ export async function POST(request: NextRequest) {
 
         // ─── 2) Clean Rate Limiter Memory ─────────────────────────────────
         rateLimitCleanup();
+
+        // ─── 3) Flush Redis Clicks to Firebase ────────────────────────────
+        try {
+            const clicksFlushed = await flushRedisClicks();
+            results.clicksFlushed = clicksFlushed;
+        } catch (e) {
+            logger.error("cleanup_clicks", "Failed to flush clicks", { error: String(e) });
+        }
 
         const durationMs = Date.now() - startTime;
         logger.info("cleanup", "Cleanup completed", { ...results, durationMs });

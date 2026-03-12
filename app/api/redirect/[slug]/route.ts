@@ -1,37 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
-import { cacheGet, cacheSet } from "@/lib/cache/redirect-cache";
-import { isNegCached, setNegCache } from "@/lib/cache/negative-cache";
+import { getRedirectCache, setRedirectCache, setNegCacheRedis } from "@/lib/redis/redirect-cache";
+import { evaluateRequest } from "@/lib/redis/protection";
+import crypto from "crypto";
 
 export const runtime = "nodejs";
-
-const redirectLimiter = new Map<string, { count: number; windowStart: number }>();
-const REDIRECT_WINDOW_MS = 60_000;
-const REDIRECT_MAX_PER_IP = 120;
-const MAX_REDIRECT_LIMITER_ENTRIES = 10_000;
-
-function isRedirectRateLimited(ip: string): boolean {
-    const now = Date.now();
-    const entry = redirectLimiter.get(ip);
-
-    if (!entry || now - entry.windowStart >= REDIRECT_WINDOW_MS) {
-        if (redirectLimiter.size >= MAX_REDIRECT_LIMITER_ENTRIES) {
-            for (const [key, val] of redirectLimiter) {
-                if (now - val.windowStart >= REDIRECT_WINDOW_MS) redirectLimiter.delete(key);
-                if (redirectLimiter.size < MAX_REDIRECT_LIMITER_ENTRIES * 0.8) break;
-            }
-        }
-        redirectLimiter.set(ip, { count: 1, windowStart: now });
-        return false;
-    }
-
-    if (entry.count >= REDIRECT_MAX_PER_IP) return true;
-    entry.count++;
-    return false;
-}
-
-// Global promise cache to deduplicate simultaneous requests for the same slug
-const pendingLookups = new Map<string, Promise<{ originalUrl?: string; isActive?: boolean; expiresAt?: number | null; error?: string }>>();
 
 export async function GET(
     request: NextRequest,
@@ -39,57 +12,79 @@ export async function GET(
 ) {
     const { slug } = await params;
 
+    // Validate slug format before any DB/cache queries
+    if (!slug || !/^[a-zA-Z0-9-]{1,30}$/.test(slug)) {
+        return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-    if (isRedirectRateLimited(ip)) {
-        return new NextResponse("Too Many Requests", { status: 429 });
+    const userAgent = request.headers.get("user-agent") || "unknown";
+    const behaviorHash = crypto.createHash("sha256").update(`redirect:${ip}:${userAgent}`).digest("hex");
+
+
+    // Skip rate-limiting for automated tests in dev mode
+    const isTestBypass = process.env.NODE_ENV !== "production" && request.headers.get("x-test-bypass") === "true";
+    if (!isTestBypass) {
+        // Protect redirect route with evaluateRequest using a laxer profile (-1 daily limit)
+        // We rely mostly on IP, burst, and abuse score to protect against slug-scanning botnets.
+        const { state } = await evaluateRequest(ip, "redirect_anon", -1, undefined, behaviorHash);
+
+        if (state === "BLOCK") {
+            return new NextResponse("Too Many Requests", { status: 429 });
+        }
+
+        if (state === "SLOW") {
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
     }
 
     try {
-        if (isNegCached(slug)) {
+        // 1. Atomic Redis Cache Lookup (handles negative AND positive cache + click counters)
+        const cacheResult = await getRedirectCache(slug);
+
+        if (cacheResult.status === "NEG") {
             return NextResponse.json({ error: "not_found" }, { status: 404 });
         }
 
-        const cached = cacheGet(slug);
-        if (cached) {
+        if (cacheResult.status === "FOUND") {
             return NextResponse.json({
-                originalUrl: cached.originalUrl,
-                isActive: cached.isActive,
-                expiresAt: cached.expiresAt,
+                originalUrl: cacheResult.url,
+                isActive: true // Assuming active if in cache
+            }, {
+                headers: {
+                    "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400"
+                }
             });
         }
 
-        // Deduplicate simultaneous requests
-        if (!pendingLookups.has(slug)) {
-            const lookupPromise = (async () => {
-                const docSnap = await adminDb.collection("links").doc(slug).get();
-                if (!docSnap.exists) {
-                    setNegCache(slug);
-                    return { error: "not_found" };
-                }
-
-                const data = docSnap.data()!;
-                const originalUrl = data.originalUrl;
-                const expiresAt = data.expiresAt || null;
-                const isActive = data.isActive !== false;
-
-                const isExpired = expiresAt && expiresAt < Date.now();
-                if (isActive && !isExpired) {
-                    cacheSet(slug, originalUrl, isActive, expiresAt);
-                }
-
-                return { originalUrl, isActive, expiresAt };
-            })().finally(() => pendingLookups.delete(slug));
-
-            pendingLookups.set(slug, lookupPromise);
-        }
-
-        const result = await pendingLookups.get(slug);
-
-        if (result?.error === "not_found") {
+        // 2. Cache MISS / Error -> Query Firebase Fallback
+        const docSnap = await adminDb.collection("links").doc(slug).get();
+        
+        if (!docSnap.exists) {
+            // Async save to Redis so we don't block response
+            setNegCacheRedis(slug, 120).catch(console.error);
             return NextResponse.json({ error: "not_found" }, { status: 404 });
         }
 
-        return NextResponse.json(result);
+        const data = docSnap.data()!;
+        const originalUrl = data.originalUrl;
+        const expiresAt = data.expiresAt || null;
+        const isActive = data.isActive !== false;
+
+        const isExpired = expiresAt && expiresAt < Date.now();
+        if (isActive && !isExpired) {
+            // Adaptive TTL based roughly on if it's high traffic or not (could be improved, default 60m for now)
+            setRedirectCache(slug, originalUrl, 3600).catch(console.error);
+        } else {
+             // If inactive or expired, we might want to still cache it as negative, but returning the standard expired data is better for frontend routing
+             return NextResponse.json({ originalUrl, isActive, expiresAt }, { status: 200 });
+        }
+
+        return NextResponse.json({ originalUrl, isActive, expiresAt }, {
+            headers: {
+                "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400"
+            }
+        });
     } catch (error) {
         console.error("Redirect lookup error:", error);
         return new NextResponse("Internal Server Error", { status: 500 });

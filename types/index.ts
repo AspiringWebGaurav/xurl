@@ -5,6 +5,9 @@
  * Collection: `users`
  * Document ID: Firebase Auth UID
  */
+export type { PlanType } from "@/lib/plans";
+import type { PlanType } from "@/lib/plans";
+
 export interface UserDocument {
     uid: string;
     email: string;
@@ -12,14 +15,41 @@ export interface UserDocument {
     photoURL: string | null;
     createdAt: number;
     updatedAt: number;
-    plan: "free" | "pro" | "enterprise";
+    plan: PlanType;
+    planStatus: "active" | "past_due" | "canceled";
+    planStart: number | null;
+    planExpiry: number | null;
+    planRenewals: number;      // How many times the current plan has been purchased (1 = first purchase)
+    planEraStart: number | null; // Timestamp when the current plan era began (used to scope quota)
+    activeLinks: number;
+    cumulativeQuota?: number;
     linksCreated: number;
+    /** Free plan: total link creations used (max 3 lifetime) */
+    free_usage_count?: number;
+    /** Free plan: timestamp of last link creation (for 24h cooldown) */
+    free_last_used_at?: number | null;
     settings: UserSettings;
 }
 
 export interface UserSettings {
     defaultDomain: string;
     timezone: string;
+}
+
+/**
+ * Payment Order document for idempotency and tracking.
+ * Collection: `orders`
+ * Document ID: Razorpay order_id
+ */
+export interface OrderDocument {
+    orderId: string;
+    userId: string;
+    planId: PlanType;
+    amount: number;
+    currency: string;
+    status: "created" | "paid" | "consumed" | "failed";
+    createdAt: number;
+    updatedAt: number;
 }
 
 /**
@@ -38,8 +68,12 @@ export interface LinkDocument {
     isActive: boolean;
     password: string | null;
     tags: string[];
+    createdUnderPlan: PlanType;     // Which plan the link was created under
+    planEraStart: number | null;   // The user's planEraStart at time of link creation
     // Aggregated counters — no per-click documents needed for totals
     totalClicks: number;
+    /** Native Firestore TTL deletion timestamp - set to 7 days after expiresAt */
+    deleteAt?: number | null;
 }
 
 /**
@@ -109,15 +143,4 @@ export interface CacheEntry {
     hitCount: number;       // for adaptive TTL
 }
 
-/**
- * Quota and Indempotency document for authenticated users.
- * Collection: `users/{userId}/quota`
- * Document ID: `main`
- */
-export interface QuotaDocument {
-    // Stores only active link references to accurately determine quota limit 
-    // despite Firestore TTL deletion delays.
-    activeLinks: { slug: string; expiresAt: number | null }[];
-    // Idempotency keys used by this user to prevent duplicate creations
-    idempotencyKeys: Record<string, { slug: string; timestamp: number }>;
-}
+

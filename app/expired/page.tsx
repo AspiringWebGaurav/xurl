@@ -44,8 +44,9 @@ export default function ExpiredPage() {
                             <div className="mt-8 pt-8 border-t border-border/40 w-full">
                                 <h3 className="text-sm font-medium text-foreground mb-2">Expiration Policy</h3>
                                 <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-4 marker:text-muted-foreground/50">
-                                    <li>Links created by guests automatically expire after 2 hours.</li>
-                                    <li>Links created by signed-in users automatically expire after 12 hours.</li>
+                                    <li>Guest links expire after 5 minutes.</li>
+                                    <li>Free account links expire after 10 minutes.</li>
+                                    <li>Paid plan links expire between 2–24 hours depending on your plan.</li>
                                     <li>Once a link expires, its destination cannot be recovered.</li>
                                 </ul>
                             </div>

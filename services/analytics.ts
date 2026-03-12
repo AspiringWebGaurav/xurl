@@ -17,6 +17,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { rateLimitAnalyticsWrite } from "@/lib/utils/rate-limiter";
 import { logger } from "@/lib/utils/logger";
+import { getRedisClient, safeRedis } from "@/lib/redis/client";
 import type { AnalyticsDocument } from "@/types";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -151,4 +152,85 @@ export async function getDashboardSummary(userId: string): Promise<{
     });
 
     return { totalClicks, activeLinks, topLinks: topLinks.slice(0, 10) };
+}
+
+// ─── Redis Sync ─────────────────────────────────────────────────────────────
+
+/**
+ * Sweeps all aggregated `clicks:{slug}` keys from Redis, resets them atomically,
+ * and commits them in batches to the Firestore link and analytics documents.
+ * This should be called by the central cron job.
+ */
+export async function flushRedisClicks(): Promise<number> {
+    const redis = getRedisClient();
+    if (!redis) return 0;
+
+    let totalFlushed = 0;
+    try {
+        const keys = (await safeRedis(c => c.keys("clicks:*"))) as string[];
+        if (!keys || keys.length === 0) return 0;
+        
+        // Process in chunks of 50 to avoid Lua maximum execution timeouts or Firebase batch limits
+        const CHUNK_SIZE = 50;
+        
+        for (let i = 0; i < keys.length; i += CHUNK_SIZE) {
+            const batchKeys = keys.slice(i, i + CHUNK_SIZE);
+            if (batchKeys.length === 0) continue;
+            
+            // Atomically GET then DEL keys to ensure 0 lost clicks between read and delete
+            const luaScript = `
+                local results = {}
+                for idx, key in ipairs(KEYS) do
+                    local val = redis.call("GET", key)
+                    table.insert(results, val)
+                    redis.call("DEL", key)
+                end
+                return results
+            `;
+            
+            const rawValues = await safeRedis(c => c.eval(luaScript, batchKeys, [] as string[]));
+            const values = rawValues as (string | null)[];
+            if (!values) continue;
+            
+            const fbBatch = adminDb.batch();
+            const today = getTodayDateString();
+            let batchHasWrites = false;
+            
+            for (let j = 0; j < batchKeys.length; j++) {
+                const clickCountStr = values[j];
+                if (!clickCountStr) continue;
+                
+                const urlClicks = Number(clickCountStr);
+                if (isNaN(urlClicks) || urlClicks <= 0) continue;
+                
+                const slug = batchKeys[j].substring(7); // Remove "clicks:" prefix
+                
+                // 1) Update total clicks
+                fbBatch.update(adminDb.collection("links").doc(slug), {
+                    totalClicks: FieldValue.increment(urlClicks)
+                });
+                
+                // 2) Update daily analytics
+                const dailyRef = adminDb.collection("analytics").doc(`${slug}_${today}`);
+                fbBatch.set(dailyRef, {
+                    slug,
+                    date: today,
+                    clicks: FieldValue.increment(urlClicks),
+                    uniqueVisitors: FieldValue.increment(urlClicks) // Simplified without fingerprinting at this stage
+                }, { merge: true });
+                
+                totalFlushed += urlClicks;
+                batchHasWrites = true;
+            }
+            
+            if (batchHasWrites) {
+                await fbBatch.commit();
+            }
+        }
+        
+    } catch (e) {
+        logger.error("redis_flush", "Failed to flush redis clicks", { error: String(e) });
+    }
+    
+    return totalFlushed;
 }
