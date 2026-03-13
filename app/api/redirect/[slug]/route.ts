@@ -76,8 +76,9 @@ export async function GET(
             // Adaptive TTL based roughly on if it's high traffic or not (could be improved, default 60m for now)
             setRedirectCache(slug, originalUrl, 3600).catch(console.error);
         } else {
-             // If inactive or expired, we might want to still cache it as negative, but returning the standard expired data is better for frontend routing
-             return NextResponse.json({ originalUrl, isActive, expiresAt }, { status: 200 });
+             // Expired/inactive: cache as negative, do not expose originalUrl
+             setNegCacheRedis(slug, 120).catch(console.error);
+             return NextResponse.json({ error: "expired", isActive, expiresAt }, { status: 410 });
         }
 
         return NextResponse.json({ originalUrl, isActive, expiresAt }, {

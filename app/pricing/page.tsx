@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, Suspense } from "react";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronLeft, ChevronRight, ShieldCheck, Zap } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Lock, ShieldCheck, Zap } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
@@ -82,11 +82,11 @@ interface PricingTier {
 
 // UI-only metadata for each paid plan (display strings not in PLAN_CONFIGS)
 const PLAN_UI_META: Record<string, { description: string; features: string[]; ctaText: string; comparisonHint?: string }> = {
-    starter: { description: "Personal use", features: ["Login required", "Custom aliases"], ctaText: "Start" },
-    pro: { description: "For power users", features: ["Login required", "Custom aliases", "Priority support"], ctaText: "Go Pro" },
-    business: { description: "Best value for heavy users", features: ["Login required", "Custom aliases", "Priority support", "4× more links than Pro"], ctaText: "Get Business", comparisonHint: "Most Popular" },
-    enterprise: { description: "Advanced link management", features: ["Login required", "Custom aliases", "Custom domains integration"], ctaText: "Go Enterprise" },
-    bigenterprise: { description: "Maximum scale", features: ["Login required", "Custom aliases", "Dedicated account manager"], ctaText: "Go Big" },
+    starter: { description: "Personal use", features: ["Login required", "Custom aliases", "Analytics Dashboard"], ctaText: "Start" },
+    pro: { description: "For power users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Priority support"], ctaText: "Go Pro" },
+    business: { description: "Best value for heavy users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Priority support", "4× more links than Pro"], ctaText: "Get Business", comparisonHint: "Most Popular" },
+    enterprise: { description: "Advanced link management", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Custom domains integration"], ctaText: "Go Enterprise" },
+    bigenterprise: { description: "Maximum scale", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Dedicated account manager"], ctaText: "Go Big" },
 };
 
 function formatTtl(ttlMs: number): string {
@@ -413,6 +413,13 @@ export default function PricingPage() {
                                         </button>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-3 px-1">
+                            <div className="flex items-start gap-3">
+                                <Lock className="mt-0.5 h-[18px] w-[18px] shrink-0 text-slate-300" />
+                                <span className="text-[14px] leading-5 text-slate-400">Analytics Dashboard</span>
                             </div>
                         </div>
 

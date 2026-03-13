@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Monitor } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -8,12 +8,13 @@ interface DesktopOnlyOverlayProps {
     children: React.ReactNode;
 }
 
+const emptySubscribe = () => () => {};
+
 export function DesktopOnlyOverlay({ children }: DesktopOnlyOverlayProps) {
     const [isDesktop, setIsDesktop] = useState(true);
-    const [isClient, setIsClient] = useState(false);
+    const isClient = useSyncExternalStore(emptySubscribe, () => true, () => false);
 
     useEffect(() => {
-        setIsClient(true);
         const checkScreenSize = () => {
             setIsDesktop(window.innerWidth >= 1024);
         };

@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/Logo";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { History, LogOut, Loader2, ArrowLeft } from "lucide-react";
+import { History, LogOut, Loader2, ArrowLeft, BarChart3 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -354,6 +354,19 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                             Back to shortener
                         </Link>
                     )}
+                    {user && (
+                        <Link
+                            href="/analytics"
+                            className={cn(
+                                navActionBase,
+                                secondaryAction,
+                                "gap-1.5"
+                            )}
+                        >
+                            <BarChart3 className="w-3.5 h-3.5" />
+                            Analytics
+                        </Link>
+                    )}
                     <button
                         onClick={() => {
                             if (pathname !== "/") {
@@ -365,10 +378,8 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                         disabled={isCreateDisabled}
                         className={cn(
                             navActionBase,
-                            "min-w-[104px] border border-transparent bg-transparent shadow-none",
-                            isCreateDisabled
-                                ? "cursor-not-allowed text-slate-400/50"
-                                : subtleAction
+                            secondaryAction,
+                            isCreateDisabled && "cursor-not-allowed opacity-50"
                         )}
                     >
                         Create link
@@ -383,14 +394,14 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                     user ? (
                         <>
                                 {/* Desktop History Button */}
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
+                                <button
                                     onClick={() => { setIsHistoryOpen(true); setHasNewHistory(false); }}
-                                    className={`hidden sm:flex relative text-[13px] font-medium h-8 px-2.5 rounded-md border transition-all ${linkCount !== null && linkCount > 0 ? "border-emerald-200/80 shadow-sm text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/80 hover:border-emerald-300" : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/50 hover:border-slate-200"
-                                        } transition-transform duration-150`}
+                                    className={cn(
+                                        navActionBase,
+                                        secondaryAction,
+                                        "hidden sm:flex relative"
+                                    )}
                                 >
-                                    <History className="h-3.5 w-3.5 mr-1.5" />
                                     History
                                     <AnimatePresence>
                                         {linkCount !== null && linkCount > 0 && (
@@ -408,7 +419,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                                     {hasNewHistory && (
                                         <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
                                     )}
-                                </Button>
+                                </button>
 
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
@@ -438,6 +449,11 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                                         <DropdownMenuItem asChild>
                                             <Link href="/purchase-history" className="w-full cursor-pointer text-[13px]">
                                                 <span className="flex-1">Purchase History</span>
+                                            </Link>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem asChild>
+                                            <Link href="/analytics" className="w-full cursor-pointer text-[13px]">
+                                                <span className="flex-1">Analytics</span>
                                             </Link>
                                         </DropdownMenuItem>
                                         <DropdownMenuItem className="sm:hidden text-[13px]" onClick={() => { setIsHistoryOpen(true); setHasNewHistory(false); }}>

@@ -28,9 +28,12 @@ const CONCURRENCY_BATCH = 50; // Fire in batches to avoid socket exhaustion
 async function createTestLink() {
     const res = await fetch(`${BASE_URL}/api/links`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+            "Content-Type": "application/json",
+            "x-test-bypass": "true",
+            "x-test-user-id": `stress_test_runner_${Date.now()}`,
+        },
         body: JSON.stringify({
-            userId: "stress-test-runner",
             originalUrl: "https://example.com/stress-test-target",
         }),
     });

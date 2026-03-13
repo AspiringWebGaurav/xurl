@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ShieldAlert, Clock, ArrowRight } from "lucide-react";
+import { ShieldAlert, Clock, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
@@ -39,7 +39,7 @@ export function RateLimitModal({ isOpen, onClose, retryAfterSeconds = 60 }: Rate
                                     Whoa there, slow down!
                                 </h3>
                                 <p className="text-sm text-muted-foreground leading-relaxed mb-6">
-                                    We've detected an unusually high number of requests from your network. To protect our service, we've temporarily paused link creation.
+                                    We&apos;ve detected an unusually high number of requests from your network. To protect our service, we&apos;ve temporarily paused link creation.
                                 </p>
 
                                 {/* Cooldown Indicator */}

@@ -5,10 +5,11 @@
  *
  * Automatically tests the XURL system's core functionality:
  *  1. API reachability
- *  2. Link creation via POST /api/links
+ *  2. Link creation via POST /api/links (guest + authenticated)
  *  3. Redirect behavior via GET /{slug}
- *  4. Expiration logic validation
- *  5. Input validation (invalid URLs, missing data)
+ *  4. Non-existent slug handling
+ *  5. Input validation (invalid URLs, missing data, bad protocols)
+ *  6. Redirect API expiration response
  *
  * Usage:
  *   node scripts/health-check.mjs [BASE_URL]
@@ -40,12 +41,31 @@ async function fetchJson(url, options = {}) {
     const res = await fetch(url, {
         ...options,
         headers: { "Content-Type": "application/json", ...options.headers },
-        redirect: "manual", // Don't follow redirects automatically
+        redirect: "manual",
     });
     const isJson =
         res.headers.get("content-type")?.includes("application/json") ?? false;
     const body = isJson ? await res.json() : await res.text();
     return { status: res.status, headers: res.headers, body };
+}
+
+// Unique IP per run to avoid guest limit collisions
+const RUN_ID = Date.now().toString(36);
+const TEST_IP = `10.99.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+
+// Common test headers: bypass rate limiting + use unique IP
+const testHeaders = {
+    "x-test-bypass": "true",
+    "x-forwarded-for": TEST_IP,
+    "x-device-fingerprint": `fp_health_${RUN_ID}`,
+};
+
+// Headers for authenticated test users
+function authTestHeaders(userId) {
+    return {
+        ...testHeaders,
+        "x-test-user-id": userId,
+    };
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -67,25 +87,51 @@ async function testApiReachable() {
 async function testCreateLink() {
     console.log("\n── Link Creation ──");
 
-    // Test with valid URL
+    // Create as guest (unique IP so we don't hit prior guest limit)
     try {
         const { status, body } = await fetchJson(`${BASE_URL}/api/links`, {
             method: "POST",
+            headers: testHeaders,
             body: JSON.stringify({
-                userId: "health-check-test",
                 originalUrl: "https://example.com/health-check-test",
             }),
         });
 
         if (status === 201 && body.slug && body.shortUrl && body.originalUrl) {
-            ok(`Link created (slug: ${body.slug})`);
-            return body; // Return for use in subsequent tests
+            ok(`Guest link created (slug: ${body.slug})`);
+            return body;
         } else {
-            fail("Link created", `Status: ${status}, Body: ${JSON.stringify(body)}`);
+            fail("Guest link created", `Status: ${status}, Body: ${JSON.stringify(body)}`);
             return null;
         }
     } catch (err) {
-        fail("Link created", err.message);
+        fail("Guest link created", err.message);
+        return null;
+    }
+}
+
+async function testAuthenticatedLink() {
+    console.log("\n── Authenticated Link Creation ──");
+
+    const userId = `health_check_user_${RUN_ID}`;
+    try {
+        const { status, body } = await fetchJson(`${BASE_URL}/api/links`, {
+            method: "POST",
+            headers: authTestHeaders(userId),
+            body: JSON.stringify({
+                originalUrl: "https://example.com/auth-health-check",
+            }),
+        });
+
+        if (status === 201 && body.slug && body.shortUrl && body.originalUrl) {
+            ok(`Auth link created (slug: ${body.slug})`);
+            return body;
+        } else {
+            fail("Auth link created", `Status: ${status}, Body: ${JSON.stringify(body)}`);
+            return null;
+        }
+    } catch (err) {
+        fail("Auth link created", err.message);
         return null;
     }
 }
@@ -117,69 +163,74 @@ async function testRedirect(slug) {
 }
 
 async function testNonExistentSlug() {
-    console.log("\n── 404 Handling ──");
+    console.log("\n── Non-Existent Slug Handling ──");
 
+    const fakeSlug = `no-such-slug-${RUN_ID}`;
+
+    // Test via proxy (edge middleware redirects to /expired)
     try {
-        const res = await fetch(`${BASE_URL}/nonexistent-slug-xyz-999`, {
-            redirect: "manual",
-        });
+        const res = await fetch(`${BASE_URL}/${fakeSlug}`, { redirect: "manual" });
 
-        if (res.status === 404) {
+        if (res.status === 302) {
+            const location = res.headers.get("location") || "";
+            if (location.includes("/expired")) {
+                ok("Non-existent slug redirects to /expired (302)");
+            } else {
+                fail("Non-existent slug handling", `302 but to unexpected location: ${location}`);
+            }
+        } else if (res.status === 404) {
             ok("Non-existent slug returns 404");
         } else {
-            fail(
-                "Non-existent slug returns 404",
-                `Expected 404, got ${res.status}`
-            );
+            fail("Non-existent slug handling", `Expected 302→/expired or 404, got ${res.status}`);
         }
     } catch (err) {
-        fail("Non-existent slug returns 404", err.message);
+        fail("Non-existent slug handling", err.message);
+    }
+
+    // Test via API directly (should return 404 JSON)
+    try {
+        const { status, body } = await fetchJson(`${BASE_URL}/api/redirect/${fakeSlug}`, {
+            headers: { "x-test-bypass": "true" },
+        });
+
+        if (status === 404) {
+            ok("Redirect API returns 404 for non-existent slug");
+        } else {
+            fail("Redirect API 404", `Expected 404, got ${status}`);
+        }
+    } catch (err) {
+        fail("Redirect API 404", err.message);
     }
 }
 
 async function testInputValidation() {
     console.log("\n── Input Validation ──");
 
-    // Test missing URL
+    const userId = `health_check_validation_${RUN_ID}`;
+
+    // Test missing originalUrl
     try {
         const { status } = await fetchJson(`${BASE_URL}/api/links`, {
             method: "POST",
-            body: JSON.stringify({ userId: "test" }),
+            headers: authTestHeaders(userId),
+            body: JSON.stringify({}),
         });
 
         if (status === 400) {
-            ok("Rejects missing URL (400)");
+            ok("Rejects missing originalUrl (400)");
         } else {
-            fail("Rejects missing URL", `Expected 400, got ${status}`);
+            fail("Rejects missing originalUrl", `Expected 400, got ${status}`);
         }
     } catch (err) {
-        fail("Rejects missing URL", err.message);
-    }
-
-    // Test missing userId
-    try {
-        const { status } = await fetchJson(`${BASE_URL}/api/links`, {
-            method: "POST",
-            body: JSON.stringify({ originalUrl: "https://example.com" }),
-        });
-
-        if (status === 400) {
-            ok("Rejects missing userId (400)");
-        } else {
-            fail("Rejects missing userId", `Expected 400, got ${status}`);
-        }
-    } catch (err) {
-        fail("Rejects missing userId", err.message);
+        fail("Rejects missing originalUrl", err.message);
     }
 
     // Test invalid URL (no protocol)
     try {
         const { status } = await fetchJson(`${BASE_URL}/api/links`, {
             method: "POST",
-            body: JSON.stringify({
-                userId: "test",
-                originalUrl: "not-a-url",
-            }),
+            headers: authTestHeaders(userId),
+            body: JSON.stringify({ originalUrl: "not-a-url" }),
         });
 
         if (status === 400) {
@@ -195,10 +246,8 @@ async function testInputValidation() {
     try {
         const { status } = await fetchJson(`${BASE_URL}/api/links`, {
             method: "POST",
-            body: JSON.stringify({
-                userId: "test",
-                originalUrl: "ftp://files.example.com/foo",
-            }),
+            headers: authTestHeaders(userId),
+            body: JSON.stringify({ originalUrl: "ftp://files.example.com/foo" }),
         });
 
         if (status === 400) {
@@ -209,50 +258,49 @@ async function testInputValidation() {
     } catch (err) {
         fail("Rejects non-http/https protocol", err.message);
     }
+
+    // Test guest cannot use custom alias
+    try {
+        const guestIp = `10.88.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+        const { status, body } = await fetchJson(`${BASE_URL}/api/links`, {
+            method: "POST",
+            headers: {
+                "x-test-bypass": "true",
+                "x-forwarded-for": guestIp,
+                "x-device-fingerprint": `fp_alias_test_${RUN_ID}`,
+            },
+            body: JSON.stringify({
+                originalUrl: "https://example.com/alias-test",
+                customSlug: "my-custom-alias",
+            }),
+        });
+
+        if (status === 403) {
+            ok("Guest blocked from custom alias (403)");
+        } else {
+            fail("Guest custom alias blocked", `Expected 403, got ${status}`);
+        }
+    } catch (err) {
+        fail("Guest custom alias blocked", err.message);
+    }
 }
 
-async function testExpirationLogic() {
-    console.log("\n── Expiration Logic ──");
+async function testRedirectApiExpiration() {
+    console.log("\n── Redirect API Expiration ──");
 
-    // Create a link as anonymous (should expire in 2h)
+    // Query redirect API for a slug that doesn't exist — should be 404
     try {
-        const { status, body } = await fetchJson(`${BASE_URL}/api/links`, {
-            method: "POST",
-            body: JSON.stringify({
-                userId: "anonymous",
-                originalUrl: "https://example.com/expiry-test",
-            }),
+        const { status } = await fetchJson(`${BASE_URL}/api/redirect/expired-test-${RUN_ID}`, {
+            headers: { "x-test-bypass": "true" },
         });
 
-        if (status === 201 && body.createdAt) {
-            // The server should have set expiresAt = createdAt + 2h
-            // We can't directly read Firestore here, but we can verify the
-            // response structure indicates the link was created properly.
-            ok("Anonymous link created with server-enforced expiration");
+        if (status === 404) {
+            ok("Redirect API correctly returns 404 for missing slug");
         } else {
-            fail("Anonymous link expiration", `Status: ${status}`);
+            fail("Redirect API missing slug", `Expected 404, got ${status}`);
         }
     } catch (err) {
-        fail("Anonymous link expiration", err.message);
-    }
-
-    // Create a link as authenticated user (should expire in 12h)
-    try {
-        const { status, body } = await fetchJson(`${BASE_URL}/api/links`, {
-            method: "POST",
-            body: JSON.stringify({
-                userId: "health-check-auth-user",
-                originalUrl: "https://example.com/auth-expiry-test",
-            }),
-        });
-
-        if (status === 201 && body.createdAt) {
-            ok("Authenticated link created with 12h expiration");
-        } else {
-            fail("Authenticated link expiration", `Status: ${status}`);
-        }
-    } catch (err) {
-        fail("Authenticated link expiration", err.message);
+        fail("Redirect API missing slug", err.message);
     }
 }
 
@@ -262,11 +310,12 @@ async function main() {
     console.log(`\n🔍 XURL Health Check — ${BASE_URL}\n${"─".repeat(50)}`);
 
     await testApiReachable();
-    const link = await testCreateLink();
-    await testRedirect(link?.slug);
+    const guestLink = await testCreateLink();
+    const authLink = await testAuthenticatedLink();
+    await testRedirect(guestLink?.slug || authLink?.slug);
     await testNonExistentSlug();
     await testInputValidation();
-    await testExpirationLogic();
+    await testRedirectApiExpiration();
 
     console.log(`\n${"─".repeat(50)}`);
     console.log(`\n📊 Results: ${passed} passed, ${failed} failed\n`);

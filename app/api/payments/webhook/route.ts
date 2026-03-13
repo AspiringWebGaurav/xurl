@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase/admin";
 import { razorpayService } from "@/services/payments/razorpay";
 import { PLAN_CONFIGS, resolvePlanType, getPricePaise } from "@/lib/plans";
 import { applyPlanUpgrade } from "@/services/plan-upgrade";
@@ -80,6 +79,6 @@ export async function POST(request: NextRequest) {
     } catch (error) {
         console.error("WEBHOOK FATAL:", error);
         logger.error("webhook_error", error instanceof Error ? error.message : "Webhook processing failed");
-        return NextResponse.json({ error: "Internal Server Error", details: error instanceof Error ? error.message : "failed", stack: error instanceof Error ? error.stack : "" }, { status: 500 });
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

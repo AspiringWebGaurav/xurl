@@ -1,7 +1,5 @@
 import { adminDb } from "@/lib/firebase/admin";
 import { type PlanType } from "@/lib/plans";
-import crypto from "crypto";
-import { FieldValue } from "firebase-admin/firestore";
 
 export type TransactionAction = "guest_use" | "free_use" | "upgrade" | "renew" | "downgrade" | "expire";
 

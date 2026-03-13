@@ -244,27 +244,22 @@ export async function GET(request: NextRequest) {
         
         const planRenewals = userData?.planRenewals || 1;
 
-        // Count ALL links (active + expired + deactivated) for comprehensive stats
-        const allLinksSnap = await adminDb.collection("links")
-            .where("userId", "==", verifiedUid)
-            .get();
+        // Use user document counters instead of scanning all links
+        const totalLinksEver = userData?.linksCreated || 0;
+        const activeLinksFromDoc = userData?.activeLinks || 0;
 
-        let totalLinksEver = 0;
-        let expiredLinksCount = 0;
+        // Count free vs paid active links only from the paginated result
+        // (these are approximate since we only see the current page, but the
+        // exact counts are enforced server-side in createLink transactions)
         let freeLinksCreated = 0;
         let paidLinksCreated = 0;
 
-        allLinksSnap.forEach((doc) => {
-            const data = doc.data();
-            totalLinksEver++;
-            if (!data.isActive) return; // deactivated
-            if (data.expiresAt && data.expiresAt <= now) {
-                expiredLinksCount++;
-                return;
-            }
-            if (data.createdUnderPlan === "free") {
+        result.links.forEach((link) => {
+            if (!link.isActive) return;
+            if (link.expiresAt && link.expiresAt <= now) return;
+            if (link.createdUnderPlan === "free") {
                 freeLinksCreated++;
-            } else if (data.createdUnderPlan !== "guest") {
+            } else if (link.createdUnderPlan !== "guest") {
                 paidLinksCreated++;
             }
         });
@@ -274,12 +269,14 @@ export async function GET(request: NextRequest) {
         const planTtlHours = planTtlMs / (60 * 60 * 1000);
 
         // Add computed status to each link for the frontend
+        let expiredLinksCount = 0;
         const enrichedLinks = result.links.map((link) => {
             let status: "active" | "expired" | "deactivated" = "active";
             if (!link.isActive) {
                 status = "deactivated";
             } else if (link.expiresAt && link.expiresAt <= now) {
                 status = "expired";
+                expiredLinksCount++;
             }
             return { ...link, status };
         });
@@ -290,6 +287,7 @@ export async function GET(request: NextRequest) {
             freeLinksCreated,
             paidLinksCreated,
             totalLinksEver,
+            activeLinks: activeLinksFromDoc,
             expiredLinksCount,
             limit: effectiveLimit,
             plan,
@@ -315,7 +313,6 @@ export async function DELETE(request: NextRequest) {
                 { status: 401 }
             );
         }
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const body = await request.json();
         const { slug } = body;
 

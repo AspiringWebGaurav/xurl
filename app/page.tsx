@@ -7,7 +7,7 @@ import { auth } from "@/lib/firebase/config";
 import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { env } from "@/lib/env";
 import { buildShortUrl } from "@/lib/utils/url-builder";
-import { SiteFooter } from "@/components/layout/SiteFooter";
+import { HomeFooter } from "@/components/layout/HomeFooter";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,6 @@ function SearchParamsHandler({ onFocus }: { onFocus: () => void }) {
         if (searchParams.get("focus") === "true") {
             onFocus();
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
     return null;
 }
@@ -77,7 +76,6 @@ export default function HomePage() {
     const [viewingPastLink, setViewingPastLink] = useState(false);
     const [focusTriggered, setFocusTriggered] = useState(false);
     const [isRateLimited, setIsRateLimited] = useState(false);
-    const [showDelayedModuleSkeleton, setShowDelayedModuleSkeleton] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -111,7 +109,6 @@ export default function HomePage() {
                 setQuota(null);
             }
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
         return () => unsubscribe();
     }, []);
 
@@ -469,24 +466,10 @@ export default function HomePage() {
         }
     };
 
-    const isMiddleModuleLoading = authLoading || (!user && guestLoading) || !mounted;
-
-    useEffect(() => {
-        if (!isMiddleModuleLoading) {
-            setShowDelayedModuleSkeleton(false);
-            return;
-        }
-
-        const timeoutId = window.setTimeout(() => {
-            setShowDelayedModuleSkeleton(true);
-        }, 150);
-
-        return () => window.clearTimeout(timeoutId);
-    }, [isMiddleModuleLoading]);
-
     // Determine if the user has reached their quota limit
     const isOverQuota = !!(user && quota && (quota.plan === "free" ? quota.freeLinksCreated >= quota.limit : quota.paidLinksCreated >= quota.limit));
     const isDisabled = (!user && guestUsed) || isOverQuota;
+    const isPageSkeletonLoading = authLoading || (!user && guestLoading) || !mounted;
     const heroCardBase = "w-full bg-card border border-border/70 rounded-2xl p-5 sm:p-6 shadow-[0_18px_45px_-28px_rgba(15,23,42,0.22)] relative overflow-hidden";
     const statusPillBase = "flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-xs font-semibold tracking-wide shadow-[0_10px_24px_-18px_rgba(15,23,42,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_32px_-20px_rgba(15,23,42,0.28)]";
     const premiumInputClass = "h-12 bg-background/95 border-border/80 shadow-[0_1px_2px_rgba(15,23,42,0.05)] rounded-xl text-[15px] placeholder:text-muted-foreground/75 focus-visible:border-foreground/20 focus-visible:bg-background focus-visible:ring-[3px] focus-visible:ring-slate-900/10 focus-visible:shadow-[0_0_0_1px_rgba(15,23,42,0.04),0_16px_32px_-22px_rgba(15,23,42,0.32)] transition-all duration-200";
@@ -494,26 +477,56 @@ export default function HomePage() {
     const premiumPrimaryButtonClass = "w-full h-12 rounded-xl py-0 shadow-[0_14px_28px_-18px_rgba(15,23,42,0.55)] bg-foreground text-background hover:-translate-y-0.5 hover:bg-foreground/92 hover:shadow-[0_20px_36px_-20px_rgba(15,23,42,0.58)] active:translate-y-0 font-medium mt-2 transition-all duration-200 relative overflow-hidden";
 
     return (
-        <div className="flex flex-col h-[100dvh] overflow-hidden bg-background">
+        <div id="home-root" className="flex flex-col h-[100dvh] overflow-hidden bg-background">
             <Suspense fallback={null}>
                 <SearchParamsHandler onFocus={() => setFocusTriggered(true)} />
             </Suspense>
-            <TopNavbar isCreateDisabled={isDisabled} />
+            {isPageSkeletonLoading ? (
+                <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-6">
+                    <div className="flex items-center gap-3">
+                        <Skeleton className="h-8 w-8 rounded-lg bg-muted/55" />
+                        <Skeleton className="h-5 w-12 rounded-md bg-muted/45" />
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                        <Skeleton className="hidden h-9 w-[86px] rounded-lg bg-muted/45 sm:block" />
+                        <Skeleton className="h-9 w-[100px] rounded-lg bg-muted/55" />
+                    </div>
+                </header>
+            ) : (
+                <TopNavbar isCreateDisabled={isDisabled} />
+            )}
 
-            <main className="flex-1 flex flex-col w-full px-6 md:px-8 overflow-y-auto overflow-x-hidden">
+            <main className="flex-1 flex flex-col w-full px-6 md:px-8 pb-16 overflow-y-auto overflow-x-hidden">
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, ease: "easeOut" }}
                     className="w-full max-w-xl flex flex-col gap-6 m-auto"
                 >
+                    {isPageSkeletonLoading ? (
+                        <div className="text-center">
+                            <div className="mx-auto flex max-w-[34rem] flex-col items-center">
+                                <Skeleton className="h-12 w-full max-w-[420px] rounded-xl bg-muted/55 sm:h-[56px]" />
+                                <Skeleton className="mt-4 h-4 w-full max-w-[430px] rounded-md bg-muted/40" />
+                                <Skeleton className="mt-2 h-4 w-full max-w-[300px] rounded-md bg-muted/30" />
+                                <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+                                    <Skeleton className="h-9 w-[250px] rounded-full bg-muted/35" />
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
                     <div className="text-center">
                         <h1 className="text-[40px] font-semibold leading-[0.98] tracking-[-0.045em] text-foreground sm:text-[46px]">
                             Shorten your URL
                         </h1>
-                        <p className="mx-auto mt-3 max-w-[34rem] text-sm leading-6 text-muted-foreground/90 sm:text-[15px]">
+                        <p className="mx-auto mt-2 max-w-[34rem] text-sm leading-6 text-muted-foreground/90 sm:text-[15px]">
                             Turn long URLs into clean, shareable links with optional custom aliases in a few quick steps.
                         </p>
+                    </div>
+                    )}
+
+                    {!(!user && guestUsed && !viewingPastLink) && (
+                    <div className="text-center">
                         {!authLoading && (
                             <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
                                 {user ? (
@@ -568,37 +581,30 @@ export default function HomePage() {
                             </div>
                         )}
                     </div>
+                    )}
 
                     <AnimatePresence mode="wait">
-                        {isMiddleModuleLoading ? (
-                            showDelayedModuleSkeleton ? (
-                                <motion.div
-                                    key="loading"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    transition={{ duration: 0.2 }}
-                                    className={`${heroCardBase} flex flex-col min-h-[290px] justify-center gap-4`}
-                                >
-                                    <div className="flex flex-col gap-2">
-                                        <div className="flex justify-between items-center px-1">
-                                            <Skeleton className="h-4 w-28 bg-muted/60" />
-                                        </div>
-                                        <Skeleton className="h-12 w-full rounded-lg bg-muted/40" />
+                        {isPageSkeletonLoading ? (
+                            <motion.div
+                                key="loading"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className={`${heroCardBase} flex flex-col min-h-[290px] justify-center gap-4`}
+                            >
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex justify-between items-center px-1">
+                                        <Skeleton className="h-4 w-28 bg-muted/60" />
                                     </div>
-                                    <div className="flex flex-col gap-2 mt-1">
-                                        <Skeleton className="h-4 w-24 bg-muted/60 px-1" />
-                                        <Skeleton className="h-12 w-full rounded-lg bg-muted/40" />
-                                    </div>
-                                    <Skeleton className="h-12 w-full rounded-lg bg-muted/60 mt-2" />
-                                </motion.div>
-                            ) : (
-                                <div
-                                    key="loading-placeholder"
-                                    aria-hidden="true"
-                                    className="min-h-[290px] w-full"
-                                />
-                            )
+                                    <Skeleton className="h-12 w-full rounded-lg bg-muted/40" />
+                                </div>
+                                <div className="flex flex-col gap-2 mt-1">
+                                    <Skeleton className="h-4 w-24 bg-muted/60 px-1" />
+                                    <Skeleton className="h-12 w-full rounded-lg bg-muted/40" />
+                                </div>
+                                <Skeleton className="h-12 w-full rounded-lg bg-muted/60 mt-2" />
+                            </motion.div>
                         ) : (!user && guestUsed && !viewingPastLink) ? (
                             <motion.div
                                 key="limit"
@@ -935,7 +941,7 @@ export default function HomePage() {
                 onClose={() => setIsRateLimited(false)}
             />
 
-            <SiteFooter />
+            <HomeFooter />
         </div>
     );
 }

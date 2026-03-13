@@ -3,10 +3,17 @@ import { Metadata } from "next";
 import { GuestPolicyContent } from "@/components/legal/GuestPolicyContent";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { TopNavbar } from "@/components/layout/TopNavbar";
+import { seo } from "@/lib/seo";
 
 export const metadata: Metadata = {
-    title: "Guest / No-Login Policy | XURL",
-    description: "XURL policy for guest users creating links without an account.",
+    title: "Guest Policy",
+    description: "XURL policy for guest users creating links without an account. Learn about guest link limits, expiry, and data handling.",
+    alternates: { canonical: `${seo.url}/guest-policy` },
+    openGraph: {
+        title: "Guest Policy — XURL",
+        description: "XURL policy for guest users creating links without an account.",
+        url: `${seo.url}/guest-policy`,
+    },
 };
 
 const updatedAt = new Date().toLocaleDateString("en-GB");

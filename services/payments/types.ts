@@ -16,7 +16,7 @@ export interface OrderResponse {
 
 export interface WebhookEvent {
     eventId: string;
-    eventBody: any;
+    eventBody: Record<string, unknown>;
 }
 
 export interface PaymentService {

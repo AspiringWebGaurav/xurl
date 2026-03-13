@@ -14,7 +14,8 @@ const RESERVED_SLUGS = new Set([
     "sw.js", "workbox", "vercel", ".well-known",
     "admin", "dashboard", "settings", "preview", "terms",
     "privacy", "acceptable-use", "about", "contact", "help", "support", "docs",
-    "profile", "purchase-history", "pricing", "guest-policy", "placeholder", "r"
+    "profile", "purchase-history", "pricing", "guest-policy", "placeholder", "r",
+    "features", "blog", "documentation", "api-docs", "refund", "analytics-preview",
 ]);
 
 function isRateLimited(ip: string): boolean {

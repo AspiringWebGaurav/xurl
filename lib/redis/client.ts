@@ -49,7 +49,7 @@ class RedisClientWithCircuitBreaker {
         }
     }
 
-    public reportError(err: any) {
+    public reportError(err: Error | { message: string }) {
         this.consecutiveErrors++;
         logger.error("redis_client", `Redis request failed (${this.consecutiveErrors}/${this.ERROR_THRESHOLD}): ${err.message}`);
 
@@ -96,8 +96,8 @@ export async function safeRedis<T>(operation: (client: Redis) => Promise<T>): Pr
 
         redisInstance.reportSuccess();
         return result;
-    } catch (error: any) {
-        redisInstance.reportError(error);
+    } catch (error: unknown) {
+        redisInstance.reportError(error instanceof Error ? error : new Error(String(error)));
         return null; // Return null so callers implement fail-open
     }
 }

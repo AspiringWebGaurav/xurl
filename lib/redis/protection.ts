@@ -220,7 +220,7 @@ export async function evaluateRequest(
 
         return { state: "ALLOW" };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         // If Redis throws an error mid-flight, apply in-memory fallback instead of failing open
         logger.error("gateway_error", "Redis evaluation failed. Falling back to in-memory limiter.", { error: String(error) });
         return { state: fallbackRateCheck(ip) };

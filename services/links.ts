@@ -211,7 +211,7 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                 // Guest Limit Concurrency Protection
                 if (input.ipHash && !input.ipHash.startsWith("test_")) {
                     const guestSnap = await transaction.get(adminDb.collection("guest_usage").doc(input.ipHash));
-                    if (guestSnap.exists && (guestSnap.data() as any).expiresAt > now) {
+                    if (guestSnap.exists && (guestSnap.data() as { expiresAt?: number }).expiresAt! > now) {
                         const e = new Error(`Guest users can only create 1 link. Sign in to create more.`);
                         e.name = "LimitReachedError";
                         throw e;
@@ -220,7 +220,7 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
 
                 if (input.fingerprintHash && !input.fingerprintHash.startsWith("test_")) {
                     const fpSnap = await transaction.get(adminDb.collection("guest_usage").doc(input.fingerprintHash));
-                    if (fpSnap.exists && (fpSnap.data() as any).expiresAt > now) {
+                    if (fpSnap.exists && (fpSnap.data() as { expiresAt?: number }).expiresAt! > now) {
                         const e = new Error(`Guest users can only create 1 link. Sign in to create more.`);
                         e.name = "LimitReachedError";
                         throw e;
@@ -300,7 +300,7 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
 
             if (userId !== "anonymous") {
                 const resolvedPlan = resolvePlanType(userData.plan);
-                const userUpdates: any = {
+                const userUpdates: Record<string, unknown> = {
                     plan: resolvedPlan,
                     activeLinks: FieldValue.increment(1),
                     linksCreated: FieldValue.increment(1),

@@ -3,7 +3,7 @@ import { PaymentService, CreateOrderParams, OrderResponse } from "./types";
 import Razorpay from "razorpay";
 
 export class RazorpayService implements PaymentService {
-    private client: any;
+    private client: InstanceType<typeof Razorpay>;
 
     constructor() {
         const key_id = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;

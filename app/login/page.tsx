@@ -23,7 +23,7 @@ import { signInWithGoogle } from "@/services/auth";
 import { releasePopupLock } from "@/services/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { SiteFooter } from "@/components/layout/SiteFooter";
+import { HomeFooter } from "@/components/layout/HomeFooter";
 import { UpgradeNavbar } from "@/components/layout/UpgradeNavbar";
 import { Loader2, ArrowRight, Link2, Clock, Check, ShieldCheck, Zap, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -245,7 +245,7 @@ function LoginContent() {
             name: "xurl.eu.cc",
             description: `Upgrade to ${planName}`,
             order_id: orderId,
-            handler: async function (response: any) {
+            handler: async function (response: { razorpay_payment_id: string; razorpay_signature: string }) {
                 setPaymentState("processing");
                 verifyPayment(orderId, planName, response.razorpay_payment_id, response.razorpay_signature);
             },
@@ -266,8 +266,9 @@ function LoginContent() {
                 }
             }
         };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const rzp = new (window as any).Razorpay(options);
-        rzp.on('payment.failed', function (response: any) {
+        rzp.on('payment.failed', function (response: { error?: { description?: string } }) {
             setPaymentState("failed");
             setIsUpgrading(false);
             toast.error(response.error?.description || "Oops! Something went wrong with the payment.");
@@ -387,7 +388,7 @@ function LoginContent() {
     }
 
     return (
-        <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden bg-slate-50 lg:h-screen lg:overflow-hidden">
+        <div id="login-root" className="flex flex-col h-[100dvh] overflow-hidden bg-slate-50">
             <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
             
             {/* Global Payment Overlay for states like processing & success */}
@@ -439,7 +440,7 @@ function LoginContent() {
                                     </div>
                                     <h3 className="text-xl font-bold text-foreground mb-2">Payment Cancelled</h3>
                                     <p className="text-sm text-muted-foreground leading-relaxed mb-6">
-                                        No changes have been made to your account. You can try again when you're ready.
+                                        No changes have been made to your account. You can try again when you&apos;re ready.
                                     </p>
                                     <div className="flex gap-3 w-full">
                                         <Button
@@ -519,7 +520,7 @@ function LoginContent() {
             {/* Subtle background decoration */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-primary/5 rounded-[100%] blur-[120px] pointer-events-none" />
 
-            <main className="relative z-10 flex flex-1 min-h-0 items-center px-6 py-8 lg:px-10 lg:py-4">
+            <main className="relative flex flex-1 flex-col items-center justify-center overflow-y-auto overflow-x-hidden px-6 py-12 pb-16 lg:flex-row lg:gap-16 lg:px-12 lg:py-0">
                 <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -722,12 +723,7 @@ function LoginContent() {
                 </motion.div>
             </main>
 
-            <SiteFooter
-                className="z-20 border-slate-200/70 bg-white/80 px-6 py-4 backdrop-blur-sm lg:px-10"
-                panelClassName="px-0 text-slate-400"
-                linkClassName="hover:text-slate-600"
-                taglineClassName="text-slate-500"
-            />
+            <HomeFooter />
         </div>
     );
 }

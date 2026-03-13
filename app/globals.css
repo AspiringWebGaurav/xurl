@@ -130,4 +130,17 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Hide scrollbar on homepage, pricing page, and login page when footer is collapsed */
+  #home-root,
+  #pricing-root,
+  #login-root {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+  }
+  #home-root::-webkit-scrollbar,
+  #pricing-root::-webkit-scrollbar,
+  #login-root::-webkit-scrollbar {
+    display: none; /* Chrome/Safari/Opera */
+  }
 }

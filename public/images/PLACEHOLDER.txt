@@ -1,0 +1,20 @@
+SEO Image Placeholders
+======================
+
+Replace these placeholder files with real assets:
+
+1. seo-preview.png (1200x630)
+   - Social sharing preview for Twitter, LinkedIn, Discord, WhatsApp
+   - Used in og:image and twitter:image meta tags
+
+2. logo-placeholder.png
+   - Organization logo for structured data (JSON-LD)
+   - Replace with the actual XURL logo when ready
+
+3. apple-touch-icon.png (180x180)
+   - iOS home screen icon
+
+4. favicon.ico
+   - Browser tab icon (place in public/ root)
+
+All paths are referenced in lib/seo.ts and app/layout.tsx.

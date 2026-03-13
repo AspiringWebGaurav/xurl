@@ -1,18 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore, useState } from "react";
 import { Loader2, ArrowRight, ExternalLink } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { buildShortUrl } from "@/lib/utils/url-builder";
+import Link from "next/link";
+
+const subscribe = () => () => {};
+const getSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 export default function RedirectClient({ dest }: { dest: string }) {
     const [isRedirecting, setIsRedirecting] = useState(false);
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
+    const mounted = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
     useEffect(() => {
         if (!dest) {
@@ -84,7 +84,7 @@ export default function RedirectClient({ dest }: { dest: string }) {
                                 <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-[0.2em]">
                                     Powered by XURL
                                 </p>
-                                <a
+                                <Link
                                     href="/"
                                     className="group text-sm text-muted-foreground flex items-center gap-2 hover:text-foreground transition-colors py-1.5 px-3 rounded-md hover:bg-muted/40"
                                 >
@@ -94,7 +94,7 @@ export default function RedirectClient({ dest }: { dest: string }) {
                                         {shortDomain}
                                         <ExternalLink className="w-3 h-3 text-muted-foreground/70 group-hover:text-foreground transition-colors" />
                                     </span>
-                                </a>
+                                </Link>
                             </div>
                         </motion.div>
                     )}

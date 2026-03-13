@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ code: "ORDER_NOT_FOUND", message: "Order not found" }, { status: 404 });
         }
 
-        let orderData = orderSnap.data()!;
+        const orderData = orderSnap.data()!;
         if (orderData.userId !== decoded.uid) {
             return NextResponse.json({ code: "FORBIDDEN", message: "Not your order" }, { status: 403 });
         }
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
                 orderId,
                 paymentId
             );
-            orderData.status = "consumed"; // reflect update
+            return NextResponse.json({ success: true, status: "consumed" });
         }
 
         return NextResponse.json({ success: true, status: orderData.status });
