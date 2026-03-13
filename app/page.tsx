@@ -483,21 +483,7 @@ export default function HomePage() {
             <Suspense fallback={null}>
                 <SearchParamsHandler onFocus={() => setFocusTriggered(true)} />
             </Suspense>
-            {isPageSkeletonLoading ? (
-                <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-6">
-                    <div className="flex items-center gap-3">
-                        <Skeleton className="h-8 w-8 rounded-lg bg-muted/55" />
-                        <Skeleton className="h-5 w-14 rounded-md bg-muted/45" />
-                    </div>
-                    <div className="flex items-center gap-2.5">
-                        <Skeleton className="hidden h-9 w-[86px] rounded-lg bg-muted/45 sm:block" />
-                        <Skeleton className="hidden h-9 w-[92px] rounded-lg bg-muted/35 sm:block" />
-                        <Skeleton className="h-9 w-[76px] rounded-lg bg-muted/55" />
-                    </div>
-                </header>
-            ) : (
-                <TopNavbar isCreateDisabled={isDisabled} />
-            )}
+            <TopNavbar isCreateDisabled={isDisabled} />
 
             <main className="flex-1 flex flex-col w-full px-6 md:px-8 overflow-y-auto overflow-x-hidden">
                 <motion.div
@@ -939,26 +925,7 @@ export default function HomePage() {
                 onClose={() => setIsRateLimited(false)}
             />
 
-            {isPageSkeletonLoading ? (
-                <footer className="shrink-0 border-t border-border bg-background px-4 py-6">
-                    <div className="flex w-full flex-col gap-3 text-xs text-muted-foreground sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-                        <div className="flex w-full items-center justify-start">
-                            <Skeleton className="h-4 w-32 rounded-md bg-muted/35" />
-                        </div>
-                        <div className="flex items-center justify-center gap-2 sm:justify-self-center">
-                            <Skeleton className="h-6 w-6 rounded-md bg-muted/45" />
-                            <Skeleton className="h-4 w-12 rounded-md bg-muted/35" />
-                        </div>
-                        <div className="flex w-full items-center justify-end gap-4">
-                            <Skeleton className="h-4 w-12 rounded-md bg-muted/30" />
-                            <Skeleton className="h-4 w-14 rounded-md bg-muted/30" />
-                            <Skeleton className="h-4 w-24 rounded-md bg-muted/30" />
-                        </div>
-                    </div>
-                </footer>
-            ) : (
-                <SiteFooter />
-            )}
+            <SiteFooter />
         </div>
     );
 }

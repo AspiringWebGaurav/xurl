@@ -12,6 +12,7 @@ import { signOut, signInWithGoogle, releasePopupLock } from "@/services/auth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/Logo";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { History, LogOut, Loader2, ArrowLeft } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -373,7 +374,12 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                         Create link
                     </button>
                 </div>
-                {!loading && (
+                {loading ? (
+                    <>
+                        <Skeleton className="hidden h-8 w-[88px] rounded-md bg-slate-100 sm:block" />
+                        <Skeleton className="h-8 w-8 rounded-full bg-slate-100" />
+                    </>
+                ) : (
                     user ? (
                         <>
                                 {/* Desktop History Button */}
