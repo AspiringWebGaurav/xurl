@@ -1,8 +1,13 @@
 "use client";
 
 import { useState, useEffect, FormEvent } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, updateProfile, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
+import {
+    emitProfileUpdated,
+    ensureUserDocument,
+    getPreferredDisplayName,
+} from "@/lib/firebase/user-profile";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Loader2 } from "lucide-react";
 
@@ -18,7 +23,9 @@ export default function ProfilePage() {
         const unsubscribe = onAuthStateChanged(auth, async (u) => {
             setUser(u);
             if (u) {
+                setDisplayName(getPreferredDisplayName(u));
                 try {
+                    await ensureUserDocument(u);
                     const token = await u.getIdToken();
                     const res = await fetch("/api/user/profile", {
                         headers: { "Authorization": `Bearer ${token}` }
@@ -43,7 +50,10 @@ export default function ProfilePage() {
         setSuccessMessage("");
         setErrorMessage("");
 
-        if (!user) return;
+        if (!user) {
+            setSaving(false);
+            return;
+        }
 
         try {
             const token = await user.getIdToken();
@@ -61,12 +71,19 @@ export default function ProfilePage() {
             if (!res.ok) {
                 setErrorMessage(data.message || "Failed to update profile");
             } else {
+                const nextDisplayName = data.displayName;
+                await updateProfile(user, { displayName: nextDisplayName });
+                const syncedUser = auth.currentUser ?? user;
+
                 setSuccessMessage("Profile updated successfully!");
-                setDisplayName(data.displayName);
-                // Simple trick to refresh the UI
-                setUser({ ...user } as any); 
+                setDisplayName(nextDisplayName);
+                emitProfileUpdated({
+                    displayName: nextDisplayName,
+                    email: syncedUser.email ?? null,
+                    photoURL: syncedUser.photoURL ?? null,
+                });
             }
-        } catch (e) {
+        } catch {
             setErrorMessage("An unexpected error occurred.");
         } finally {
             setSaving(false);

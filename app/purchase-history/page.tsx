@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
+import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
@@ -29,6 +30,7 @@ export default function PurchaseHistoryPage() {
         const unsubscribe = onAuthStateChanged(auth, async (u) => {
             setUser(u);
             if (u) {
+                await ensureUserDocument(u);
                 try {
                     const token = await u.getIdToken();
                     const res = await fetch("/api/user/transactions", {

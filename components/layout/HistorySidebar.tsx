@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ExternalLink, Copy, Calendar, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ interface HistorySidebarProps {
     isOpen: boolean;
     onClose: () => void;
     userId: string;
+    onLinksChange?: (count: number) => void;
 }
 
 interface LinkItem {
@@ -21,40 +22,35 @@ interface LinkItem {
     expiresAt: number | null;
 }
 
-export function HistorySidebar({ isOpen, onClose, userId }: HistorySidebarProps) {
+export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: HistorySidebarProps) {
     const [links, setLinks] = useState<LinkItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
     const [userPlan, setUserPlan] = useState<string | null>(null);
+    const linksRef = useRef<LinkItem[]>([]);
 
     useEffect(() => {
-        if (isOpen) {
-            fetchLinks();
-        }
-    }, [isOpen, userId]);
+        linksRef.current = links;
+    }, [links]);
 
-    // Listen for new links generated in the background
-    useEffect(() => {
-        const handleLinkGenerated = () => fetchLinks(false);
-
-        window.addEventListener("linkGenerated", handleLinkGenerated);
-        return () => window.removeEventListener("linkGenerated", handleLinkGenerated);
-    }, [userId]);
-
-    const fetchLinks = async (isLoadMore = false) => {
+    const fetchLinks = useCallback(async (isLoadMore = false) => {
         if (isLoadMore) {
             setLoadingMore(true);
         } else {
             setLoading(true);
         }
+
         try {
             const currentUser = auth.currentUser;
             let fetchedLinks: LinkItem[] = [];
             let fetchedHasMore = false;
-
-            const cursorParam = isLoadMore && links.length > 0 ? `&cursor=${links[links.length - 1].createdAt}` : "";
+            const existingLinks = linksRef.current;
+            const cursorParam =
+                isLoadMore && existingLinks.length > 0
+                    ? `&cursor=${existingLinks[existingLinks.length - 1].createdAt}`
+                    : "";
 
             if (currentUser) {
                 const token = await currentUser.getIdToken();
@@ -73,32 +69,29 @@ export function HistorySidebar({ isOpen, onClose, userId }: HistorySidebarProps)
                 } else {
                     setUserPlan("free");
                 }
-            } else {
-                if (!isLoadMore) {
-                    // Fetch live server state for unauthenticated guest
-                    setUserPlan("guest");
-                    const fp = await getDeviceFingerprint();
-                    const res = await fetch("/api/guest-status", {
-                        headers: { "x-device-fingerprint": fp },
-                    });
-                    const data = await res.json();
+            } else if (!isLoadMore) {
+                // Fetch live server state for unauthenticated guest
+                setUserPlan("guest");
+                const fp = await getDeviceFingerprint();
+                const res = await fetch("/api/guest-status", {
+                    headers: { "x-device-fingerprint": fp },
+                });
+                const data = await res.json();
 
-                    if (data.active && data.slug) {
-                        fetchedLinks.push({
-                            slug: data.slug,
-                            originalUrl: data.originalUrl || "Original URL hidden for guests",
-                            createdAt: data.createdAt || Date.now(),
-                            expiresAt: Date.now() + (data.expiresIn * 1000)
-                        });
-                    }
+                if (data.active && data.slug) {
+                    fetchedLinks.push({
+                        slug: data.slug,
+                        originalUrl: data.originalUrl || "Original URL hidden for guests",
+                        createdAt: data.createdAt || Date.now(),
+                        expiresAt: Date.now() + (data.expiresIn * 1000),
+                    });
                 }
             }
 
-            if (isLoadMore) {
-                setLinks(prev => [...prev, ...fetchedLinks]);
-            } else {
-                setLinks(fetchedLinks);
-            }
+            const nextLinks = isLoadMore ? [...existingLinks, ...fetchedLinks] : fetchedLinks;
+            linksRef.current = nextLinks;
+            setLinks(nextLinks);
+            onLinksChange?.(nextLinks.length);
             setHasMore(fetchedHasMore);
         } catch (e) {
             console.error(e);
@@ -106,7 +99,23 @@ export function HistorySidebar({ isOpen, onClose, userId }: HistorySidebarProps)
             setLoading(false);
             setLoadingMore(false);
         }
-    };
+    }, [onLinksChange]);
+
+    useEffect(() => {
+        if (isOpen) {
+            void fetchLinks();
+        }
+    }, [fetchLinks, isOpen, userId]);
+
+    // Listen for new links generated in the background
+    useEffect(() => {
+        const handleLinkGenerated = () => {
+            void fetchLinks(false);
+        };
+
+        window.addEventListener("linkGenerated", handleLinkGenerated);
+        return () => window.removeEventListener("linkGenerated", handleLinkGenerated);
+    }, [fetchLinks, userId]);
 
     const handleCopy = async (slug: string) => {
         const url = `${window.location.origin}/${slug}`;

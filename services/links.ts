@@ -67,7 +67,8 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
         "favicon.ico", "robots.txt", "sitemap.xml", "manifest.json",
         "sw.js", "workbox", "vercel", ".well-known",
         "admin", "dashboard", "settings", "preview", "terms",
-        "privacy", "about", "contact", "help", "support", "docs"
+        "privacy", "acceptable-use", "about", "contact", "help", "support", "docs",
+        "profile", "purchase-history", "pricing", "guest-policy", "placeholder", "r"
     ]);
 
     if (input.customSlug) {

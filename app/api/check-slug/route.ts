@@ -8,6 +8,15 @@ const WINDOW_MS = 60_000;
 const MAX_CHECKS = 30; // 30 checks per minute per IP
 const MAX_ENTRIES = 5_000;
 
+const RESERVED_SLUGS = new Set([
+    "api", "login", "expired", "_next", "not-found",
+    "favicon.ico", "robots.txt", "sitemap.xml", "manifest.json",
+    "sw.js", "workbox", "vercel", ".well-known",
+    "admin", "dashboard", "settings", "preview", "terms",
+    "privacy", "acceptable-use", "about", "contact", "help", "support", "docs",
+    "profile", "purchase-history", "pricing", "guest-policy", "placeholder", "r"
+]);
+
 function isRateLimited(ip: string): boolean {
     const now = Date.now();
     const entry = slugCheckLimiter.get(ip);
@@ -46,6 +55,10 @@ export async function GET(request: NextRequest) {
     // Alphanumeric + hyphens validation
     if (!/^[a-zA-Z0-9-]{2,30}$/.test(slug)) {
         return NextResponse.json({ available: false }, { status: 400 });
+    }
+
+    if (RESERVED_SLUGS.has(slug.toLowerCase())) {
+        return NextResponse.json({ available: false });
     }
 
     try {

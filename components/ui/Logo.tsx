@@ -4,9 +4,10 @@ import { cn } from "@/lib/utils";
 interface LogoProps {
     className?: string;
     size?: "sm" | "md" | "lg";
+    href?: string | null;
 }
 
-export function Logo({ className, size = "md" }: LogoProps) {
+export function Logo({ className, size = "md", href = "/" }: LogoProps) {
     const sizeClasses = {
         sm: {
             container: "gap-2",
@@ -26,16 +27,8 @@ export function Logo({ className, size = "md" }: LogoProps) {
     };
 
     const s = sizeClasses[size];
-
-    return (
-        <Link
-            href="/"
-            className={cn(
-                "flex items-center transition-opacity hover:opacity-90",
-                s.container,
-                className
-            )}
-        >
+    const content = (
+        <>
             <div
                 className={cn(
                     "flex items-center justify-center bg-foreground text-background font-semibold tracking-tight transition-colors",
@@ -53,6 +46,29 @@ export function Logo({ className, size = "md" }: LogoProps) {
             >
                 URL
             </div>
+        </>
+    );
+
+    const containerClassName = cn(
+        "flex items-center transition-opacity hover:opacity-90",
+        s.container,
+        className
+    );
+
+    if (!href) {
+        return (
+            <div className={containerClassName}>
+                {content}
+            </div>
+        );
+    }
+
+    return (
+        <Link
+            href={href}
+            className={containerClassName}
+        >
+            {content}
         </Link>
     );
 }

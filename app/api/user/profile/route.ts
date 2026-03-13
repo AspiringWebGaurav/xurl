@@ -17,17 +17,36 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ code: "UNAUTHORIZED", message: "Invalid token" }, { status: 401 });
         }
 
-        const userSnap = await adminDb.collection("users").doc(decoded.uid).get();
+        const userRef = adminDb.collection("users").doc(decoded.uid);
+        const userSnap = await userRef.get();
+        const fallbackDisplayName = decoded.name || decoded.email?.split("@")[0] || "User";
+
         if (!userSnap.exists) {
-            return NextResponse.json({ code: "NOT_FOUND", message: "User not found" }, { status: 404 });
+            const now = Date.now();
+            await userRef.set(
+                {
+                    uid: decoded.uid,
+                    email: decoded.email || null,
+                    displayName: fallbackDisplayName,
+                    photoURL: decoded.picture || null,
+                    plan: "free",
+                    createdAt: now,
+                    updatedAt: now,
+                },
+                { merge: true }
+            );
+
+            return NextResponse.json({
+                displayName: fallbackDisplayName,
+            });
         }
 
         const userData = userSnap.data()!;
         
         return NextResponse.json({ 
-            displayName: userData.displayName || decoded.name || "User",
+            displayName: userData.displayName || fallbackDisplayName,
         });
-    } catch (error) {
+    } catch {
         return NextResponse.json({ code: "FETCH_FAILED", message: "Failed to fetch profile" }, { status: 500 });
     }
 }
@@ -54,17 +73,22 @@ export async function PATCH(request: NextRequest) {
             return NextResponse.json({ code: "INVALID_INPUT", message: "Display name must be between 1 and 50 characters" }, { status: 400 });
         }
 
-        await adminDb.collection("users").doc(decoded.uid).update({
-            displayName: displayName.trim(),
-            updatedAt: Date.now()
-        });
+        const normalizedDisplayName = displayName.trim();
+        await adminDb.collection("users").doc(decoded.uid).set(
+            {
+                email: decoded.email || null,
+                displayName: normalizedDisplayName,
+                updatedAt: Date.now(),
+            },
+            { merge: true }
+        );
 
         // Also update the display name in Firebase Auth
         await adminAuth.updateUser(decoded.uid, {
-            displayName: displayName.trim()
+            displayName: normalizedDisplayName
         });
 
-        return NextResponse.json({ success: true, displayName: displayName.trim() });
+        return NextResponse.json({ success: true, displayName: normalizedDisplayName });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to update profile";
         logger.error("api_profile_update", message);

@@ -55,6 +55,12 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
         pathname === '/pricing' ||
         pathname === '/expired' ||
         pathname === '/r' ||
+        pathname === '/terms' ||
+        pathname === '/privacy' ||
+        pathname === '/acceptable-use' ||
+        pathname === '/profile' ||
+        pathname === '/purchase-history' ||
+        pathname === '/placeholder' ||
         pathname === '/guest-policy' ||
         request.nextUrl.searchParams.has('dest')
     ) {
@@ -122,7 +128,7 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
 
 export const config = {
     matcher: [
-        '/((?!_next/static|_next/image|favicon.ico|api|login|pricing|expired|r|guest-policy).*)',
+        '/((?!_next/static|_next/image|favicon.ico|api|login|pricing|expired|r|terms|privacy|acceptable-use|profile|purchase-history|placeholder|guest-policy).*)',
     ],
 };
 

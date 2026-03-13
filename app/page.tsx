@@ -4,8 +4,10 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
+import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { env } from "@/lib/env";
 import { buildShortUrl } from "@/lib/utils/url-builder";
+import { SiteFooter } from "@/components/layout/SiteFooter";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,6 +84,7 @@ export default function HomePage() {
             setUser(u);
             setAuthLoading(false);
             if (u) {
+                void ensureUserDocument(u);
                 // Clear any guest state so logged-in user gets a fresh form
                 setUrl("");
                 setIsValidUrl(false);
@@ -468,13 +471,33 @@ export default function HomePage() {
     // Determine if the user has reached their quota limit
     const isOverQuota = !!(user && quota && (quota.plan === "free" ? quota.freeLinksCreated >= quota.limit : quota.paidLinksCreated >= quota.limit));
     const isDisabled = (!user && guestUsed) || isOverQuota;
+    const isPageSkeletonLoading = authLoading || (!user && guestLoading) || !mounted;
+    const heroCardBase = "w-full bg-card border border-border/70 rounded-2xl p-5 sm:p-6 shadow-[0_18px_45px_-28px_rgba(15,23,42,0.22)] relative overflow-hidden";
+    const statusPillBase = "flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-xs font-semibold tracking-wide shadow-[0_10px_24px_-18px_rgba(15,23,42,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_32px_-20px_rgba(15,23,42,0.28)]";
+    const premiumInputClass = "h-12 bg-background/95 border-border/80 shadow-[0_1px_2px_rgba(15,23,42,0.05)] rounded-xl text-[15px] placeholder:text-muted-foreground/75 focus-visible:border-foreground/20 focus-visible:bg-background focus-visible:ring-[3px] focus-visible:ring-slate-900/10 focus-visible:shadow-[0_0_0_1px_rgba(15,23,42,0.04),0_16px_32px_-22px_rgba(15,23,42,0.32)] transition-all duration-200";
+    const premiumFieldShellBase = "relative flex items-center w-full h-12 rounded-xl border bg-background/95 shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-all duration-200 focus-within:shadow-[0_0_0_1px_rgba(15,23,42,0.04),0_16px_32px_-22px_rgba(15,23,42,0.32)]";
+    const premiumPrimaryButtonClass = "w-full h-12 rounded-xl py-0 shadow-[0_14px_28px_-18px_rgba(15,23,42,0.55)] bg-foreground text-background hover:-translate-y-0.5 hover:bg-foreground/92 hover:shadow-[0_20px_36px_-20px_rgba(15,23,42,0.58)] active:translate-y-0 font-medium mt-2 transition-all duration-200 relative overflow-hidden";
 
     return (
         <div className="flex flex-col h-[100dvh] overflow-hidden bg-background">
             <Suspense fallback={null}>
                 <SearchParamsHandler onFocus={() => setFocusTriggered(true)} />
             </Suspense>
-            <TopNavbar isCreateDisabled={isDisabled} />
+            {isPageSkeletonLoading ? (
+                <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-6">
+                    <div className="flex items-center gap-3">
+                        <Skeleton className="h-8 w-8 rounded-lg bg-muted/55" />
+                        <Skeleton className="h-5 w-14 rounded-md bg-muted/45" />
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                        <Skeleton className="hidden h-9 w-[86px] rounded-lg bg-muted/45 sm:block" />
+                        <Skeleton className="hidden h-9 w-[92px] rounded-lg bg-muted/35 sm:block" />
+                        <Skeleton className="h-9 w-[76px] rounded-lg bg-muted/55" />
+                    </div>
+                </header>
+            ) : (
+                <TopNavbar isCreateDisabled={isDisabled} />
+            )}
 
             <main className="flex-1 flex flex-col w-full px-6 md:px-8 overflow-y-auto overflow-x-hidden">
                 <motion.div
@@ -483,17 +506,32 @@ export default function HomePage() {
                     transition={{ duration: 0.3, ease: "easeOut" }}
                     className="w-full max-w-xl flex flex-col gap-6 m-auto"
                 >
+                    {isPageSkeletonLoading ? (
+                        <div className="text-center">
+                            <div className="mx-auto flex max-w-[34rem] flex-col items-center">
+                                <Skeleton className="h-12 w-full max-w-[420px] rounded-xl bg-muted/55 sm:h-[56px]" />
+                                <Skeleton className="mt-4 h-4 w-full max-w-[430px] rounded-md bg-muted/40" />
+                                <Skeleton className="mt-2 h-4 w-full max-w-[300px] rounded-md bg-muted/30" />
+                                <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+                                    <Skeleton className="h-9 w-[250px] rounded-full bg-muted/35" />
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
                     <div className="text-center">
-                        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+                        <h1 className="text-[40px] font-semibold leading-[0.98] tracking-[-0.045em] text-foreground sm:text-[46px]">
                             Shorten your URL
                         </h1>
+                        <p className="mx-auto mt-3 max-w-[34rem] text-sm leading-6 text-muted-foreground/90 sm:text-[15px]">
+                            Turn long URLs into clean, shareable links with optional custom aliases in a few quick steps.
+                        </p>
                         {!authLoading && (
-                            <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
+                            <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
                                 {user ? (
                                     quota ? (
                                         <>
                                             {/* Free Plan Status */}
-                                            <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-indigo-50 border border-indigo-200/80 text-indigo-700 text-xs font-semibold tracking-wide shadow-sm hover:shadow-md transition-shadow">
+                                            <div className={`${statusPillBase} bg-indigo-50/90 border-indigo-200/80 text-indigo-700`}>
                                                 <Link2 className="w-3.5 h-3.5 text-indigo-500" />
                                                 {quota.freeLinksCreated} / 1 free link
                                                 <span className="text-indigo-300 mx-0.5">|</span>
@@ -503,7 +541,7 @@ export default function HomePage() {
 
                                             {/* Paid Plan Status (if any) */}
                                             {quota.plan !== "free" && (
-                                                <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-xs font-semibold tracking-wide shadow-sm hover:shadow-md transition-shadow">
+                                                <div className={`${statusPillBase} bg-emerald-50/90 border-emerald-200/80 text-emerald-700`}>
                                                     <Link2 className="w-3.5 h-3.5 text-emerald-500" />
                                                     {quota.paidLinksCreated} / {quota.limit} {quota.plan} links
                                                     {quota.planRenewals && quota.planRenewals > 1 ? ` (×${quota.planRenewals})` : ""}
@@ -515,7 +553,7 @@ export default function HomePage() {
 
                                             {/* Expired Links Warning */}
                                             {quota.expiredLinksCount !== undefined && quota.expiredLinksCount > 0 && (
-                                                <div className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-amber-50 border border-amber-200/80 text-amber-700 text-xs font-semibold tracking-wide shadow-sm hover:shadow-md transition-shadow" title={`${quota.expiredLinksCount} links have expired`}>
+                                                <div className={`${statusPillBase} bg-amber-50/90 border-amber-200/80 text-amber-700`} title={`${quota.expiredLinksCount} links have expired`}>
                                                     <Clock className="w-3.5 h-3.5 text-amber-500" />
                                                     {quota.expiredLinksCount} expired history
                                                 </div>
@@ -529,7 +567,7 @@ export default function HomePage() {
                                     )
                                 ) : (
 
-                                    <Link href="/guest-policy" target="_blank" className="group flex items-center px-4 py-1.5 rounded-full bg-amber-50/80 border border-amber-300/40 text-amber-700 hover:bg-amber-100/80 hover:border-amber-400/50 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 text-xs font-semibold tracking-wide cursor-pointer">
+                                    <Link href="/guest-policy" target="_blank" className="group flex items-center px-4 py-1.5 rounded-full bg-amber-50/85 border border-amber-300/40 text-amber-700 hover:bg-amber-100/80 hover:border-amber-400/50 shadow-[0_10px_24px_-18px_rgba(217,119,6,0.4)] hover:shadow-[0_14px_32px_-20px_rgba(217,119,6,0.45)] hover:-translate-y-0.5 transition-all duration-300 text-xs font-semibold tracking-wide cursor-pointer">
                                         <Lock className="w-3.5 h-3.5 mr-1.5 text-amber-600/80 group-hover:text-amber-700 transition-colors" />
                                         <span>1 free link for no login policy</span>
                                         <span className="mx-2 text-amber-300">—</span>
@@ -541,16 +579,17 @@ export default function HomePage() {
                             </div>
                         )}
                     </div>
+                    )}
 
                     <AnimatePresence mode="wait">
-                        {(authLoading || (!user && guestLoading) || !mounted) ? (
+                        {isPageSkeletonLoading ? (
                             <motion.div
                                 key="loading"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.2 }}
-                                className="w-full bg-card border border-border rounded-xl p-5 sm:p-6 shadow-sm flex flex-col min-h-[290px] justify-center gap-4 relative overflow-hidden"
+                                className={`${heroCardBase} flex flex-col min-h-[290px] justify-center gap-4`}
                             >
                                 <div className="flex flex-col gap-2">
                                     <div className="flex justify-between items-center px-1">
@@ -571,7 +610,7 @@ export default function HomePage() {
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -15, filter: "blur(4px)" }}
                                 transition={{ duration: 0.4, ease: "easeInOut" }}
-                                className="w-full bg-card border border-border rounded-xl p-5 sm:p-6 shadow-sm flex flex-col items-center justify-center gap-3 min-h-[290px] text-center"
+                                className={`${heroCardBase} flex flex-col items-center justify-center gap-3 min-h-[290px] text-center`}
                             >
                                 <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-2">
                                     <Lock className="w-5 h-5 text-muted-foreground" />
@@ -739,7 +778,7 @@ export default function HomePage() {
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -15, filter: "blur(4px)" }}
                                 transition={{ duration: 0.4, ease: "easeInOut" }}
-                                className="w-full bg-card border border-border rounded-xl p-5 sm:p-6 shadow-sm flex flex-col gap-4 min-h-[290px] justify-center relative overflow-hidden"
+                                className={`${heroCardBase} flex flex-col gap-4 min-h-[290px] justify-center`}
                             >
                                 <div className={`flex flex-col gap-1.5 ${isOverQuota ? 'opacity-50 pointer-events-none' : ''}`}>
                                     <div className="flex justify-between items-center px-1">
@@ -766,7 +805,7 @@ export default function HomePage() {
                                         onPaste={handleUrlPaste}
                                         disabled={isDisabled || loading}
                                         onKeyDown={(e) => e.key === "Enter" && isValidUrl && handleShorten()}
-                                        className={`h-12 bg-background border-border shadow-sm rounded-lg text-sm focus-visible:ring-1 focus-visible:ring-foreground transition-all duration-200 ${highlightInput ? "ring-2 ring-emerald-500 border-emerald-500 bg-emerald-50/10" : ""
+                                        className={`${premiumInputClass} ${highlightInput ? "ring-2 ring-emerald-500 border-emerald-500 bg-emerald-50/10" : ""
                                             }`}
                                     />
                                 </div>
@@ -800,9 +839,9 @@ export default function HomePage() {
                                             );
                                         })()}
                                     </label>
-                                    <div className={`relative flex items-center w-full h-12 bg-background shadow-sm rounded-lg border focus-within:ring-1 transition-all ${aliasStatus === "taken" || aliasStatus === "invalid"
+                                    <div className={`${premiumFieldShellBase} ${aliasStatus === "taken" || aliasStatus === "invalid"
                                         ? "border-red-200 focus-within:ring-red-500"
-                                        : "border-border focus-within:ring-foreground"
+                                        : "border-border/80 focus-within:border-foreground/20 focus-within:ring-slate-900/10"
                                         } ${(isDisabled || loading || !user || (quota && quota.plan === 'free')) ? "bg-muted/50 cursor-not-allowed" : ""}`}>
                                         <span className="pl-3 pr-1 text-muted-foreground text-sm select-none pointer-events-none whitespace-nowrap">
                                             {shortDomain} /
@@ -870,7 +909,7 @@ export default function HomePage() {
                                     <Button
                                         onClick={handleShorten}
                                         disabled={!isValidUrl || isDisabled || loading || aliasStatus === "checking" || aliasStatus === "taken" || aliasStatus === "invalid"}
-                                        className="w-full h-12 rounded-lg py-0 shadow-sm bg-foreground text-background hover:bg-foreground/90 font-medium mt-2 transition-all relative overflow-hidden"
+                                        className={premiumPrimaryButtonClass}
                                     >
                                         {loading ? (
                                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -900,25 +939,26 @@ export default function HomePage() {
                 onClose={() => setIsRateLimited(false)}
             />
 
-            <footer className="shrink-0 flex items-center justify-center gap-4 py-6 text-xs text-muted-foreground border-t border-border bg-background flex-wrap px-4">
-                <div className="flex items-center gap-2 opacity-80 hover:opacity-100 transition-opacity">
-                    <div className="flex h-[20px] w-[20px] items-center justify-center rounded-[5px] bg-foreground text-background font-semibold text-[10px] tracking-tight transition-colors">
-                        X
+            {isPageSkeletonLoading ? (
+                <footer className="shrink-0 border-t border-border bg-background px-4 py-6">
+                    <div className="flex w-full flex-col gap-3 text-xs text-muted-foreground sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+                        <div className="flex w-full items-center justify-start">
+                            <Skeleton className="h-4 w-32 rounded-md bg-muted/35" />
+                        </div>
+                        <div className="flex items-center justify-center gap-2 sm:justify-self-center">
+                            <Skeleton className="h-6 w-6 rounded-md bg-muted/45" />
+                            <Skeleton className="h-4 w-12 rounded-md bg-muted/35" />
+                        </div>
+                        <div className="flex w-full items-center justify-end gap-4">
+                            <Skeleton className="h-4 w-12 rounded-md bg-muted/30" />
+                            <Skeleton className="h-4 w-14 rounded-md bg-muted/30" />
+                            <Skeleton className="h-4 w-24 rounded-md bg-muted/30" />
+                        </div>
                     </div>
-                    <div className="flex items-center text-[12px] font-semibold tracking-[0.16em] text-foreground uppercase">
-                        URL
-                    </div>
-                </div>
-                <span className="hidden sm:inline mx-1 opacity-40">&middot;</span>
-                <span className="opacity-80">Minimal URL Shortener</span>
-                
-                <div className="w-full sm:w-auto flex items-center justify-center gap-4 mt-2 sm:mt-0">
-                    <span className="hidden sm:inline mx-1 opacity-40">&middot;</span>
-                    <Link href="/terms" className="hover:text-foreground transition-colors hover:underline underline-offset-4">Terms</Link>
-                    <Link href="/privacy" className="hover:text-foreground transition-colors hover:underline underline-offset-4">Privacy</Link>
-                    <Link href="/acceptable-use" className="hover:text-foreground transition-colors hover:underline underline-offset-4">Acceptable Use</Link>
-                </div>
-            </footer>
+                </footer>
+            ) : (
+                <SiteFooter />
+            )}
         </div>
     );
 }

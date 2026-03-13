@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
+import { ensureUserDocument } from "@/lib/firebase/user-profile";
 
 function getDynamicExpiryMessage(planKey?: string | null) {
     if (!planKey) return "";
@@ -19,13 +20,14 @@ function getDynamicExpiryMessage(planKey?: string | null) {
     return `Expires ${now.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}`;
 }
 import { signInWithGoogle } from "@/services/auth";
+import { releasePopupLock } from "@/services/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Logo } from "@/components/ui/Logo";
-import { Loader2, ArrowRight, ArrowLeft, Home, Link2, Clock, Check, ShieldCheck, Zap, AlertCircle } from "lucide-react";
+import { SiteFooter } from "@/components/layout/SiteFooter";
+import { UpgradeNavbar } from "@/components/layout/UpgradeNavbar";
+import { Loader2, ArrowRight, Link2, Clock, Check, ShieldCheck, Zap, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Suspense } from "react";
-import Link from "next/link";
 import Script from "next/script";
 import { toast } from "sonner";
 
@@ -116,15 +118,19 @@ const PLAN_DATA: Record<string, {
 };
 
 function LoginContent() {
-    const [loading, setLoading] = useState(true);
+    const [authLoading, setAuthLoading] = useState(true);
     const [user, setUser] = useState<User | null>(null);
     const [isUpgrading, setIsUpgrading] = useState(false);
+    const [isLoggingIn, setIsLoggingIn] = useState(false);
+    const [showLoginOverlay, setShowLoginOverlay] = useState(false);
+    const [overlayMessage, setOverlayMessage] = useState<React.ReactNode>("Connecting to Google...");
     const [paymentState, setPaymentState] = useState<"idle" | "upgrading" | "processing" | "success" | "failed" | "cancelled">("idle");
     const router = useRouter();
     const searchParams = useSearchParams();
     const plan = searchParams.get("plan");
     const planKey = plan ? plan.toLowerCase() : null;
     const planContext = planKey && PLAN_DATA[planKey] ? PLAN_DATA[planKey] : null;
+    const planDisplayName = planContext?.badgeName.replace(/\s+Plan$/, "") ?? "";
 
     // Live quota data for renewal detection
     const [renewalData, setRenewalData] = useState<{
@@ -141,11 +147,12 @@ function LoginContent() {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (u) => {
             if (u) {
+                await ensureUserDocument(u);
                 setUser(u);
                 if (!plan) {
                     router.push("/");
                 } else {
-                    setLoading(false);
+                    setAuthLoading(false);
                     // Fetch live quota data for renewal detection
                     try {
                         const token = await u.getIdToken();
@@ -179,7 +186,7 @@ function LoginContent() {
                 }
             } else {
                 setUser(null);
-                setLoading(false);
+                setAuthLoading(false);
                 setRenewalData(null);
             }
         });
@@ -318,48 +325,60 @@ function LoginContent() {
         }
     };
 
-    const [loginMessage, setLoginMessage] = useState<React.ReactNode | null>(null);
+    const resetLoginState = () => {
+        setIsLoggingIn(false);
+        setShowLoginOverlay(false);
+        releasePopupLock();
+    };
 
     const handleLogin = async () => {
-        if (loading) return;
-        setLoading(true);
-        setLoginMessage(null);
+        if (authLoading || isLoggingIn) return;
+        setIsLoggingIn(true);
+        setOverlayMessage("Connecting to Google...");
+        setShowLoginOverlay(true);
         
         try {
             const { user: loggedInUser, error } = await signInWithGoogle();
             
             if (error) {
                 if (error === "auth/popup-blocked") {
-                    setLoading(false);
-                    setLoginMessage(
-                        <div className="text-sm font-medium text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-200 text-center animate-in fade-in slide-in-from-top-2">
-                            Popup blocked. Please allow popups or 
+                    setOverlayMessage(
+                        <>
+                            Popup blocked - click to retry login
+                            <br />
                             <span 
                                 onClick={(e) => { 
                                     e.stopPropagation(); 
-                                    setLoginMessage(null);
+                                    resetLoginState();
                                     setTimeout(() => handleLogin(), 50); 
                                 }} 
-                                className="underline cursor-pointer ml-1 hover:text-amber-800 transition-colors font-bold"
+                                className="mt-2 inline-block cursor-pointer underline transition-colors hover:text-foreground"
                             >
-                                click here to retry login
-                            </span>.
-                        </div>
+                                Open login
+                            </span>
+                        </>
                     );
+                    return;
+                } else if (error === "auth/popup-closed-by-user" || error === "auth/cancelled-popup-request") {
+                    setOverlayMessage("Login cancelled - staying on this page...");
+                    setTimeout(() => resetLoginState(), 500);
                 } else {
-                    setLoading(false);
+                    setOverlayMessage("Unable to sign in. Please try again.");
+                    setTimeout(() => resetLoginState(), 700);
                 }
-            } else if (!loggedInUser) {
-                setLoading(false);
+            } else if (loggedInUser) {
+                setOverlayMessage("Signing in...");
+                setTimeout(() => resetLoginState(), 600);
+            } else {
+                resetLoginState();
             }
-            // On success, the auth state listener will handle the redirect
         } catch (error) {
             console.error("Login unexpected error", error);
-            setLoading(false);
+            resetLoginState();
         }
     };
 
-    if (loading) {
+    if (authLoading) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -368,7 +387,7 @@ function LoginContent() {
     }
 
     return (
-        <div className="flex min-h-screen w-full flex-col items-center justify-center bg-slate-50 relative overflow-hidden">
+        <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden bg-slate-50 lg:h-screen lg:overflow-hidden">
             <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
             
             {/* Global Payment Overlay for states like processing & success */}
@@ -470,181 +489,226 @@ function LoginContent() {
                 )}
             </AnimatePresence>
 
-            {/* Navigation - Top Left */}
-            <div className="absolute top-6 left-6 z-20 flex items-center gap-2">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.back()}
-                    className="text-slate-500 hover:text-slate-900 hover:bg-slate-200/50 transition-colors"
-                >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back to pricing
-                </Button>
-                <Link href="/">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-slate-500 hover:text-slate-900 hover:bg-slate-200/50 transition-colors"
+            <AnimatePresence>
+                {showLoginOverlay && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center bg-background/40 backdrop-blur-md"
                     >
-                        <Home className="w-4 h-4 mr-2" />
-                        Home
-                    </Button>
-                </Link>
-            </div>
+                        <div className="flex flex-col items-center gap-3 px-6 text-center">
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                            <p className="text-sm font-medium tracking-tight text-muted-foreground">
+                                {overlayMessage}
+                            </p>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            <UpgradeNavbar
+                backLabel="Back to pricing"
+                logoHref="/"
+                homeHref="/"
+                onBack={() => router.back()}
+                contentClassName="max-w-none"
+            />
 
             {/* Subtle background decoration */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-primary/5 rounded-[100%] blur-[120px] pointer-events-none" />
 
-            <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-                className="w-full max-w-md flex flex-col items-center gap-8 p-8 relative z-10"
-            >
-                <Logo size="lg" />
-
-                <div className="text-center w-full space-y-3">
+            <main className="relative z-10 flex flex-1 min-h-0 items-center px-6 py-8 lg:px-10 lg:py-4">
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="mx-auto grid h-full w-full max-w-[1120px] grid-cols-1 gap-8 lg:grid-cols-[minmax(0,560px)_420px] lg:items-center lg:justify-between lg:gap-10"
+                >
+                <section className="flex w-full flex-col items-center gap-6 lg:items-start lg:justify-center lg:self-center lg:gap-8">
+                <div className="flex w-full max-w-[560px] flex-col items-center gap-5 lg:items-start">
+                <div className="w-full space-y-5 text-center lg:text-left">
+                    <div className="space-y-4">
                     {planContext && (
-                        <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border mb-2 ${planContext.badgeStyle}`}>
+                        <div className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 ${planContext.badgeStyle}`}>
                             <span className="text-[11px] font-bold uppercase tracking-wider">{renewalData?.isRenewal ? `RENEW ${planContext.badgeName}` : planContext.badgeName}</span>
                         </div>
                     )}
 
-                    <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900">
-                        {user && planContext
-                            ? (renewalData?.isRenewal ? `Renew ${planContext.badgeName}` : `Confirm ${planContext.badgeName}`)
-                            : (planContext ? planContext.title : "Welcome back")}
-                    </h1>
+                    {planContext ? (
+                        <h1 className="text-[clamp(1.5rem,5vw,3.25rem)] font-extrabold tracking-[-0.05em] text-slate-900 whitespace-nowrap">
+                            <span>{renewalData?.isRenewal ? "Renew" : "Upgrade to"} </span>
+                            <span className="bg-[linear-gradient(90deg,#6366f1,#22c55e,#f59e0b)] bg-clip-text text-transparent">
+                                {planDisplayName}
+                            </span>
+                        </h1>
+                    ) : (
+                        <h1 className="text-[clamp(1.5rem,5vw,3.25rem)] font-extrabold tracking-[-0.05em] text-slate-900">
+                            Welcome back
+                        </h1>
+                    )}
+                    </div>
 
                     {planContext ? (
-                        <div className="flex flex-col items-center gap-5 mt-2 mb-2 w-full">
-                            <p className="text-base text-slate-600">
+                        <div className="flex w-full flex-col items-center gap-6 lg:items-start">
+                            <p className="max-w-[52ch] text-base leading-7 text-slate-600 sm:text-lg">
                                 {user
                                     ? (renewalData?.isRenewal
-                                        ? "Your existing links stay untouched. Here's what this renewal adds:"
-                                        : "Review your plan limits globally unlocking across your account:")
+                                        ? "Your current usage stays intact. Review the updated limits below before continuing."
+                                        : "Review the unlocked benefits below, then apply this plan to your account.")
                                     : planContext.description}
                             </p>
 
                             {/* Renewal-specific quota breakdown */}
                             {user && renewalData?.isRenewal ? (
-                                <div className="w-full max-w-[380px] space-y-3">
+                                <div className="w-full max-w-[520px] rounded-[28px] border border-slate-200/80 bg-white/90 p-6 shadow-[0_20px_50px_-40px_rgba(15,23,42,0.35)] backdrop-blur-sm">
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Renewal Overview</p>
+                                        <p className="text-sm leading-6 text-slate-500">A compact summary of what changes when you renew.</p>
+                                    </div>
                                     {/* Current usage */}
-                                    <div className="flex items-center justify-between bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm">
-                                        <div className="flex items-center gap-2.5">
-                                            <div className={`${planContext.linkBgColor} p-1.5 rounded-lg shrink-0`}>
-                                                <Link2 className={`w-4 h-4 ${planContext.linkIconColor}`} />
-                                            </div>
-                                            <span className="text-sm text-slate-600">Active links</span>
+                                    <div className="mt-6 flex items-start gap-4 border-b border-slate-100 pb-4">
+                                        <div className={`${planContext.linkBgColor} rounded-lg p-2 shrink-0`}>
+                                            <Link2 className={`h-4 w-4 ${planContext.linkIconColor}`} />
                                         </div>
-                                        <span className="text-sm font-bold text-slate-900">{renewalData.linksUsed} / {renewalData.currentLimit} used</span>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-semibold text-slate-900">Active links</p>
+                                            <p className="text-sm text-slate-500">{renewalData.linksUsed} of {renewalData.currentLimit} currently in use</p>
+                                        </div>
                                     </div>
 
                                     {/* Expired links row — only if there are expired links */}
                                     {renewalData.expiredLinksCount > 0 && (
-                                        <div className="flex items-center justify-between bg-amber-50/60 px-4 py-3 rounded-xl border border-amber-200/50 shadow-sm">
-                                            <div className="flex items-center gap-2.5">
-                                                <div className="bg-amber-100 p-1.5 rounded-lg shrink-0">
-                                                    <Clock className="w-4 h-4 text-amber-600" />
-                                                </div>
-                                                <span className="text-sm text-amber-700">Expired links</span>
+                                        <div className="flex items-start gap-4 border-b border-slate-100 pb-4">
+                                            <div className="rounded-lg bg-amber-100 p-2 shrink-0">
+                                                <Clock className="h-4 w-4 text-amber-600" />
                                             </div>
-                                            <span className="text-sm font-bold text-amber-700">{renewalData.expiredLinksCount} expired</span>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-sm font-semibold text-slate-900">Expired links</p>
+                                                <p className="text-sm text-slate-500">{renewalData.expiredLinksCount} links are already expired</p>
+                                            </div>
                                         </div>
                                     )}
 
                                     {/* New addition */}
-                                    <div className="flex items-center justify-between bg-emerald-50/70 px-4 py-3 rounded-xl border border-emerald-200/60 shadow-sm">
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="bg-emerald-100 p-1.5 rounded-lg shrink-0">
-                                                <Zap className="w-4 h-4 text-emerald-600" />
-                                            </div>
-                                            <span className="text-sm text-emerald-700 font-medium">+ Renewal adds</span>
+                                    <div className="flex items-start gap-4 border-b border-slate-100 pb-4">
+                                        <div className="rounded-lg bg-emerald-100 p-2 shrink-0">
+                                            <Zap className="h-4 w-4 text-emerald-600" />
                                         </div>
-                                        <span className="text-sm font-bold text-emerald-700">+{renewalData.newAddition} links</span>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-semibold text-slate-900">Renewal adds</p>
+                                            <p className="text-sm text-slate-500">+{renewalData.newAddition} links added to your current allocation</p>
+                                        </div>
                                     </div>
 
-                                    {/* Divider */}
-                                    <div className="flex items-center gap-2 px-2">
-                                        <div className="flex-1 h-px bg-slate-200" />
-                                        <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">After renewal</span>
-                                        <div className="flex-1 h-px bg-slate-200" />
+                                    <div className="flex items-start gap-4 border-b border-slate-100 pb-4">
+                                        <div className={`${planContext.linkBgColor} rounded-lg p-2 shrink-0`}>
+                                            <Link2 className={`h-4 w-4 ${planContext.linkIconColor}`} />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-semibold text-slate-900">Total after renewal</p>
+                                            <p className="text-sm text-slate-500">{renewalData.newTotal} total links available after checkout</p>
+                                        </div>
                                     </div>
 
-                                    {/* New total */}
-                                    <div className="grid grid-cols-2 gap-3 w-full">
-                                        <div className="flex flex-col items-center justify-center gap-1.5 bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm w-full h-full transition-all hover:-translate-y-1 hover:shadow-md">
-                                            <div className={`${planContext.linkBgColor} p-2 rounded-lg mb-1 shrink-0`}>
-                                                <Link2 className={`w-5 h-5 ${planContext.linkIconColor}`} />
-                                            </div>
-                                            <span className="text-sm font-bold text-slate-900 break-words text-center">{renewalData.newTotal} Total Links</span>
+                                    <div className="flex items-start gap-4">
+                                        <div className={`${planContext.clockBgColor} rounded-lg p-2 shrink-0`}>
+                                            <Clock className={`h-4 w-4 ${planContext.clockIconColor}`} />
                                         </div>
-                                        <div className="flex flex-col items-center justify-center gap-1.5 bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm w-full h-full transition-all hover:-translate-y-1 hover:shadow-md">
-                                            <div className={`${planContext.clockBgColor} p-2 rounded-lg mb-1 shrink-0`}>
-                                                <Clock className={`w-5 h-5 ${planContext.clockIconColor}`} />
-                                            </div>
-                                            <span className="text-sm font-bold text-slate-900 break-words text-center">
-                                                {getDynamicExpiryMessage(planKey)}
-                                            </span>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-semibold text-slate-900">Expiry window</p>
+                                            <p className="text-sm text-slate-500">{getDynamicExpiryMessage(planKey)}</p>
                                         </div>
                                     </div>
                                 </div>
                             ) : (
                                 /* Standard first-purchase cards */
-                                <div className="grid grid-cols-2 gap-3 w-full max-w-[340px]">
-                                    <div className="flex flex-col items-center justify-center gap-1.5 bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm w-full h-full transition-all hover:-translate-y-1 hover:shadow-md">
-                                        <div className={`${planContext.linkBgColor} p-2 rounded-lg mb-1 shrink-0`}>
-                                            <Link2 className={`w-5 h-5 ${planContext.linkIconColor}`} />
-                                        </div>
-                                        <span className="text-sm font-bold text-slate-900 break-words text-center">{planContext.linkCount}</span>
+                                <div className="w-full max-w-[520px] rounded-[28px] border border-slate-200/80 bg-white/90 p-6 shadow-[0_20px_50px_-40px_rgba(15,23,42,0.35)] backdrop-blur-sm">
+                                    <div className="mb-6 space-y-2 text-left">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Included Benefits</p>
+                                        <p className="text-sm leading-6 text-slate-500">Everything unlocked immediately after you continue.</p>
                                     </div>
-                                    <div className="flex flex-col items-center justify-center gap-1.5 bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-sm w-full h-full transition-all hover:-translate-y-1 hover:shadow-md">
-                                        <div className={`${planContext.clockBgColor} p-2 rounded-lg mb-1 shrink-0`}>
-                                            <Clock className={`w-5 h-5 ${planContext.clockIconColor}`} />
+                                <div className="space-y-4">
+                                    <div className="flex items-start gap-4 border-b border-slate-100 pb-4">
+                                        <div className={`${planContext.linkBgColor} rounded-lg p-2 shrink-0`}>
+                                            <Link2 className={`h-4 w-4 ${planContext.linkIconColor}`} />
                                         </div>
-                                        <span className="text-sm font-bold text-slate-900 break-words text-center">
-                                            {user || planKey === 'free' ? getDynamicExpiryMessage(planKey) : planContext.expiryTime}
-                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-semibold text-slate-900">Link capacity</p>
+                                            <p className="text-sm text-slate-500">{planContext.linkCount}</p>
+                                        </div>
                                     </div>
+                                    <div className="flex items-start gap-4">
+                                        <div className={`${planContext.clockBgColor} rounded-lg p-2 shrink-0`}>
+                                            <Clock className={`h-4 w-4 ${planContext.clockIconColor}`} />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-semibold text-slate-900">Expiry window</p>
+                                            <p className="text-sm text-slate-500">{user || planKey === 'free' ? getDynamicExpiryMessage(planKey) : planContext.expiryTime}</p>
+                                        </div>
+                                    </div>
+                                </div>
                                 </div>
                             )}
                         </div>
                     ) : (
-                        <p className="text-base text-slate-600">
+                        <p className="max-w-[52ch] text-lg leading-8 text-slate-600">
                             Sign in to XURL to manage your custom aliases and track history.
                         </p>
                     )}
                 </div>
+                </div>
+                </section>
 
-                <div className="w-full max-w-[320px] mt-2">
+                <aside className="w-full max-w-[420px] justify-self-center lg:w-[420px] lg:self-center lg:justify-self-end">
+                    <div className="w-full rounded-[32px] border border-slate-200/90 bg-white px-5 py-6 shadow-[0_32px_90px_-34px_rgba(15,23,42,0.4)] lg:px-6 lg:py-6">
+                    <div className="mb-5 space-y-2.5 text-center lg:text-left">
+                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                            {user ? "Complete upgrade" : "Continue to account"}
+                        </p>
+                        <h2 className="text-[clamp(1.4rem,1.1rem+0.8vw,1.9rem)] font-bold leading-none tracking-[-0.035em] text-slate-900 whitespace-nowrap">
+                            {user
+                                ? (planContext ? `Unlock ${planContext.badgeName}` : "Finish checkout")
+                                : "Continue with your account"}
+                        </h2>
+                        <p className="text-sm leading-6 text-slate-500">
+                            {user
+                                ? "Review your plan details and confirm to activate this tier on your account."
+                                : "Sign in with Google to continue securely and apply the selected plan instantly."}
+                        </p>
+                    </div>
+                    {planContext && (
+                        <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5">
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Selected plan</p>
+                            <div className="mt-2.5 flex items-center justify-between gap-4">
+                                <span className="text-sm font-semibold text-slate-900">{renewalData?.isRenewal ? `Renew ${planContext.badgeName}` : planContext.badgeName}</span>
+                                <span className="text-xs text-slate-500">{user || planKey === 'free' ? getDynamicExpiryMessage(planKey) : planContext.expiryTime}</span>
+                            </div>
+                        </div>
+                    )}
+
                     {user ? (
                         <Button
                             onClick={handlePurchase}
                             disabled={isUpgrading}
-                            className="w-full h-12 rounded-xl bg-slate-900 text-slate-50 hover:bg-slate-800 font-medium shadow-md shadow-slate-900/10 transition-all hover:-translate-y-0.5"
+                            className="h-12 w-full rounded-xl bg-slate-900 text-base font-medium text-slate-50 shadow-lg shadow-slate-900/15 transition-all hover:-translate-y-0.5 hover:bg-slate-800"
                         >
-                            {isUpgrading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-                            {isUpgrading ? "Processing..." : (planKey === 'free' ? "Claim Free Plan" : (renewalData?.isRenewal ? "Renew Now" : "Buy Now"))} <ArrowRight className="w-4 h-4 ml-2 opacity-70" />
+                            {isUpgrading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                            {isUpgrading ? "Processing..." : (planKey === 'free' ? "Claim Free Plan" : (renewalData?.isRenewal ? "Renew Now" : "Buy Now"))} <ArrowRight className="ml-2 h-4 w-4 opacity-70" />
                         </Button>
                     ) : (
                         <Button
                             onClick={handleLogin}
-                            disabled={loading}
-                            className="w-full h-12 rounded-xl bg-slate-900 text-slate-50 hover:bg-slate-800 font-medium shadow-md shadow-slate-900/10 transition-all hover:-translate-y-0.5"
+                            disabled={authLoading || isLoggingIn}
+                            className="h-12 w-full rounded-xl bg-slate-900 text-base font-medium text-slate-50 shadow-lg shadow-slate-900/15 transition-all hover:-translate-y-0.5 hover:bg-slate-800"
                         >
-                            {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-                            {loading ? "Connecting..." : "Continue with Google"} <ArrowRight className="w-4 h-4 ml-2 opacity-70" />
+                            {isLoggingIn ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                            {isLoggingIn ? "Connecting..." : "Continue with Google"} <ArrowRight className="ml-2 h-4 w-4 opacity-70" />
                         </Button>
                     )}
-                    
-                    {loginMessage && (
-                        <div className="mt-4">
-                            {loginMessage}
-                        </div>
-                    )}
 
-                    <p className="text-center text-xs text-slate-500 mt-6">
+                    <p className="mt-5 text-center text-xs leading-6 text-slate-500">
                         {user ? "By confirming purchase, you agree to the immediate billing of this tier." : "By continuing, you agree to our Terms of Service and Privacy Policy."}
                     </p>
                     {user && planKey !== 'free' && (
@@ -654,17 +718,16 @@ function LoginContent() {
                         </div>
                     )}
                 </div>
-            </motion.div>
+                </aside>
+                </motion.div>
+            </main>
 
-            {/* Dedicated Login Page Footer */}
-            <div className="absolute bottom-6 w-full px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-medium text-slate-400 z-20 max-w-7xl mx-auto">
-                <p>&copy; {new Date().getFullYear()} XURL. All rights reserved.</p>
-                <div className="flex items-center gap-6">
-                    <Link href="/placeholder" target="_blank" rel="noopener noreferrer" className="hover:text-slate-600 transition-colors">Help Center</Link>
-                    <Link href="/placeholder" target="_blank" rel="noopener noreferrer" className="hover:text-slate-600 transition-colors">Privacy Policy</Link>
-                    <Link href="/placeholder" target="_blank" rel="noopener noreferrer" className="hover:text-slate-600 transition-colors">Terms of Service</Link>
-                </div>
-            </div>
+            <SiteFooter
+                className="z-20 border-slate-200/70 bg-white/80 px-6 py-4 backdrop-blur-sm lg:px-10"
+                panelClassName="px-0 text-slate-400"
+                linkClassName="hover:text-slate-600"
+                taglineClassName="text-slate-500"
+            />
         </div>
     );
 }

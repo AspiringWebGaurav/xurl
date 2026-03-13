@@ -1,13 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
+import {
+    ensureUserDocument,
+    PROFILE_UPDATED_EVENT,
+    type ProfileUpdatedDetail,
+} from "@/lib/firebase/user-profile";
 import { signOut, signInWithGoogle, releasePopupLock } from "@/services/auth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/Logo";
-import { History, LogOut, Loader2, Plus, ArrowLeft } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { History, LogOut, Loader2, ArrowLeft } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -37,50 +43,95 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
     const [pulseBadge, setPulseBadge] = useState(false);
     const [plan, setPlan] = useState<string>("free");
     const [quota, setQuota] = useState<{ limit: number, currentActive: number, ttlHours: number | "Unlimited" } | null>(null);
+    const [pricingLabelIndex, setPricingLabelIndex] = useState(0);
+    const [isPricingHovered, setIsPricingHovered] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
+    const pricingLabels = ["Pricing", "Plans"] as const;
 
-    useEffect(() => {
-        const checkGuestHistory = () => {
-            const h = localStorage.getItem("xurl_guest_link_history");
-            if (h) {
-                try {
-                    const parsed = JSON.parse(h);
-                    if (parsed.expiresAt > Date.now()) {
-                        setHasGuestHistory(true);
-                        setLinkCount(prev => prev === null ? 1 : prev);
-                    } else {
-                        setHasGuestHistory(false);
-                        setLinkCount(prev => prev === null ? 0 : prev);
-                    }
-                } catch {
-                    setHasGuestHistory(false);
-                    setLinkCount(prev => prev === null ? 0 : prev);
-                }
+    const syncGuestHistoryState = useCallback(() => {
+        const h = localStorage.getItem("xurl_guest_link_history");
+        if (!h) {
+            setHasGuestHistory(false);
+            setLinkCount(0);
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(h);
+            if (parsed.expiresAt > Date.now()) {
+                setHasGuestHistory(true);
+                setLinkCount(1);
             } else {
                 setHasGuestHistory(false);
-                setLinkCount(prev => prev === null ? 0 : prev);
+                setLinkCount(0);
             }
-        };
+        } catch {
+            setHasGuestHistory(false);
+            setLinkCount(0);
+        }
+    }, []);
 
-        checkGuestHistory(); // Initial check
+    const syncUserHistoryState = useCallback(async (currentUser: User) => {
+        setHasGuestHistory(false);
+        setLinkCount(0);
 
-        const intervalId = setInterval(checkGuestHistory, 1000); // Check every second for expiration
+        try {
+            const token = await currentUser.getIdToken();
+            const res = await fetch("/api/links?pageSize=25", { headers: { "Authorization": `Bearer ${token}` } });
+            const data = await res.json();
 
+            const nextLinkCount = Array.isArray(data.links) ? data.links.length : 0;
+            const currentActive = (data.freeLinksCreated || 0) + (data.paidLinksCreated || 0);
+
+            setLinkCount(nextLinkCount);
+            setPlan(data.plan || "free");
+
+            if (typeof data.limit === "number") {
+                setQuota({
+                    limit: data.limit,
+                    currentActive,
+                    ttlHours: data.planTtlHours,
+                });
+            } else {
+                setQuota(null);
+            }
+        } catch (error) {
+            console.error(error);
+            setLinkCount(0);
+            setPlan("free");
+            setQuota(null);
+        }
+    }, []);
+
+    useEffect(() => {
         const handleLinkGenerated = () => {
             setHasNewHistory(true);
-            checkGuestHistory(); // Recheck when a link is generated
-            setLinkCount(prev => prev !== null ? prev + 1 : 1);
             setPulseBadge(true);
             setTimeout(() => setPulseBadge(false), 200);
+
+            const currentUser = auth.currentUser;
+            if (currentUser) {
+                void syncUserHistoryState(currentUser);
+                return;
+            }
+
+            syncGuestHistoryState();
         };
+
+        let intervalId: ReturnType<typeof setInterval> | null = null;
+        if (!user) {
+            intervalId = setInterval(syncGuestHistoryState, 1000);
+        }
 
         window.addEventListener("linkGenerated", handleLinkGenerated);
         return () => {
-            clearInterval(intervalId);
+            if (intervalId) {
+                clearInterval(intervalId);
+            }
             window.removeEventListener("linkGenerated", handleLinkGenerated);
         };
-    }, []);
+    }, [syncGuestHistoryState, syncUserHistoryState, user]);
 
     const resetLoginState = () => {
         setIsLoggingIn(false);
@@ -138,32 +189,64 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
         const unsubscribe = onAuthStateChanged(auth, (u) => {
             setUser(u);
             setLoading(false);
+            setHasNewHistory(false);
             if (u) {
-                u.getIdToken().then(token => {
-                    fetch("/api/links?pageSize=1", { headers: { "Authorization": `Bearer ${token}` } })
-                        .then(r => r.json())
-                        .then(d => {
-                            if (d.linksCreated !== undefined) {
-                                setLinkCount(d.linksCreated);
-                            }
-                            if (d.plan) {
-                                setPlan(d.plan);
-                            }
-                            if (d.limit) {
-                                setQuota({ limit: d.limit, currentActive: d.linksCreated || 0, ttlHours: d.planTtlHours });
-                            }
-                        })
-                        .catch(console.error);
-                });
+                void ensureUserDocument(u);
+                void syncUserHistoryState(u);
             } else {
-                // If not logged in, we rely on the localStorage check to set linkCount for guest
-                const h = localStorage.getItem("xurl_guest_link_history");
-                setLinkCount(h ? 1 : 0);
+                syncGuestHistoryState();
                 setPlan("free");
                 setQuota(null);
             }
         });
         return () => unsubscribe();
+    }, [syncGuestHistoryState, syncUserHistoryState]);
+
+    useEffect(() => {
+        const handleProfileUpdated = (event: Event) => {
+            const { detail } = event as CustomEvent<ProfileUpdatedDetail>;
+            if (!detail?.displayName) {
+                return;
+            }
+
+            setUser((currentUser) => {
+                if (!currentUser) {
+                    return currentUser;
+                }
+
+                return {
+                    ...currentUser,
+                    displayName: detail.displayName,
+                    email: detail.email ?? currentUser.email,
+                    photoURL: detail.photoURL ?? currentUser.photoURL,
+                } as User;
+            });
+        };
+
+        window.addEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated as EventListener);
+        return () => window.removeEventListener(PROFILE_UPDATED_EVENT, handleProfileUpdated as EventListener);
+    }, []);
+
+    useEffect(() => {
+        if (pathname === "/pricing" || isPricingHovered) {
+            return;
+        }
+
+        const intervalId = window.setInterval(() => {
+            setPricingLabelIndex((current) => (current + 1) % pricingLabels.length);
+        }, 5000);
+
+        return () => window.clearInterval(intervalId);
+    }, [isPricingHovered, pathname, pricingLabels.length]);
+
+    const handleHistoryLinksChange = useCallback((count: number) => {
+        setLinkCount(count);
+        if (auth.currentUser) {
+            setHasGuestHistory(false);
+            return;
+        }
+
+        setHasGuestHistory(count > 0);
     }, []);
 
     const getPlanBadgeStyle = (p: string) => {
@@ -176,6 +259,15 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
             default: return "bg-slate-100 text-slate-600 border-slate-200";
         }
     };
+
+    const navActionBase =
+        "inline-flex h-9 items-center justify-center rounded-lg px-4 text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.98]";
+    const subtleAction =
+        "text-slate-600 hover:bg-slate-100 hover:text-slate-900";
+    const primaryAction =
+        "bg-slate-900 text-slate-50 shadow-sm hover:bg-slate-800 hover:shadow-md";
+    const secondaryAction =
+        "border border-slate-200 bg-slate-50 text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900";
 
     return (
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-6">
@@ -222,19 +314,40 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                 )}
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3">
-                <div className="hidden sm:flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-2.5">
+                <div className="hidden sm:flex items-center gap-2">
                     {pathname !== "/pricing" ? (
                         <Link
                             href="/pricing"
-                            className="text-[13px] font-medium transition-colors flex items-center gap-1.5 h-8 px-3 rounded-md border border-primary/20 bg-primary/5 text-primary shadow-[0_0_15px_rgba(0,0,0,0.1)] hover:bg-primary/10 hover:border-primary/30"
+                            className={cn(
+                                navActionBase,
+                                secondaryAction
+                            )}
+                            onMouseEnter={() => setIsPricingHovered(true)}
+                            onMouseLeave={() => setIsPricingHovered(false)}
                         >
-                            Pricing
+                            <span className="relative inline-flex h-5 w-[44px] items-center justify-center overflow-hidden">
+                                <AnimatePresence mode="wait" initial={false}>
+                                    <motion.span
+                                        key={pricingLabels[pricingLabelIndex]}
+                                        initial={{ opacity: 0, y: 6 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -6 }}
+                                        transition={{ duration: 0.22, ease: "easeOut" }}
+                                        className="absolute inset-0 inline-flex items-center justify-center"
+                                    >
+                                        {pricingLabels[pricingLabelIndex]}
+                                    </motion.span>
+                                </AnimatePresence>
+                            </span>
                         </Link>
                     ) : (
                         <Link
                             href="/"
-                            className="text-[13px] font-medium transition-colors flex items-center gap-1.5 h-8 px-3 rounded-md border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                            className={cn(
+                                navActionBase,
+                                "gap-1.5 border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                            )}
                         >
                             <ArrowLeft className="w-3.5 h-3.5" />
                             Back to shortener
@@ -249,12 +362,17 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                             }
                         }}
                         disabled={isCreateDisabled}
-                        className={`text-[13px] font-medium transition-colors flex items-center gap-1.5 ${isCreateDisabled ? "text-slate-400/50 cursor-not-allowed" : "text-slate-600 hover:text-slate-900"}`}
+                        className={cn(
+                            navActionBase,
+                            "min-w-[104px] border border-transparent bg-transparent shadow-none",
+                            isCreateDisabled
+                                ? "cursor-not-allowed text-slate-400/50"
+                                : subtleAction
+                        )}
                     >
                         Create link
                     </button>
                 </div>
-                <div className="hidden sm:block w-px h-4 bg-slate-200 mx-1" />
                 {!loading && (
                     user ? (
                         <>
@@ -293,7 +411,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                                                 <img src={user.photoURL} alt="Avatar" className="h-full w-full object-cover" />
                                             ) : (
                                                 <div className="h-full w-full bg-slate-100 flex items-center justify-center text-slate-600 font-medium text-xs">
-                                                    {user.email?.charAt(0).toUpperCase() || 'U'}
+                                                    {user.displayName?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
                                                 </div>
                                             )}
                                         </button>
@@ -367,7 +485,11 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                                 size="sm"
                                 onClick={handleGoogleLogin}
                                 disabled={isLoggingIn}
-                                className="h-8 px-3.5 rounded-md text-[13px] font-medium shadow-sm bg-slate-900 text-slate-50 hover:bg-slate-800 disabled:opacity-80 transition-colors"
+                                className={cn(
+                                    navActionBase,
+                                    primaryAction,
+                                    "min-w-[96px] px-4 disabled:opacity-80 disabled:hover:shadow-sm"
+                                )}
                             >
                                 {isLoggingIn ? "Connecting..." : "Login"}
                             </Button>
@@ -375,7 +497,12 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                     )
                 )}
             </div>
-            <HistorySidebar isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} userId={user?.uid || ""} />
+            <HistorySidebar
+                isOpen={isHistoryOpen}
+                onClose={() => setIsHistoryOpen(false)}
+                userId={user?.uid || ""}
+                onLinksChange={handleHistoryLinksChange}
+            />
 
             <AnimatePresence>
                 {showOverlay && (
