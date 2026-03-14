@@ -60,6 +60,7 @@ const minimalLegalLinks = [
 export function HomeFooter() {
     const [expanded, setExpanded] = useState(false);
     const expandedRef = useRef<HTMLDivElement>(null);
+    const footerRef = useRef<HTMLDivElement>(null);
     const [contentHeight, setContentHeight] = useState(0);
 
     useEffect(() => {
@@ -94,6 +95,20 @@ export function HomeFooter() {
         };
     }, [expanded]);
 
+    useEffect(() => {
+        const handleMouseDown = (e: MouseEvent) => {
+            if (
+                expanded &&
+                footerRef.current &&
+                !footerRef.current.contains(e.target as Node)
+            ) {
+                setExpanded(false);
+            }
+        };
+        document.addEventListener("mousedown", handleMouseDown);
+        return () => document.removeEventListener("mousedown", handleMouseDown);
+    }, [expanded]);
+
     return (
         <>
             {/* Keyframe injection */}
@@ -122,7 +137,7 @@ export function HomeFooter() {
                 .footer-col:nth-child(4) { animation-delay: 0.22s; }
             `}</style>
 
-            <footer className="shrink-0 border-t border-border bg-background">
+            <footer ref={footerRef} className="shrink-0 border-t border-border bg-background">
                 {/* ── Minimal row (always visible) ── */}
                 <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3 px-6 py-5 text-xs text-muted-foreground">
                     {/* Left — tagline */}
@@ -187,7 +202,7 @@ export function HomeFooter() {
                     aria-hidden={!expanded}
                 >
                     <div ref={expandedRef} className="border-t border-border">
-                        <div className="mx-auto w-full max-w-[1120px] px-6 pt-10 pb-8">
+                        <div className="w-full px-10 xl:px-20 pt-10 pb-8">
                             {/* Link columns — 4-equal grid on desktop */}
                             <div className="grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-4">
                                 {footerColumns.map((col) => (
