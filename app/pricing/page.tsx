@@ -292,7 +292,6 @@ export default function PricingPage() {
         router.push(`/login?plan=${tierPlanId}`);
     };
 
-    const toggleButtonBase = "min-w-[88px] rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300";
     const cardBase = "relative flex h-full flex-col rounded-2xl border bg-white p-8 shadow-[0_16px_40px_-30px_rgba(15,23,42,0.22)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[0_26px_56px_-30px_rgba(15,23,42,0.3)]";
     const priceValueBase = "text-[52px] leading-none font-extrabold tracking-[-0.06em] text-slate-900";
     const featureItemBase = "flex items-start gap-3.5";
@@ -313,24 +312,6 @@ export default function PricingPage() {
                     <p className="mx-auto max-w-2xl text-lg leading-8 text-slate-600">
                         Choose the perfect plan for your link management needs. No hidden fees.
                     </p>
-                </div>
-
-                <div className="mb-14 inline-flex items-center gap-1.5 rounded-2xl border border-slate-200 bg-white/85 p-1.5 shadow-[0_16px_36px_-28px_rgba(15,23,42,0.26)] backdrop-blur-sm">
-                    {(["INR", "USD", "EUR"] as Currency[]).map((c) => (
-                        <button
-                            key={c}
-                            onClick={() => setCurrency(c)}
-                            aria-pressed={currency === c}
-                            className={cn(
-                                toggleButtonBase,
-                                currency === c
-                                    ? "bg-white text-slate-900 shadow-[0_12px_28px_-22px_rgba(15,23,42,0.28)] ring-1 ring-slate-200"
-                                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                            )}
-                        >
-                            {currencySymbols[c]} {c}
-                        </button>
-                    ))}
                 </div>
 
                 {/* ↓ id added for intro scroll targeting */}
@@ -514,18 +495,37 @@ export default function PricingPage() {
                                     <p className="min-h-[48px] text-sm leading-6 text-slate-500">{tier.description}</p>
                                 </div>
 
-                                <div className="mb-8 flex items-end gap-1.5 text-slate-900">
-                                    <span className="pb-1 text-[26px] font-bold tracking-[-0.04em]">{currencySymbols[currency]}</span>
-                                    <motion.span
-                                        key={currency}
-                                        initial={{ opacity: 0, filter: "blur(4px)" }}
-                                        animate={{ opacity: 1, filter: "blur(0px)" }}
-                                        transition={{ duration: 0.4, ease: "easeOut" }}
-                                        className={priceValueBase}
-                                    >
-                                        {formatPrice(tier.priceINR)}
-                                    </motion.span>
-                                    <span className="pb-1.5 text-sm font-semibold text-slate-400">/mo</span>
+                               <div className="mb-8 flex items-center gap-3">
+                                    <div className="flex items-end gap-1.5 text-slate-900">
+                                        <span className="pb-1 text-[26px] font-bold tracking-[-0.04em]">{currencySymbols[currency]}</span>
+                                        <motion.span
+                                            key={currency}
+                                            initial={{ opacity: 0, filter: "blur(4px)" }}
+                                            animate={{ opacity: 1, filter: "blur(0px)" }}
+                                            transition={{ duration: 0.4, ease: "easeOut" }}
+                                            className={priceValueBase}
+                                        >
+                                            {formatPrice(tier.priceINR)}
+                                        </motion.span>
+                                        <span className="pb-1.5 text-sm font-semibold text-slate-400">/mo</span>
+                                    </div>
+                                    <div className="ml-2 inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                                        {(["INR", "USD", "EUR"] as Currency[]).map((c) => (
+                                            <button
+                                                key={c}
+                                                onClick={() => setCurrency(c)}
+                                                aria-pressed={currency === c}
+                                                className={cn(
+                                                    "rounded-md px-2.5 py-1 text-xs font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300",
+                                                    currency === c
+                                                        ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200"
+                                                        : "text-slate-500 hover:text-slate-700"
+                                                )}
+                                            >
+                                                {c}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
 
                                 <div className="flex-1">
