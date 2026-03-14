@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TopNavbar } from "@/components/layout/TopNavbar";
-import { SiteFooter } from "@/components/layout/SiteFooter";
+import { HomeFooter } from "@/components/layout/HomeFooter";
 import { seo } from "@/lib/seo";
 
 export const metadata: Metadata = {
@@ -114,7 +114,7 @@ export default function FeaturesPage() {
                     </div>
                 </div>
             </main>
-            <SiteFooter />
+            <HomeFooter />
         </div>
     );
 }

@@ -1,7 +1,6 @@
 import { Metadata } from "next";
 
 import { GuestPolicyContent } from "@/components/legal/GuestPolicyContent";
-import { SiteFooter } from "@/components/layout/SiteFooter";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { seo } from "@/lib/seo";
 
@@ -82,7 +81,6 @@ export default function GuestPolicyPage() {
         <div className="flex h-[100dvh] flex-col overflow-hidden bg-background">
             <TopNavbar isCreateDisabled={false} />
             <GuestPolicyContent updatedAt={updatedAt} sections={policySections} />
-            <SiteFooter />
         </div>
     );
 }

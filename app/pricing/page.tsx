@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, Suspense } from "react";
+import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Button } from "@/components/ui/button";
 import { Check, ChevronLeft, ChevronRight, Lock, ShieldCheck, Zap } from "lucide-react";
@@ -80,7 +80,6 @@ interface PricingTier {
     comparisonHint?: string;
 }
 
-// UI-only metadata for each paid plan (display strings not in PLAN_CONFIGS)
 const PLAN_UI_META: Record<string, { description: string; features: string[]; ctaText: string; comparisonHint?: string }> = {
     starter: { description: "Personal use", features: ["Login required", "Custom aliases", "Analytics Dashboard"], ctaText: "Start" },
     pro: { description: "For power users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Priority support"], ctaText: "Go Pro" },
@@ -95,7 +94,6 @@ function formatTtl(ttlMs: number): string {
     return `Expires in ${hours} hour${hours > 1 ? "s" : ""}`;
 }
 
-// Derive tiers from the centralized PLAN_CONFIGS — prices, limits, and TTLs stay in sync automatically
 const tiers: PricingTier[] = PAID_PLAN_ORDER.map((planId: PlanType) => {
     const cfg = PLAN_CONFIGS[planId];
     const ui = PLAN_UI_META[planId] || { description: "", features: [], ctaText: cfg.label };
@@ -134,6 +132,30 @@ const cardVariants: Variants = {
     },
 };
 
+/* ── Cinematic scroll helper ── */
+function easeInOutCubic(t: number): number {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function smoothScrollTo(el: HTMLElement, targetY: number, duration: number) {
+    const startY = el.scrollTop;
+    const distance = targetY - startY;
+    let startTime: number | null = null;
+
+    function step(timestamp: number) {
+        if (!startTime) startTime = timestamp;
+        const elapsed = timestamp - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = easeInOutCubic(progress);
+        el.scrollTop = startY + distance * eased;
+        if (progress < 1) requestAnimationFrame(step);
+    }
+
+    requestAnimationFrame(step);
+}
+
+const INTRO_SESSION_KEY = "pricing_intro_done";
+
 export default function PricingPage() {
     const [currency, setCurrency] = useState<Currency>("INR");
     const [rates, setRates] = useState<Record<Currency, number>>(defaultExchangeRates);
@@ -146,12 +168,36 @@ export default function PricingPage() {
     const router = useRouter();
     const [focusPlan, setFocusPlan] = useState<string | null>(null);
 
+    /* ── One-time cinematic intro scroll ── */
+    useEffect(() => {
+        const alreadyPlayed = sessionStorage.getItem(INTRO_SESSION_KEY);
+        if (alreadyPlayed) return;
+        sessionStorage.setItem(INTRO_SESSION_KEY, "1");
+
+        const timer = setTimeout(() => {
+            const root = document.getElementById("pricing-root");
+            const cardsEl = document.getElementById("pricing-cards-grid");
+            if (!root || !cardsEl) return;
+
+            // cardsEl.offsetTop gives position relative to its offset parent
+            // We want to scroll the root container so cards sit ~90px from top
+            const target = cardsEl.offsetTop - 90;
+            if (target <= 0) return;
+            smoothScrollTo(root, target, 1400);
+        }, 700);
+
+        return () => clearTimeout(timer);
+    }, []);
+
+    /* ── focusPlan scroll (existing logic, unchanged) ── */
     useEffect(() => {
         if (focusPlan) {
             const timer = setTimeout(() => {
+                const root = document.getElementById("pricing-root");
                 const element = document.getElementById(`plan-${focusPlan.toLowerCase()}`);
-                if (element) {
-                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (element && root) {
+                    const target = element.offsetTop - root.clientHeight / 2 + element.clientHeight / 2;
+                    smoothScrollTo(root, target, 900);
                 }
             }, 600);
             return () => clearTimeout(timer);
@@ -191,32 +237,24 @@ export default function PricingPage() {
             })
             .catch(console.error);
 
-        document.documentElement.style.setProperty('scrollbar-width', 'none');
-        document.body.style.setProperty('scrollbar-width', 'none');
-        const style = document.createElement('style');
-        style.id = 'hide-scrollbar-style';
-        style.innerHTML = `
-            ::-webkit-scrollbar {
-                display: none !important;
-            }
-        `;
+        document.documentElement.style.setProperty("scrollbar-width", "none");
+        document.body.style.setProperty("scrollbar-width", "none");
+        const style = document.createElement("style");
+        style.id = "hide-scrollbar-style";
+        style.innerHTML = `::-webkit-scrollbar { display: none !important; }`;
         document.head.appendChild(style);
 
         return () => {
             mounted = false;
-            document.documentElement.style.removeProperty('scrollbar-width');
-            document.body.style.removeProperty('scrollbar-width');
-            const styleElement = document.getElementById('hide-scrollbar-style');
-            if (styleElement) {
-                styleElement.remove();
-            }
+            document.documentElement.style.removeProperty("scrollbar-width");
+            document.body.style.removeProperty("scrollbar-width");
+            const styleElement = document.getElementById("hide-scrollbar-style");
+            if (styleElement) styleElement.remove();
         };
     }, []);
 
     useEffect(() => {
-        if (isFreeCardHovered) {
-            return;
-        }
+        if (isFreeCardHovered) return;
 
         const intervalId = window.setInterval(() => {
             setFreeSlideIndex((prev) => (prev + 1) % FREE_FEATURE_SLIDES.length);
@@ -251,7 +289,6 @@ export default function PricingPage() {
                 if (direction === "prev") {
                     return (current - 1 + FREE_FEATURE_SLIDES.length) % FREE_FEATURE_SLIDES.length;
                 }
-
                 return (current + 1) % FREE_FEATURE_SLIDES.length;
             });
             resetFreeSlideTimer();
@@ -270,7 +307,7 @@ export default function PricingPage() {
     const ctaBase = "mt-0 h-11 w-full rounded-xl text-[15px] font-semibold transition-all duration-200 ease-out active:scale-[0.99]";
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden">
+        <div id="pricing-root" className="min-h-screen bg-slate-50 flex flex-col relative overflow-x-hidden overflow-y-auto">
             <Suspense fallback={null}>
                 <SearchParamsReader onPlan={setFocusPlan} />
             </Suspense>
@@ -304,13 +341,15 @@ export default function PricingPage() {
                     ))}
                 </div>
 
+                {/* ↓ id added for intro scroll targeting */}
                 <motion.div
+                    id="pricing-cards-grid"
                     variants={containerVariants}
                     initial="hidden"
                     animate="visible"
                     className="max-w-7xl w-full grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3 group/cards"
                 >
-                    {/* Free Plan Card — Guest + Account Access */}
+                    {/* Free Plan Card */}
                     <motion.div
                         id="plan-free"
                         variants={cardVariants}

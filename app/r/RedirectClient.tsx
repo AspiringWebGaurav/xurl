@@ -4,6 +4,7 @@ import { useEffect, useSyncExternalStore, useState } from "react";
 import { Loader2, ArrowRight, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { buildShortUrl } from "@/lib/utils/url-builder";
+import { HomeFooter } from "@/components/layout/HomeFooter";
 import Link from "next/link";
 
 const subscribe = () => () => {};
@@ -101,9 +102,7 @@ export default function RedirectClient({ dest }: { dest: string }) {
                 </AnimatePresence>
             </main>
 
-            <footer className="shrink-0 text-center py-4 text-xs text-muted-foreground border-t border-border bg-background">
-                XURL &middot; Minimal URL Shortener
-            </footer>
+            <HomeFooter />
         </div>
     );
 }

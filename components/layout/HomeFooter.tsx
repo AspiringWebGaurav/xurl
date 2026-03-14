@@ -6,32 +6,46 @@ import { cn } from "@/lib/utils";
 import { ChevronUp } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
-/*  Link data                                                         */
+/*  Link data                                                           */
 /* ------------------------------------------------------------------ */
 
-const productLinks = [
-    { href: "/features", label: "Features" },
-    { href: "/pricing", label: "Pricing" },
-    { href: "/analytics", label: "Analytics" },
-    { href: "/api-docs", label: "API" },
-    { href: "/documentation", label: "Documentation" },
+const footerColumns = [
+    {
+        label: "Product",
+        links: [
+            { href: "/features", label: "Features" },
+            { href: "/pricing", label: "Pricing" },
+            { href: "/analytics", label: "Analytics" },
+            { href: "/api-docs", label: "API" },
+            { href: "/documentation", label: "Documentation" },
+        ],
+    },
+    {
+        label: "Resources",
+        links: [
+            { href: "/api-docs", label: "API Reference" },
+            { href: "/documentation", label: "Documentation" },
+            { href: "/changelog", label: "Changelog" },
+        ],
+    },
+    {
+        label: "Legal",
+        links: [
+            { href: "/terms", label: "Terms of Service" },
+            { href: "/privacy", label: "Privacy Policy" },
+            { href: "/acceptable-use", label: "Acceptable Use" },
+            { href: "/refund", label: "Refund Policy" },
+        ],
+    },
+    {
+        label: "Company",
+        links: [
+            { href: "/about", label: "About" },
+            { href: "/blog", label: "Blog" },
+        ],
+        comingSoon: ["REST API Access"],
+    },
 ];
-
-const companyLinks = [
-    { href: "/about", label: "About" },
-    { href: "/blog", label: "Blog" },
-];
-
-const legalLinks = [
-    { href: "/terms", label: "Terms of Service" },
-    { href: "/privacy", label: "Privacy Policy" },
-    { href: "/acceptable-use", label: "Acceptable Use" },
-    { href: "/refund", label: "Refund Policy" },
-];
-
-/* ------------------------------------------------------------------ */
-/*  Minimal footer row (always visible)                               */
-/* ------------------------------------------------------------------ */
 
 const minimalLegalLinks = [
     { href: "/terms", label: "Terms" },
@@ -40,7 +54,7 @@ const minimalLegalLinks = [
 ];
 
 /* ------------------------------------------------------------------ */
-/*  Component                                                         */
+/*  Component                                                           */
 /* ------------------------------------------------------------------ */
 
 export function HomeFooter() {
@@ -48,27 +62,25 @@ export function HomeFooter() {
     const expandedRef = useRef<HTMLDivElement>(null);
     const [contentHeight, setContentHeight] = useState(0);
 
-    /* Measure expanded content height on mount & resize */
     useEffect(() => {
         const el = expandedRef.current;
         if (!el) return;
-
         const measure = () => setContentHeight(el.scrollHeight);
         measure();
-
         const observer = new ResizeObserver(measure);
         observer.observe(el);
         return () => observer.disconnect();
     }, []);
 
-    /* Toggle body overflow so the page becomes scrollable when expanded */
     useEffect(() => {
-        const root = document.getElementById("home-root") || document.getElementById("pricing-root") || document.getElementById("login-root");
+        const root =
+            document.getElementById("home-root") ||
+            document.getElementById("pricing-root") ||
+            document.getElementById("login-root");
         if (!root) return;
 
         if (expanded) {
             root.style.overflow = "auto";
-            // Scroll to bottom so expanded content is visible
             requestAnimationFrame(() => {
                 root.scrollTo({ top: root.scrollHeight, behavior: "smooth" });
             });
@@ -82,163 +94,155 @@ export function HomeFooter() {
         };
     }, [expanded]);
 
-    const linkClass =
-        "text-muted-foreground transition-colors duration-200 hover:text-foreground";
-
     return (
-        <footer className="shrink-0 border-t border-border bg-background">
-            {/* ── Minimal row (always shown) ──────────────────────── */}
-            <div className="flex w-full flex-col gap-3 text-xs text-muted-foreground sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center px-4 py-6">
-                {/* Left — tagline */}
-                <div className="flex w-full items-center justify-start">
-                    <p className="text-xs text-muted-foreground opacity-80">
-                        Minimal URL Shortener
-                    </p>
-                </div>
+        <>
+            {/* Keyframe injection */}
+            <style>{`
+                @keyframes footer-nudge {
+                    0%, 100% { transform: translateY(0); }
+                    40%       { transform: translateY(-3px); }
+                    70%       { transform: translateY(1px); }
+                }
+                .footer-chevron-idle {
+                    animation: footer-nudge 2.4s ease-in-out infinite;
+                }
+                .footer-chevron-idle:hover {
+                    animation: none;
+                }
+                @keyframes footer-fadein {
+                    from { opacity: 0; transform: translateY(6px); }
+                    to   { opacity: 1; transform: translateY(0); }
+                }
+                .footer-col {
+                    animation: footer-fadein 0.35s ease both;
+                }
+                .footer-col:nth-child(1) { animation-delay: 0.04s; }
+                .footer-col:nth-child(2) { animation-delay: 0.10s; }
+                .footer-col:nth-child(3) { animation-delay: 0.16s; }
+                .footer-col:nth-child(4) { animation-delay: 0.22s; }
+            `}</style>
 
-                {/* Center — logo */}
-                <div className="opacity-80 transition-opacity hover:opacity-100 sm:justify-self-center">
-                    <Logo size="sm" className="shrink-0" />
-                </div>
+            <footer className="shrink-0 border-t border-border bg-background">
+                {/* ── Minimal row (always visible) ── */}
+                <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3 px-6 py-5 text-xs text-muted-foreground">
+                    {/* Left — tagline */}
+                    <p className="opacity-70 whitespace-nowrap">Minimal URL Shortener</p>
 
-                {/* Right — legal links + expand trigger */}
-                <nav
-                    aria-label="Footer"
-                    className="flex w-full flex-wrap items-center gap-4 justify-end"
-                >
-                    {minimalLegalLinks.map((link) => (
-                        <a
-                            key={link.href}
-                            href={link.href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="rounded-md px-2 py-1 transition-colors duration-200 hover:bg-muted/70 hover:text-foreground"
-                        >
-                            {link.label}
-                        </a>
-                    ))}
+                    {/* Center — logo */}
+                    <div className="justify-self-center opacity-80 transition-opacity hover:opacity-100">
+                        <Logo size="sm" className="shrink-0" />
+                    </div>
 
-                    <button
-                        type="button"
-                        onClick={() => setExpanded((prev) => !prev)}
-                        className="ml-1 flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground/70 transition-colors duration-200 hover:bg-muted/70 hover:text-foreground"
-                        aria-expanded={expanded}
-                        aria-label={expanded ? "Collapse footer" : "Expand footer"}
+                    {/* Right — links + expand button */}
+                    <nav
+                        aria-label="Footer navigation"
+                        className="flex items-center justify-end gap-1 flex-wrap"
                     >
-                        <ChevronUp
-                            className={cn(
-                                "h-3.5 w-3.5 transition-transform duration-300",
-                                expanded && "rotate-180"
-                            )}
-                        />
-                        <span className="text-[11px] font-medium">
-                            {expanded ? "Less" : "More"}
-                        </span>
-                    </button>
-                </nav>
-            </div>
+                        {minimalLegalLinks.map((link) => (
+                            <a
+                                key={link.href}
+                                href={link.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="rounded-md px-2 py-1 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground"
+                            >
+                                {link.label}
+                            </a>
+                        ))}
 
-            {/* ── Expandable section ─────────────────────────────── */}
-            <div
-                style={{
-                    maxHeight: expanded ? contentHeight : 0,
-                    opacity: expanded ? 1 : 0,
-                }}
-                className="overflow-hidden transition-all duration-300 ease-out"
-            >
-                <div ref={expandedRef} className="border-t border-border px-4 pt-8 pb-6">
-                    <div className="mx-auto w-full max-w-[1120px] flex flex-col gap-8">
-                        {/* Link columns */}
-                        <div className="flex w-full flex-wrap gap-10 text-xs">
-                            {/* Product */}
-                            <div className="flex flex-col gap-2">
-                                <span className="font-medium text-foreground">
-                                    Product
-                                </span>
-                                {productLinks.map((link) => (
-                                    <a
-                                        key={link.href}
-                                        href={link.href}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className={linkClass}
+                        {/* Divider */}
+                        <span className="mx-1 h-3 w-px bg-border" aria-hidden="true" />
+
+                        {/* Expand / Collapse button */}
+                        <button
+                            type="button"
+                            onClick={() => setExpanded((prev) => !prev)}
+                            className="group ml-0.5 flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground/70 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground"
+                            aria-expanded={expanded}
+                            aria-label={expanded ? "Collapse footer" : "Expand footer"}
+                        >
+                            <span
+                                className={cn(
+                                    "h-3.5 w-3.5 transition-transform duration-300",
+                                    !expanded && "footer-chevron-idle",
+                                    expanded && "rotate-180"
+                                )}
+                            >
+                                <ChevronUp className="h-full w-full" />
+                            </span>
+                            <span className="text-[11px] font-medium leading-none">
+                                {expanded ? "Less" : "More"}
+                            </span>
+                        </button>
+                    </nav>
+                </div>
+
+                {/* ── Expandable section ── */}
+                <div
+                    style={{
+                        maxHeight: expanded ? contentHeight : 0,
+                        opacity: expanded ? 1 : 0,
+                    }}
+                    className="overflow-hidden transition-all duration-300 ease-out"
+                    aria-hidden={!expanded}
+                >
+                    <div ref={expandedRef} className="border-t border-border">
+                        <div className="mx-auto w-full max-w-[1120px] px-6 pt-10 pb-8">
+                            {/* Link columns — 4-equal grid on desktop */}
+                            <div className="grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-4">
+                                {footerColumns.map((col) => (
+                                    <div
+                                        key={col.label}
+                                        className={cn(
+                                            "footer-col flex flex-col gap-3 text-xs",
+                                            !expanded && "animation-none"
+                                        )}
                                     >
-                                        {link.label}
-                                    </a>
+                                        <span className="text-[11px] font-bold uppercase tracking-widest text-foreground">
+                                            {col.label}
+                                        </span>
+                                        <span className="w-6 h-px bg-foreground/20 -mt-1 mb-0.5" aria-hidden="true" />
+                                        <div className="flex flex-col gap-2">
+                                            {col.links.map((link) => (
+                                                <a
+                                                    key={link.href}
+                                                    href={link.href}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium"
+                                                >
+                                                    {link.label}
+                                                </a>
+                                            ))}
+                                            {col.comingSoon?.map((item) => (
+                                                <span
+                                                    key={item}
+                                                    className="flex items-center gap-1.5 text-muted-foreground/50 cursor-default"
+                                                >
+                                                    {item}
+                                                    <span className="rounded-sm border border-border bg-muted/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                                                        Paid · Soon
+                                                    </span>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
                                 ))}
                             </div>
 
-                            {/* Resources */}
-                            <div className="flex flex-col gap-2">
-                                <span className="font-medium text-foreground">
-                                    Resources
+                            {/* Copyright row */}
+                            <div className="mt-10 flex items-center justify-between border-t border-border pt-5 text-[11px] text-muted-foreground/50">
+                                <span>
+                                    &copy; {new Date().getFullYear()} XURL. All rights reserved.
                                 </span>
-                                <a
-                                    href="/api-docs"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className={linkClass}
-                                >
-                                    API
-                                </a>
-                                <a
-                                    href="/documentation"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className={linkClass}
-                                >
-                                    Documentation
-                                </a>
-                            </div>
-
-                            {/* Legal */}
-                            <div className="flex flex-col gap-2">
-                                <span className="font-medium text-foreground">
-                                    Legal
-                                </span>
-                                {legalLinks.map((link) => (
-                                    <a
-                                        key={link.href}
-                                        href={link.href}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className={linkClass}
-                                    >
-                                        {link.label}
-                                    </a>
-                                ))}
-                            </div>
-
-                            {/* Company */}
-                            <div className="flex flex-col gap-2">
-                                <span className="font-medium text-foreground">
-                                    Company
-                                </span>
-                                {companyLinks.map((link) => (
-                                    <a
-                                        key={link.href}
-                                        href={link.href}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className={linkClass}
-                                    >
-                                        {link.label}
-                                    </a>
-                                ))}
-                                <span className="text-muted-foreground/60">
-                                    Support — Coming Soon
+                                <span className="hidden sm:block opacity-60 tracking-wide">
+                                    Built for speed.
                                 </span>
                             </div>
-                        </div>
-
-                        {/* Copyright */}
-                        <div className="border-t border-border pt-4 text-center text-xs text-muted-foreground">
-                            &copy; {new Date().getFullYear()} XURL. All rights
-                            reserved.
                         </div>
                     </div>
                 </div>
-            </div>
-        </footer>
+            </footer>
+        </>
     );
 }
