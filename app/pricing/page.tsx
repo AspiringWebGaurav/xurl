@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, Suspense } from "react";
+import { useCallback, useEffect, useState, Suspense } from "react";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Button } from "@/components/ui/button";
 import { Check, ChevronLeft, ChevronRight, Lock, ShieldCheck, Zap } from "lucide-react";
@@ -154,8 +154,6 @@ function smoothScrollTo(el: HTMLElement, targetY: number, duration: number) {
     requestAnimationFrame(step);
 }
 
-const INTRO_SESSION_KEY = "pricing_intro_done";
-
 export default function PricingPage() {
     const [currency, setCurrency] = useState<Currency>("INR");
     const [rates, setRates] = useState<Record<Currency, number>>(defaultExchangeRates);
@@ -168,20 +166,14 @@ export default function PricingPage() {
     const router = useRouter();
     const [focusPlan, setFocusPlan] = useState<string | null>(null);
 
-    /* ── One-time cinematic intro scroll ── */
+    /* ── Cinematic intro scroll (every page visit) ── */
     useEffect(() => {
-        const alreadyPlayed = sessionStorage.getItem(INTRO_SESSION_KEY);
-        if (alreadyPlayed) return;
-        sessionStorage.setItem(INTRO_SESSION_KEY, "1");
-
         const timer = setTimeout(() => {
             const root = document.getElementById("pricing-root");
             const cardsEl = document.getElementById("pricing-cards-grid");
             if (!root || !cardsEl) return;
 
-            // cardsEl.offsetTop gives position relative to its offset parent
-            // We want to scroll the root container so cards sit ~90px from top
-            const target = cardsEl.offsetTop - 90;
+            const target = cardsEl.offsetTop - 9.5;
             if (target <= 0) return;
             smoothScrollTo(root, target, 1400);
         }, 700);
@@ -189,7 +181,7 @@ export default function PricingPage() {
         return () => clearTimeout(timer);
     }, []);
 
-    /* ── focusPlan scroll (existing logic, unchanged) ── */
+    /* ── focusPlan scroll ── */
     useEffect(() => {
         if (focusPlan) {
             const timer = setTimeout(() => {
@@ -307,7 +299,7 @@ export default function PricingPage() {
     const ctaBase = "mt-0 h-11 w-full rounded-xl text-[15px] font-semibold transition-all duration-200 ease-out active:scale-[0.99]";
 
     return (
-        <div id="pricing-root" className="min-h-screen bg-slate-50 flex flex-col relative overflow-x-hidden overflow-y-auto">
+        <div id="pricing-root" className="h-[100dvh] bg-slate-50 flex flex-col relative overflow-x-hidden overflow-y-auto">
             <Suspense fallback={null}>
                 <SearchParamsReader onPlan={setFocusPlan} />
             </Suspense>
