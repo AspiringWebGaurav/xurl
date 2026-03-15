@@ -75,6 +75,10 @@ firebase-debug.*.log
 firestore-debug.log
 ui-debug.log
 
+# Firebase Functions build output
+/functions/lib/
+/functions/node_modules/
+
 # Temporary files
 tmp/
 temp/
@@ -84,3 +88,10 @@ temp/
 scripts/
 CLAUDE.md
 screenshot/
+
+# Local-only Claude experiments
+.claude/
+.local/claude/
+
+# Local developer data (indexes, caches)
+.local/

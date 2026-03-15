@@ -30,6 +30,7 @@ export class RazorpayService implements PaymentService {
             notes: {
                 userId: params.userId,
                 planId: params.planId,
+                ...(params.notes || {}),
             }
         };
 

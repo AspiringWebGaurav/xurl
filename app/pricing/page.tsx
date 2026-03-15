@@ -10,6 +10,7 @@ import { auth } from "@/lib/firebase/config";
 import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { AnimatePresence, motion, Variants } from "framer-motion";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 import { PLAN_CONFIGS, PAID_PLAN_ORDER } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
@@ -83,9 +84,9 @@ interface PricingTier {
 const PLAN_UI_META: Record<string, { description: string; features: string[]; ctaText: string; comparisonHint?: string }> = {
     starter: { description: "Personal use", features: ["Login required", "Custom aliases", "Analytics Dashboard"], ctaText: "Start" },
     pro: { description: "For power users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Priority support"], ctaText: "Go Pro" },
-    business: { description: "Best value for heavy users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Priority support", "4× more links than Pro"], ctaText: "Get Business", comparisonHint: "Most Popular" },
-    enterprise: { description: "Advanced link management", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Custom domains integration"], ctaText: "Go Enterprise" },
-    bigenterprise: { description: "Maximum scale", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Dedicated account manager"], ctaText: "Go Big" },
+    business: { description: "Best value for heavy users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "4× more links than Pro"], ctaText: "Get Business", comparisonHint: "Most Popular" },
+    enterprise: { description: "Advanced link management", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "Custom domains integration"], ctaText: "Go Enterprise" },
+    bigenterprise: { description: "Maximum scale", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "Dedicated account manager"], ctaText: "Go Big" },
 };
 
 function formatTtl(ttlMs: number): string {
@@ -570,6 +571,58 @@ export default function PricingPage() {
                         );
                     })}
                 </motion.div>
+
+                <div className="mt-12 w-full max-w-7xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+                    <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <h2 className="text-xl font-bold tracking-tight text-slate-900">Feature comparison</h2>
+                            <p className="mt-1 text-sm text-slate-500">Quick plan-by-plan visibility for developer access.</p>
+                        </div>
+                        <Link href="/documentation/api" className="text-sm font-semibold text-slate-700 underline-offset-4 hover:text-slate-900 hover:underline">
+                            Open API documentation
+                        </Link>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <table className="w-full min-w-[720px] text-left text-sm">
+                            <thead className="border-b border-slate-200 text-slate-500">
+                                <tr>
+                                    <th className="px-4 py-3 font-medium">Feature</th>
+                                    <th className="px-4 py-3 font-medium">Free</th>
+                                    <th className="px-4 py-3 font-medium">Starter</th>
+                                    <th className="px-4 py-3 font-medium">Pro</th>
+                                    <th className="px-4 py-3 font-medium">Business</th>
+                                    <th className="px-4 py-3 font-medium">Enterprise</th>
+                                    <th className="px-4 py-3 font-medium">Big Enterprise</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                                <tr>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">
+                                        <Link href="/documentation/api" className="underline decoration-slate-300 underline-offset-4 hover:text-slate-700">
+                                            API Access
+                                        </Link>
+                                    </td>
+                                    <td className="px-4 py-4 text-slate-400">No</td>
+                                    <td className="px-4 py-4 text-slate-400">No</td>
+                                    <td className="px-4 py-4 text-slate-400">No</td>
+                                    <td className="px-4 py-4 font-semibold text-emerald-600">Yes</td>
+                                    <td className="px-4 py-4 font-semibold text-emerald-600">Yes</td>
+                                    <td className="px-4 py-4 font-semibold text-emerald-600">Yes</td>
+                                </tr>
+                                <tr>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">Included API quota</td>
+                                    <td className="px-4 py-4 text-slate-400">-</td>
+                                    <td className="px-4 py-4 text-slate-400">-</td>
+                                    <td className="px-4 py-4 text-slate-400">-</td>
+                                    <td className="px-4 py-4 text-slate-700">500 requests</td>
+                                    <td className="px-4 py-4 text-slate-700">5000 requests</td>
+                                    <td className="px-4 py-4 text-slate-700">5000 requests</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
                 <div className="mt-16 mb-8 flex items-center justify-center gap-2 text-slate-400">
                     <ShieldCheck className="w-4 h-4" />

@@ -29,7 +29,7 @@ const docs = [
         title: "API Reference",
         description:
             "Complete endpoint documentation with request/response examples, authentication, and rate limits.",
-        href: "/api-docs",
+        href: "/documentation/api",
         internal: true,
     },
     {

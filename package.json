@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:premium-api": "node scripts/test-premium-api.mjs",
+    "test:promo-codes": "node scripts/test-promo-codes.mjs",
     "deploy:ttl": "firebase deploy --only firestore:indexes --non-interactive"
   },
   "dependencies": {

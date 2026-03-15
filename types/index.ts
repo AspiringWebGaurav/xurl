@@ -24,6 +24,12 @@ export interface UserDocument {
     activeLinks: number;
     cumulativeQuota?: number;
     linksCreated: number;
+    apiEnabled?: boolean;
+    apiQuotaTotal?: number;
+    apiRequestsUsed?: number;
+    apiKeyHash?: string | null;
+    apiKeyEncrypted?: string | null;
+    apiKeyLastRotatedAt?: number | null;
     /** Free plan: total link creations used (max 3 lifetime) */
     free_usage_count?: number;
     /** Free plan: timestamp of last link creation (for 24h cooldown) */
@@ -46,10 +52,47 @@ export interface OrderDocument {
     userId: string;
     planId: PlanType;
     amount: number;
+    baseAmount?: number;
+    discountAmount?: number;
+    promoCodeId?: string | null;
+    promoCode?: string | null;
+    promoDiscountType?: "percentage" | "fixed" | "free_plan" | null;
+    promoDiscountValue?: number | null;
     currency: string;
     status: "created" | "paid" | "consumed" | "failed";
+    source?: "razorpay" | "developer_mode" | "promo_free" | "admin_grant";
     createdAt: number;
     updatedAt: number;
+}
+
+export interface PromoRedemptionDocument {
+    promoCodeId: string;
+    promoCode: string;
+    userId: string;
+    planId: PlanType;
+    orderId?: string | null;
+    discountType: "percentage" | "fixed" | "free_plan";
+    discountValue: number;
+    redeemedAt: number;
+}
+
+export interface PromoCodeDocument {
+    code: string;
+    normalizedCode: string;
+    discountType: "percentage" | "fixed" | "free_plan";
+    discountValue: number;
+    expiresAt: number | null;
+    usageLimit: number | null;
+    perUserLimit?: number | null;
+    usageCount: number;
+    planRestriction: PlanType | null;
+    isActive: boolean;
+    createdAt: number;
+    updatedAt: number;
+    createdBy: string;
+    updatedBy: string;
+    lastUsedAt?: number | null;
+    redemptionCount?: number;
 }
 
 /**
@@ -126,6 +169,19 @@ export interface RedirectResult {
     source: "edge" | "memory" | "firestore";
 }
 
+export interface ApiLogDocument {
+    requestId: string;
+    userId: string;
+    endpoint: string;
+    method: string;
+    statusCode: number;
+    responseTimeMs: number;
+    ip: string;
+    quotaUsage: number;
+    quotaTotal: number;
+    createdAt: number;
+}
+
 export interface ApiError {
     code: string;
     message: string;
@@ -142,5 +198,3 @@ export interface CacheEntry {
     ttl: number;           // milliseconds
     hitCount: number;       // for adaptive TTL
 }
-
-

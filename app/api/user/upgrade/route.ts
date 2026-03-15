@@ -57,7 +57,10 @@ export async function POST(request: NextRequest) {
         }
 
         // Atomic read-then-write to prevent race with concurrent webhook/verify
-        await applyPlanUpgrade(plan, decoded.uid, orderId);
+        await applyPlanUpgrade(plan, decoded.uid, orderId, undefined, undefined, {
+            source: orderId ? "razorpay" : "system",
+            amountPaise: undefined,
+        });
 
         logger.info("api_upgrade", `User ${decoded.uid} upgraded to ${plan}`);
 

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminDb } from "@/lib/firebase/admin";
 import { razorpayService } from "@/services/payments/razorpay";
-import { PLAN_CONFIGS, resolvePlanType, getPricePaise } from "@/lib/plans";
+import { PLAN_CONFIGS, resolvePlanType } from "@/lib/plans";
 import { applyPlanUpgrade } from "@/services/plan-upgrade";
 import { logger } from "@/lib/utils/logger";
-import type { PlanType } from "@/lib/plans";
 
 export async function POST(request: NextRequest) {
     try {
@@ -58,9 +58,21 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ success: true }); // Ack but don't process
             }
 
+            const orderSnap = await adminDb.collection("orders").doc(orderId).get();
+            if (!orderSnap.exists) {
+                logger.error("webhook_order_missing", `Order ${orderId} not found in Firestore`);
+                return NextResponse.json({ success: true });
+            }
+
+            const orderData = orderSnap.data()!;
+            if (orderData.userId !== userId || resolvePlanType(orderData.planId) !== planId) {
+                logger.error("webhook_order_metadata_mismatch", `Order ${orderId} metadata does not match webhook payload`);
+                return NextResponse.json({ success: true });
+            }
+
             // Security: Validate payment amount matches expected plan price
             if (paymentEntity.amount !== undefined) {
-                const expectedAmount = getPricePaise(planId);
+                const expectedAmount = Number(orderData.amount);
                 if (Number(paymentEntity.amount) !== expectedAmount) {
                     logger.error("webhook_amount_mismatch", `Amount ${paymentEntity.amount} does not match expected ${expectedAmount} for plan ${planId}`);
                     return NextResponse.json({ success: true }); // Ack but don't process tampered amount
@@ -70,7 +82,10 @@ export async function POST(request: NextRequest) {
             // Perform idempotent update — mark as "consumed" to prevent double-upgrade
             // via the /user/upgrade endpoint
             // The `applyPlanUpgrade` service handles reading the order to prevent double-upgrade and writes the user update.
-            await applyPlanUpgrade(planId, userId, orderId, paymentId);
+            await applyPlanUpgrade(planId, userId, orderId, paymentId, undefined, {
+                source: "razorpay",
+                amountPaise: Number(orderData.amount) || undefined,
+            });
 
             logger.info("webhook_processed", `Successfully upgraded user ${userId} to ${planId}`);
         }

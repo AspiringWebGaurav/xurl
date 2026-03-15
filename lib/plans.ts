@@ -40,6 +40,10 @@ export interface PlanConfig {
     maxUses?: number;
     /** For the free plan: cooldown between uses in milliseconds */
     cooldownMs?: number;
+    /** Whether developer API access is enabled for the plan */
+    apiAccess?: boolean;
+    /** Total API requests included with the active plan purchase */
+    apiQuotaTotal?: number;
 }
 
 // ─── Central Plan Configuration ─────────────────────────────────────────────
@@ -53,6 +57,8 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
         label: "Free",
         maxUses: 3,
         cooldownMs: 24 * 60 * 60 * 1000,          // 24 hours
+        apiAccess: false,
+        apiQuotaTotal: 0,
     },
     starter: {
         limit: 5,
@@ -60,6 +66,8 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
         priceINR: 49,
         slugAllowed: true,
         label: "Starter",
+        apiAccess: false,
+        apiQuotaTotal: 0,
     },
     pro: {
         limit: 25,
@@ -67,6 +75,8 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
         priceINR: 99,
         slugAllowed: true,
         label: "Pro",
+        apiAccess: false,
+        apiQuotaTotal: 0,
     },
     business: {
         limit: 100,
@@ -75,6 +85,8 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
         slugAllowed: true,
         label: "Business",
         badge: "MOST_POPULAR",
+        apiAccess: true,
+        apiQuotaTotal: 500,
     },
     enterprise: {
         limit: 300,
@@ -82,6 +94,8 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
         priceINR: 299,
         slugAllowed: true,
         label: "Enterprise",
+        apiAccess: true,
+        apiQuotaTotal: 5000,
     },
     bigenterprise: {
         limit: 600,
@@ -89,6 +103,8 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
         priceINR: 999,
         slugAllowed: true,
         label: "Big Enterprise",
+        apiAccess: true,
+        apiQuotaTotal: 5000,
     },
     guest: {
         limit: 1,
@@ -96,6 +112,8 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
         priceINR: 0,
         slugAllowed: false,
         label: "Guest",
+        apiAccess: false,
+        apiQuotaTotal: 0,
     }
 };
 

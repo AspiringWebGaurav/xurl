@@ -2,6 +2,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { type PlanType } from "@/lib/plans";
 
 export type TransactionAction = "guest_use" | "free_use" | "upgrade" | "renew" | "downgrade" | "expire";
+export type TransactionSource = "system" | "razorpay" | "developer_mode" | "admin_grant" | "promo_free";
 
 export interface PlanTransaction {
     id?: string;
@@ -9,6 +10,9 @@ export interface PlanTransaction {
     planType: PlanType;
     action: TransactionAction;
     linksAllocated: number;
+    amount?: number;
+    source?: TransactionSource;
+    reason?: string;
     paymentId?: string;
     orderId?: string;
     createdAt: number;

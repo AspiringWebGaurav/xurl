@@ -18,6 +18,8 @@ XURL is a serverless SaaS URL shortening platform built for speed, security, and
 - **Link Preview** — Metadata extraction (title + favicon) for destination URLs
 - **Automatic Expiry** — Plan-based TTL with Firestore native TTL cleanup
 - **Payment Integration** — Secure Razorpay checkout with idempotent order processing
+- **Admin Console** — Promo code CRUD with redemptions, per-user limits, free-plan promos; plan grants with custom durations
+- **Developer Mode** — Dev-only simulated payments (no Razorpay calls) for the whitelisted dev email
 - **Edge Caching** — Three-tier caching (edge, Redis, Firestore) for sub-millisecond redirects
 - **Desktop-Optimized UI** — Clean, modern interface built with shadcn/ui and Framer Motion
 
@@ -68,6 +70,12 @@ For detailed architecture documentation, see [Documentation/Architecture.md](Doc
 | [Upstash Redis](https://upstash.com) | Distributed caching and abuse protection |
 | [Razorpay](https://razorpay.com) | Payment processing |
 | [Zod](https://zod.dev) | Runtime schema validation |
+
+Additional capabilities
+
+- **Promo code policy** — Percentage, fixed, and free_plan discounts; plan scoping; total/per-user limits; redemptions tracked; admin-only CRUD
+- **Admin grants** — Zero-amount grants with custom durations and source=admin_grant
+- **Developer mode** — Dev-only toggle that simulates successful payments with source=developer_mode; production untouched
 
 ## Plans
 
@@ -204,6 +212,7 @@ Complete documentation is available in the [`Documentation/`](Documentation/) di
 | [Deployment](Documentation/Deployment.md) | Environment variables, production checklist |
 | [Developer Guide](Documentation/Developer-Guide.md) | Local setup, project patterns, scripts |
 | [Security](Documentation/Security.md) | Auth, abuse protection, SSRF, rate limiting |
+| [Promo Policy](Documentation/Promo-Policy.md) | Promo types, limits, redemptions, admin rules |
 
 ### Legal
 
@@ -213,6 +222,13 @@ Complete documentation is available in the [`Documentation/`](Documentation/) di
 | [Privacy Policy](Documentation/Privacy-Policy.md) | Data collection and usage practices |
 | [Acceptable Use Policy](Documentation/Acceptable-Use-Policy.md) | Prohibited content and activities |
 | [Refund Policy](Documentation/Refund-Policy.md) | Billing terms and refund eligibility |
+
+### Operations & Scripts
+
+- `scripts/test-dev-admin.mjs` — Dev/admin end-to-end: dev mode toggle, promo validation, admin grant, dev-mode purchase, per-user limit, transactions/redemptions
+- `scripts/clean_all.mjs` — Flush Redis, delete key Firestore collections, reset counters, delete Auth users (destructive)
+- `scripts/wipe-firestore-all.mjs` — Delete all top-level Firestore collections (destructive)
+- `scripts/flush-redis.mjs` — Upstash Redis FLUSHALL (destructive)
 
 ## Contributing
 

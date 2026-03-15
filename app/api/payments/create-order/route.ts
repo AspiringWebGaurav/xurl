@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { razorpayService } from "@/services/payments/razorpay";
-import { PLAN_CONFIGS, isPaidPlan, getPricePaise, resolvePlanType } from "@/lib/plans";
-import type { PlanType, OrderDocument } from "@/types";
+import { getPricePaise, isPaidPlan, resolvePlanType } from "@/lib/plans";
+import type { OrderDocument } from "@/types";
 import { logger } from "@/lib/utils/logger";
 import { getRedisClient } from "@/lib/redis/client";
+import { validatePromoCodeForPlan } from "@/services/promo-codes";
+import { getDevModeForUser, isDevEnvironment, isDeveloperEmail } from "@/lib/dev-mode";
+import { applyPlanUpgrade } from "@/services/plan-upgrade";
 
 // Ensure a user can only create 10 orders per hour
 const ORDER_RATE_LIMIT = 10;
@@ -74,29 +77,112 @@ export async function POST(request: NextRequest) {
 
         const body = await request.json();
         const planId = resolvePlanType(body.planId);
+        const promoCode = typeof body.promoCode === "string" ? body.promoCode : null;
 
         if (!isPaidPlan(planId)) {
             return NextResponse.json({ code: "INVALID_PLAN", message: "Invalid plan specified." }, { status: 400 });
         }
 
-        const amountPaise = getPricePaise(planId);
+        const promoValidation = promoCode
+            ? await validatePromoCodeForPlan(promoCode, planId, decoded.uid)
+            : null;
 
+        if (promoValidation && !promoValidation.valid) {
+            return NextResponse.json(
+                { code: "INVALID_PROMO", message: promoValidation.message, reason: promoValidation.reason },
+                { status: 400 }
+            );
+        }
+
+        const finalAmountPaise = promoValidation?.valid
+            ? promoValidation.finalAmount
+            : getPricePaise(planId);
+
+        const now = Date.now();
+
+        // ─── Developer Mode: Simulate successful payment without Razorpay ─────
+        const devModeActive =
+            isDevEnvironment() &&
+            isDeveloperEmail(decoded.email || null) &&
+            (await getDevModeForUser(decoded.uid));
+
+        if (devModeActive) {
+            const syntheticOrderId = `devmode-${decoded.uid}-${now}`;
+            const orderDoc: OrderDocument = {
+                orderId: syntheticOrderId,
+                userId: decoded.uid,
+                planId,
+                amount: finalAmountPaise,
+                baseAmount: promoValidation?.valid ? promoValidation.originalAmount : finalAmountPaise,
+                discountAmount: promoValidation?.valid ? promoValidation.discountAmount : 0,
+                promoCodeId: promoValidation?.valid ? promoValidation.promoId : null,
+                promoCode: promoValidation?.valid ? promoValidation.code : null,
+                promoDiscountType: promoValidation?.valid ? promoValidation.discountType : null,
+                promoDiscountValue: promoValidation?.valid ? promoValidation.discountValue : null,
+                currency: "INR",
+                status: "paid",
+                source: "developer_mode",
+                createdAt: now,
+                updatedAt: now,
+            };
+
+            await adminDb.collection("orders").doc(syntheticOrderId).set(orderDoc);
+
+            await applyPlanUpgrade(planId, decoded.uid, syntheticOrderId, `devmode-${now}`, undefined, {
+                source: "developer_mode",
+                amountPaise: 0,
+            });
+
+            logger.info(
+                "payment_order_dev_mode",
+                `Developer mode simulated upgrade for user ${decoded.uid} plan ${planId}`
+            );
+
+            return NextResponse.json({
+                success: true,
+                orderId: syntheticOrderId,
+                amount: 0,
+                currency: "INR",
+                pricing: {
+                    originalAmount: orderDoc.baseAmount,
+                    discountAmount: orderDoc.baseAmount,
+                    finalAmount: 0,
+                    promoCode: orderDoc.promoCode,
+                },
+                developerMode: true,
+            });
+        }
+
+        // ─── Normal Razorpay flow (production + non-dev users) ────────────────
         const order = await razorpayService.createOrder({
             userId: decoded.uid,
             planId,
-            amount: amountPaise,
-            currency: "INR"
+            amount: finalAmountPaise,
+            currency: "INR",
+            notes: promoValidation?.valid
+                ? {
+                    promoCode: promoValidation.code,
+                    promoDiscountType: promoValidation.discountType,
+                    promoDiscountValue: String(promoValidation.discountValue),
+                }
+                : undefined,
         });
 
         const orderDoc: OrderDocument = {
             orderId: order.id,
             userId: decoded.uid,
             planId,
-            amount: amountPaise,
+            amount: finalAmountPaise,
+            baseAmount: promoValidation?.valid ? promoValidation.originalAmount : finalAmountPaise,
+            discountAmount: promoValidation?.valid ? promoValidation.discountAmount : 0,
+            promoCodeId: promoValidation?.valid ? promoValidation.promoId : null,
+            promoCode: promoValidation?.valid ? promoValidation.code : null,
+            promoDiscountType: promoValidation?.valid ? promoValidation.discountType : null,
+            promoDiscountValue: promoValidation?.valid ? promoValidation.discountValue : null,
             currency: "INR",
             status: "created",
-            createdAt: Date.now(),
-            updatedAt: Date.now()
+            createdAt: now,
+            updatedAt: now
         };
 
         // Initialize tracking document
@@ -104,7 +190,18 @@ export async function POST(request: NextRequest) {
 
         logger.info("payment_order_created", `Order ${order.id} created for user ${decoded.uid} plan ${planId}`);
 
-        return NextResponse.json({ success: true, orderId: order.id, amount: amountPaise, currency: "INR" });
+        return NextResponse.json({
+            success: true,
+            orderId: order.id,
+            amount: finalAmountPaise,
+            currency: "INR",
+            pricing: {
+                originalAmount: orderDoc.baseAmount,
+                discountAmount: orderDoc.discountAmount,
+                finalAmount: orderDoc.amount,
+                promoCode: orderDoc.promoCode,
+            },
+        });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to create order.";
         logger.error("api_payment_create", message);

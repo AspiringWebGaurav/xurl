@@ -26,6 +26,9 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PLAN_CONFIGS, resolvePlanType } from "@/lib/plans";
+import { isAdminEmail } from "@/lib/admin-config";
+import { DeveloperModeToggle } from "@/components/dev/DeveloperModeToggle";
 
 interface TopNavbarProps {
     isCreateDisabled?: boolean;
@@ -263,16 +266,19 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
 
     const navActionBase =
         "inline-flex h-9 items-center justify-center rounded-lg px-4 text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.98]";
-    const subtleAction =
-        "text-slate-600 hover:bg-slate-100 hover:text-slate-900";
     const primaryAction =
         "bg-slate-900 text-slate-50 shadow-sm hover:bg-slate-800 hover:shadow-md";
     const secondaryAction =
         "border border-slate-200 bg-slate-50 text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900";
+    const apiEnabledForPlan = Boolean(PLAN_CONFIGS[resolvePlanType(plan)].apiAccess);
+    const canAccessAdmin = isAdminEmail(user?.email);
+    const isDevEnv = process.env.NODE_ENV === "development";
+    const isDeveloper =
+        !!user?.email && user.email.toLowerCase() === "gauravpatil9262@gmail.com";
 
     return (
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-6">
-            <div className="flex items-center gap-3">
+        <header className="flex h-14 shrink-0 items-center border-b border-border bg-background px-6">
+            <div className="flex flex-1 items-center gap-3">
                 <Logo size="md" />
                 {plan && plan !== "free" && (
                     <div className="relative group flex items-center">
@@ -315,7 +321,13 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                 )}
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-2.5">
+            <div className="flex flex-1 items-center justify-center">
+                {isDevEnv && isDeveloper && (
+                    <DeveloperModeToggle visible={true} />
+                )}
+            </div>
+
+            <div className="flex flex-1 items-center justify-end gap-2 sm:gap-2.5">
                 <div className="hidden sm:flex items-center gap-2">
                     {pathname !== "/pricing" ? (
                         <Link
@@ -365,6 +377,30 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                         >
                             <BarChart3 className="w-3.5 h-3.5" />
                             Analytics
+                        </Link>
+                    )}
+                    {user && apiEnabledForPlan && (
+                        <Link
+                            href="/dashboard/api"
+                            className={cn(
+                                navActionBase,
+                                secondaryAction,
+                                "gap-1.5"
+                            )}
+                        >
+                            API
+                        </Link>
+                    )}
+                    {user && canAccessAdmin && (
+                        <Link
+                            href="/admin/promo-codes"
+                            className={cn(
+                                navActionBase,
+                                secondaryAction,
+                                "gap-1.5"
+                            )}
+                        >
+                            Admin
                         </Link>
                     )}
                     <button
@@ -447,15 +483,22 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                                             </Link>
                                         </DropdownMenuItem>
                                         <DropdownMenuItem asChild>
-                                            <Link href="/purchase-history" className="w-full cursor-pointer text-[13px]">
-                                                <span className="flex-1">Purchase History</span>
+                                            <Link href="/dashboard/api" className="w-full cursor-pointer text-[13px]">
+                                                <span className="flex-1">API Keys</span>
                                             </Link>
                                         </DropdownMenuItem>
                                         <DropdownMenuItem asChild>
-                                            <Link href="/analytics" className="w-full cursor-pointer text-[13px]">
-                                                <span className="flex-1">Analytics</span>
+                                            <Link href="/purchase-history" className="w-full cursor-pointer text-[13px]">
+                                                <span className="flex-1">Billing</span>
                                             </Link>
                                         </DropdownMenuItem>
+                                        {canAccessAdmin && (
+                                            <DropdownMenuItem asChild>
+                                                <Link href="/admin/promo-codes" className="w-full cursor-pointer text-[13px]">
+                                                    <span className="flex-1">Admin</span>
+                                                </Link>
+                                            </DropdownMenuItem>
+                                        )}
                                         <DropdownMenuItem className="sm:hidden text-[13px]" onClick={() => { setIsHistoryOpen(true); setHasNewHistory(false); }}>
                                             <span className="flex-1">Link History</span>
                                         </DropdownMenuItem>

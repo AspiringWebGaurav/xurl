@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { applyPlanUpgrade } from "@/services/plan-upgrade";
 import { resolvePlanType } from "@/lib/plans";
+import { getDevModeForUser, isDevEnvironment, isDeveloperEmail } from "@/lib/dev-mode";
 import { logger } from "@/lib/utils/logger";
 import crypto from "crypto";
 
@@ -39,6 +40,16 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ code: "FORBIDDEN", message: "Not your order" }, { status: 403 });
         }
 
+        // Developer mode orders are already simulated as consumed; no Razorpay verification needed.
+        const isDevOrder =
+            isDevEnvironment() &&
+            isDeveloperEmail(decoded.email || null) &&
+            orderData.source === "developer_mode";
+
+        if (isDevOrder) {
+            return NextResponse.json({ success: true, status: orderData.status ?? "consumed", developerMode: true });
+        }
+
         // Synchronous Payment Verification (Fallback/Immediate if webhook hasn't fired)
         if (orderData.status !== "paid" && orderData.status !== "consumed" && paymentId && signature) {
             const secret = process.env.RAZORPAY_KEY_SECRET;
@@ -69,7 +80,12 @@ export async function POST(request: NextRequest) {
                 resolvePlanType(orderData.planId),
                 decoded.uid,
                 orderId,
-                paymentId
+                paymentId,
+                undefined,
+                {
+                    source: "razorpay",
+                    amountPaise: Number(orderData.amount) || undefined,
+                }
             );
             return NextResponse.json({ success: true, status: "consumed" });
         }

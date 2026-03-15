@@ -16,6 +16,8 @@ type Transaction = {
     createdAt: number;
     paymentId?: string;
     orderId?: string;
+    source?: string;
+    amount?: number;
 };
 
 export default function PurchaseHistoryPage() {
@@ -142,6 +144,8 @@ export default function PurchaseHistoryPage() {
                                     <th className="px-6 py-4 whitespace-nowrap">Action</th>
                                     <th className="px-6 py-4 whitespace-nowrap">Plan</th>
                                     <th className="px-6 py-4 whitespace-nowrap">Links Granted</th>
+                                    <th className="px-6 py-4 whitespace-nowrap">Source</th>
+                                    <th className="px-6 py-4 whitespace-nowrap text-right">Amount</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -171,6 +175,10 @@ export default function PurchaseHistoryPage() {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-slate-500">
                                                 {t.linksAllocated > 0 ? `+${t.linksAllocated}` : t.linksAllocated}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-slate-500 capitalize">{t.source || "-"}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right text-slate-500">
+                                                {t.amount !== undefined ? (t.amount === 0 ? "₹0" : `₹${t.amount / 100}`) : "-"}
                                             </td>
                                         </tr>
                                     ))

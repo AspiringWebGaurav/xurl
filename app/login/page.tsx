@@ -30,6 +30,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Suspense } from "react";
 import Script from "next/script";
 import { toast } from "sonner";
+import { PromoCodeSection, type AppliedPromo } from "@/components/payments/PromoCodeSection";
 
 const PLAN_DATA: Record<string, {
     badgeName: string;
@@ -125,6 +126,7 @@ function LoginContent() {
     const [showLoginOverlay, setShowLoginOverlay] = useState(false);
     const [overlayMessage, setOverlayMessage] = useState<React.ReactNode>("Connecting to Google...");
     const [paymentState, setPaymentState] = useState<"idle" | "upgrading" | "processing" | "success" | "failed" | "cancelled">("idle");
+    const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
     const router = useRouter();
     const searchParams = useSearchParams();
     const plan = searchParams.get("plan");
@@ -307,7 +309,7 @@ function LoginContent() {
                 const res = await fetch("/api/payments/create-order", {
                     method: "POST",
                     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                    body: JSON.stringify({ planId: plan })
+                    body: JSON.stringify({ planId: plan, promoCode: appliedPromo?.code ?? null })
                 });
                 const data = await res.json();
 
@@ -687,6 +689,13 @@ function LoginContent() {
                                 <span className="text-xs text-slate-500">{user || planKey === 'free' ? getDynamicExpiryMessage(planKey) : planContext.expiryTime}</span>
                             </div>
                         </div>
+                    )}
+
+                    {planKey !== 'free' && (
+                        <PromoCodeSection
+                            planId={planKey}
+                            onPromoChange={setAppliedPromo}
+                        />
                     )}
 
                     {user ? (

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/utils";
@@ -13,19 +14,15 @@ const footerColumns = [
     {
         label: "Product",
         links: [
-            { href: "/features", label: "Features" },
             { href: "/pricing", label: "Pricing" },
             { href: "/analytics", label: "Analytics" },
-            { href: "/api-docs", label: "API" },
-            { href: "/documentation", label: "Documentation" },
         ],
     },
     {
         label: "Resources",
         links: [
-            { href: "/api-docs", label: "API Reference" },
+            { href: "/documentation/api", label: "API" },
             { href: "/documentation", label: "Documentation" },
-            { href: "/changelog", label: "Changelog" },
         ],
     },
     {
@@ -38,12 +35,9 @@ const footerColumns = [
         ],
     },
     {
-        label: "Company",
-        links: [
-            { href: "/about", label: "About" },
-            { href: "/blog", label: "Blog" },
-        ],
-        comingSoon: ["REST API Access"],
+        label: "Support",
+        links: [],
+        comingSoon: ["Coming Soon"],
     },
 ];
 
@@ -154,15 +148,13 @@ export function HomeFooter() {
                         className="flex items-center justify-end gap-1 flex-wrap"
                     >
                         {minimalLegalLinks.map((link) => (
-                            <a
+                            <Link
                                 key={link.href}
                                 href={link.href}
-                                target="_blank"
-                                rel="noopener noreferrer"
                                 className="rounded-md px-2 py-1 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground"
                             >
                                 {link.label}
-                            </a>
+                            </Link>
                         ))}
 
                         {/* Divider */}
@@ -219,15 +211,13 @@ export function HomeFooter() {
                                         <span className="w-6 h-px bg-foreground/20 -mt-1 mb-0.5" aria-hidden="true" />
                                         <div className="flex flex-col gap-2">
                                             {col.links.map((link) => (
-                                                <a
+                                                <Link
                                                     key={link.href}
                                                     href={link.href}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
                                                     className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium"
                                                 >
                                                     {link.label}
-                                                </a>
+                                                </Link>
                                             ))}
                                             {col.comingSoon?.map((item) => (
                                                 <span

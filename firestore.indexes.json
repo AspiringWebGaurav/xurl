@@ -69,6 +69,20 @@
                     "order": "ASCENDING"
                 }
             ]
+        },
+        {
+            "collectionGroup": "api_logs",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "userId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
         }
     ],
     "fieldOverrides": [

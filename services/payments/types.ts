@@ -5,6 +5,7 @@ export interface CreateOrderParams {
     planId: PlanType;
     amount: number;
     currency?: string;
+    notes?: Record<string, string>;
 }
 
 export interface OrderResponse {

@@ -60,6 +60,8 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
         pathname === '/acceptable-use' ||
         pathname === '/profile' ||
         pathname === '/purchase-history' ||
+        pathname.startsWith('/dashboard') ||
+        pathname.startsWith('/admin') ||
         pathname === '/placeholder' ||
         pathname === '/guest-policy' ||
         pathname === '/analytics' ||
@@ -136,7 +138,7 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
 
 export const config = {
     matcher: [
-        '/((?!_next/static|_next/image|favicon.ico|api|login|pricing|expired|r|terms|privacy|acceptable-use|profile|purchase-history|placeholder|guest-policy|analytics|analytics-preview|features|about|blog|documentation|api-docs|refund|images).*)',
+        '/((?!_next/static|_next/image|favicon.ico|api|login|pricing|expired|r|terms|privacy|acceptable-use|profile|purchase-history|dashboard|admin|placeholder|guest-policy|analytics|analytics-preview|features|about|blog|documentation|api-docs|refund|images).*)',
     ],
 };
 
