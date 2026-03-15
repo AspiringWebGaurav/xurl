@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { PLAN_CONFIGS, resolvePlanType } from "@/lib/plans";
 import { logger } from "@/lib/utils/logger";
-import { ensureApiProvisioning, getEffectiveApiPlan, getRecentApiLogs, regenerateApiKeyForUser } from "@/services/api-access";
+import { ensureApiProvisioning, getApiLogsPage, getEffectiveApiPlan, getRecentApiLogs, regenerateApiKeyForUser } from "@/services/api-access";
 import type { UserDocument } from "@/types";
 
 async function verifyUser(request: NextRequest): Promise<string | null> {
@@ -27,6 +27,12 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ code: "UNAUTHORIZED", message: "Authentication required." }, { status: 401 });
         }
 
+        const url = new URL(request.url);
+        const cursorParam = url.searchParams.get("cursor");
+        const limitParam = url.searchParams.get("limit");
+        const limit = Math.min(Math.max(Number(limitParam) || 20, 5), 100);
+        const cursor = cursorParam ? Number(cursorParam) : undefined;
+
         const userSnap = await adminDb.collection("users").doc(userId).get();
         if (!userSnap.exists) {
             return NextResponse.json({ code: "NOT_FOUND", message: "User not found." }, { status: 404 });
@@ -35,7 +41,7 @@ export async function GET(request: NextRequest) {
         const currentUser = userSnap.data() as UserDocument;
         const plan = getEffectiveApiPlan(currentUser);
         const apiEligible = Boolean(PLAN_CONFIGS[plan].apiAccess);
-        const recentRequests = await getRecentApiLogs(userId);
+        const logsPage = await getApiLogsPage(userId, limit, cursor);
 
         if (!apiEligible) {
             const apiRequestsUsed = currentUser.apiRequestsUsed || 0;
@@ -49,7 +55,8 @@ export async function GET(request: NextRequest) {
                 apiRequestsUsed,
                 apiQuotaTotal,
                 remainingRequests: Math.max(apiQuotaTotal - apiRequestsUsed, 0),
-                recentRequests,
+                recentRequests: logsPage.logs,
+                nextCursor: logsPage.nextCursor,
             });
         }
 
@@ -66,7 +73,8 @@ export async function GET(request: NextRequest) {
             apiQuotaTotal,
             remainingRequests: Math.max(apiQuotaTotal - apiRequestsUsed, 0),
             apiKeyLastRotatedAt: provisioned.user.apiKeyLastRotatedAt || null,
-            recentRequests,
+            recentRequests: logsPage.logs,
+            nextCursor: logsPage.nextCursor,
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to load API access.";

@@ -314,6 +314,15 @@ function LoginContent() {
                 const data = await res.json();
 
                 if (data.success) {
+                    // Developer mode: backend already applied upgrade, skip Razorpay entirely.
+                    if (data.developerMode) {
+                        setPaymentState("success");
+                        setIsUpgrading(false);
+                        toast.success("Developer Mode: plan activated without payment.");
+                        router.push("/");
+                        return;
+                    }
+
                     loadRazorpayOptions(data.orderId, data.amount, data.currency, planContext?.badgeName || "Paid Plan");
                 } else {
                     setPaymentState("failed");

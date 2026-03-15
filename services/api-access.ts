@@ -132,16 +132,23 @@ export async function regenerateApiKeyForUser(userId: string): Promise<{
     });
 }
 
-export async function getRecentApiLogs(userId: string, limit: number = 20): Promise<ApiLogDocument[]> {
+export async function getApiLogsPage(userId: string, limit: number = 20, cursor?: number): Promise<{ logs: ApiLogDocument[]; nextCursor: number | null }> {
     try {
-        const snapshot = await adminDb
+        let query = adminDb
             .collection("api_logs")
             .where("userId", "==", userId)
             .orderBy("createdAt", "desc")
-            .limit(limit)
-            .get();
+            .limit(limit);
 
-        return snapshot.docs.map((doc) => doc.data() as ApiLogDocument);
+        if (cursor) {
+            query = query.startAfter(cursor);
+        }
+
+        const snapshot = await query.get();
+        const logs = snapshot.docs.map((doc) => doc.data() as ApiLogDocument);
+        const nextCursor = logs.length === limit ? logs[logs.length - 1]?.createdAt ?? null : null;
+
+        return { logs, nextCursor };
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (!message.includes("FAILED_PRECONDITION")) {
@@ -154,9 +161,19 @@ export async function getRecentApiLogs(userId: string, limit: number = 20): Prom
             .limit(Math.max(limit * 3, 50))
             .get();
 
-        return fallbackSnapshot.docs
+        const sorted = fallbackSnapshot.docs
             .map((doc) => doc.data() as ApiLogDocument)
-            .sort((a, b) => b.createdAt - a.createdAt)
-            .slice(0, limit);
+            .sort((a, b) => b.createdAt - a.createdAt);
+
+        const startIndex = cursor ? sorted.findIndex((log) => log.createdAt === cursor) + 1 : 0;
+        const logs = sorted.slice(startIndex, startIndex + limit);
+        const nextCursor = logs.length === limit ? logs[logs.length - 1]?.createdAt ?? null : null;
+
+        return { logs, nextCursor };
     }
+}
+
+export async function getRecentApiLogs(userId: string, limit: number = 20): Promise<ApiLogDocument[]> {
+    const { logs } = await getApiLogsPage(userId, limit);
+    return logs;
 }

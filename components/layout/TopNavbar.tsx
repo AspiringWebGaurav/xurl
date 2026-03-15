@@ -52,6 +52,9 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
     const pathname = usePathname();
     const router = useRouter();
     const pricingLabels = ["Pricing", "Plans"] as const;
+    const isDevEnv = process.env.NODE_ENV === "development";
+    const isDeveloper =
+        !!user?.email && user.email.toLowerCase() === "gauravpatil9262@gmail.com";
 
     const syncGuestHistoryState = useCallback(() => {
         const h = localStorage.getItem("xurl_guest_link_history");
@@ -272,14 +275,22 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
         "border border-slate-200 bg-slate-50 text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900";
     const apiEnabledForPlan = Boolean(PLAN_CONFIGS[resolvePlanType(plan)].apiAccess);
     const canAccessAdmin = isAdminEmail(user?.email);
-    const isDevEnv = process.env.NODE_ENV === "development";
-    const isDeveloper =
-        !!user?.email && user.email.toLowerCase() === "gauravpatil9262@gmail.com";
 
     return (
         <header className="flex h-14 shrink-0 items-center border-b border-border bg-background px-6">
             <div className="flex flex-1 items-center gap-3">
                 <Logo size="md" />
+                {user && canAccessAdmin && (
+                    <span
+                        className="relative inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-800 shadow-[0_8px_24px_-12px_rgba(16,185,129,0.45)] ring-1 ring-emerald-100/80 transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_10px_32px_-12px_rgba(16,185,129,0.55)] hover:ring-2 hover:ring-emerald-200/90 hover:bg-gradient-to-r hover:from-emerald-50 hover:via-emerald-100/70 hover:to-white"
+                    >
+                        <span className="relative h-2.5 w-2.5 flex items-center justify-center">
+                            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400/70 animate-ping" />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(34,197,94,0.25)]" />
+                        </span>
+                        Admin
+                    </span>
+                )}
                 {plan && plan !== "free" && (
                     <div className="relative group flex items-center">
                         <Link href={`/pricing?plan=${plan}`} className={`hidden sm:flex items-center px-2 py-0.5 rounded border shadow-sm text-[10px] font-bold tracking-widest uppercase transition-all duration-300 hover:brightness-105 hover:scale-105 cursor-pointer ${getPlanBadgeStyle(plan)}`}>
@@ -415,6 +426,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                         className={cn(
                             navActionBase,
                             secondaryAction,
+                            "min-w-[118px] px-4 whitespace-nowrap shrink-0", // keep width consistent across auth states
                             isCreateDisabled && "cursor-not-allowed opacity-50"
                         )}
                     >
