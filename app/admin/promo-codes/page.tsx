@@ -4,10 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
 import { ensureUserDocument } from "@/lib/firebase/user-profile";
-import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Pencil, Plus, TicketPercent, Trash2, RefreshCw, Eye } from "lucide-react";
+import { Loader2, Pencil, Plus, TicketPercent, Trash2, Eye } from "lucide-react";
 import { isAdminEmail } from "@/lib/admin-config";
 
 type PromoCodeItem = {
@@ -272,7 +271,7 @@ export default function AdminPromoCodesPage() {
 
     if (loading) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-slate-50">
+            <div className="flex min-h-[240px] items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
             </div>
         );
@@ -280,21 +279,16 @@ export default function AdminPromoCodesPage() {
 
     if (!user || !canAccess) {
         return (
-            <div className="min-h-screen bg-slate-50">
-                <TopNavbar />
-                <main className="mx-auto flex max-w-3xl flex-col items-center px-6 py-20 text-center">
-                    <TicketPercent className="h-10 w-10 text-slate-400" />
-                    <h1 className="mt-5 text-3xl font-bold text-slate-900">Admin access required</h1>
-                    <p className="mt-2 text-slate-500">This area is only available to the configured XURL administrators.</p>
-                </main>
+            <div className="flex min-h-[280px] flex-col items-center justify-center rounded-[28px] border border-slate-200 bg-white px-6 py-20 text-center shadow-sm">
+                <TicketPercent className="h-10 w-10 text-slate-400" />
+                <h1 className="mt-5 text-3xl font-bold text-slate-900">Admin access required</h1>
+                <p className="mt-2 text-slate-500">This area is only available to the configured XURL administrators.</p>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-slate-50">
-            <TopNavbar />
-            <main className="mx-auto max-w-7xl px-6 py-12">
+        <div className="space-y-8">
                 <div className="mb-8 flex flex-col gap-2">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Admin</p>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">Promo Codes</h1>
@@ -502,7 +496,6 @@ export default function AdminPromoCodesPage() {
                         )}
                     </section>
                 </div>
-            </main>
         </div>
     );
 }

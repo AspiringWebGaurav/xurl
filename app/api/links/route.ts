@@ -235,11 +235,15 @@ export async function GET(request: NextRequest) {
         
         const config = PLAN_CONFIGS[plan];
         
+        const giftQuotas = Array.isArray(userData?.giftQuotas) ? userData.giftQuotas : [];
+        const activeGiftQuotas = giftQuotas.filter((gift: { amount: number; expiresAt: number | null }) => !gift.expiresAt || gift.expiresAt > now);
+        const giftBonus = activeGiftQuotas.reduce((sum: number, gift: { amount: number }) => sum + (gift.amount || 0), 0);
+
         let effectiveLimit: number;
         if (plan === "free") {
-            effectiveLimit = config.limit;
+            effectiveLimit = config.limit + giftBonus;
         } else {
-            effectiveLimit = userData?.cumulativeQuota || (config.limit * (userData?.planRenewals || 1));
+            effectiveLimit = (userData?.cumulativeQuota || (config.limit * (userData?.planRenewals || 1))) + giftBonus;
         }
         
         const planRenewals = userData?.planRenewals || 1;
@@ -289,6 +293,7 @@ export async function GET(request: NextRequest) {
             totalLinksEver,
             activeLinks: activeLinksFromDoc,
             expiredLinksCount,
+            giftedLinksAvailable: giftBonus,
             limit: effectiveLimit,
             plan,
             planRenewals,

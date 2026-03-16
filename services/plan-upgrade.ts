@@ -53,6 +53,12 @@ export interface PlanUpgradeOptions {
      * Optional human-readable reason to store alongside the transaction.
      */
     reason?: string;
+    recipientEmail?: string | null;
+    adminEmail?: string | null;
+    grantType?: "plan" | "link_gift";
+    durationOption?: string;
+    customValue?: number;
+    customUnit?: string;
 }
 
 /**
@@ -241,9 +247,13 @@ export async function applyPlanUpgrade(
         }
 
         // Log transaction history
-        let action: "upgrade" | "renew" | "downgrade" = "upgrade";
-        if (isRenewal) action = "renew";
-        if (planId === "free" && existingUser?.plan !== "free") action = "downgrade";
+        let action: "upgrade" | "renew" | "downgrade" | "admin_grant" = "upgrade";
+        if (options?.source === "admin_grant") {
+            action = "admin_grant";
+        } else {
+            if (isRenewal) action = "renew";
+            if (planId === "free" && existingUser?.plan !== "free") action = "downgrade";
+        }
 
         await createTransaction(
             {
@@ -256,6 +266,26 @@ export async function applyPlanUpgrade(
                 source: options?.source,
                 amount: options?.amountPaise,
                 reason: options?.reason,
+                recipientEmail: options?.recipientEmail ?? existingUser?.email ?? null,
+                adminEmail: options?.adminEmail ?? null,
+                grantType: options?.grantType,
+                durationOption: options?.durationOption,
+                customValue: options?.customValue,
+                customUnit: options?.customUnit,
+                overrideExpiryMs: options?.overrideExpiryMs ?? null,
+                previousPlan: existingUser?.plan ?? null,
+                previousPlanStatus: existingUser?.planStatus ?? null,
+                previousPlanStart: existingUser?.planStart ?? null,
+                previousPlanExpiry: existingUser?.planExpiry ?? null,
+                previousPlanRenewals: existingUser?.planRenewals ?? null,
+                previousPlanEraStart: existingUser?.planEraStart ?? null,
+                previousCumulativeQuota: existingUser?.cumulativeQuota ?? null,
+                previousApiEnabled: existingUser?.apiEnabled ?? null,
+                previousApiQuotaTotal: existingUser?.apiQuotaTotal ?? null,
+                previousApiRequestsUsed: existingUser?.apiRequestsUsed ?? null,
+                previousApiKeyHash: existingUser?.apiKeyHash ?? null,
+                previousApiKeyEncrypted: existingUser?.apiKeyEncrypted ?? null,
+                previousApiKeyLastRotatedAt: existingUser?.apiKeyLastRotatedAt ?? null,
             },
             transaction
         );

@@ -109,6 +109,8 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                 createdAt: now,
                 updatedAt: now,
             };
+            let activeGiftQuotas: { id: string; amount: number; expiresAt: number | null }[] = [];
+            let originalGiftQuotaCount = 0;
 
             // If user is authenticated, handle limits and logic via user doc
             if (userId !== "anonymous") {
@@ -133,6 +135,11 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                     userData.plan = "free";
                     userData.planStatus = "past_due";
                 }
+
+                const giftQuotas = Array.isArray(userData.giftQuotas) ? userData.giftQuotas : [];
+                originalGiftQuotaCount = giftQuotas.length;
+                activeGiftQuotas = giftQuotas.filter((gift) => !gift.expiresAt || gift.expiresAt > now);
+                const giftBonus = activeGiftQuotas.reduce((sum, gift) => sum + (gift.amount || 0), 0);
 
                 // ── Free Plan Cooldown & Usage Enforcement ──
                 if (currentPlan === "free") {
@@ -161,10 +168,10 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
 
                 let effectiveLimit: number;
                 if (currentPlan === "free") {
-                    effectiveLimit = config.limit;
+                    effectiveLimit = config.limit + giftBonus;
                 } else {
                     // Use permanent accumulated limit, fallback for legacy users
-                    effectiveLimit = userData.cumulativeQuota || (config.limit * (userData.planRenewals || 1));
+                    effectiveLimit = (userData.cumulativeQuota || (config.limit * (userData.planRenewals || 1))) + giftBonus;
                 }
 
                 // Count ALL active links belonging to the user across ALL time (infinite accumulation)
@@ -308,6 +315,9 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                 };
                 if (userData.planStatus) {
                     userUpdates.planStatus = userData.planStatus;
+                }
+                if (originalGiftQuotaCount !== activeGiftQuotas.length || activeGiftQuotas.length > 0) {
+                    userUpdates.giftQuotas = activeGiftQuotas;
                 }
                 // Free plan: increment usage counter and record timestamp
                 if (resolvedPlan === "free") {

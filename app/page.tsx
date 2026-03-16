@@ -78,6 +78,7 @@ export default function HomePage() {
     const [focusTriggered, setFocusTriggered] = useState(false);
     const [isRateLimited, setIsRateLimited] = useState(false);
     const [showDelayedModuleSkeleton, setShowDelayedModuleSkeleton] = useState(false);
+    const [grantNotified, setGrantNotified] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -114,6 +115,102 @@ export default function HomePage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
         return () => unsubscribe();
     }, []);
+
+    useEffect(() => {
+        if (!user || grantNotified || typeof window === "undefined") {
+            return;
+        }
+
+        const raw = localStorage.getItem("xurl_pending_grants_applied");
+        if (!raw) {
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(raw) as {
+                items?: Array<{ type: string; planId?: string; quantity?: number; expiresAt?: number | null }>;
+                ts?: number;
+            };
+
+            if (!Array.isArray(parsed.items) || parsed.items.length === 0) {
+                localStorage.removeItem("xurl_pending_grants_applied");
+                return;
+            }
+
+            if (parsed.ts && Date.now() - parsed.ts > 10 * 60 * 1000) {
+                localStorage.removeItem("xurl_pending_grants_applied");
+                return;
+            }
+
+            for (const item of parsed.items) {
+                if (item.type === "plan" && item.planId) {
+                    toast.success(
+                        `Admin granted your ${item.planId} plan${item.expiresAt === null ? " permanently" : ""}.`,
+                        { position: "top-center", duration: 5500, closeButton: true }
+                    );
+                } else if (item.type === "link_gift" && item.quantity) {
+                    toast.success(
+                        `Admin gifted ${item.quantity} extra links${item.expiresAt ? ` until ${new Date(item.expiresAt).toLocaleString()}` : ""}.`,
+                        { position: "top-center", duration: 5500, closeButton: true }
+                    );
+                }
+            }
+
+            const canvas = document.createElement("canvas");
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            canvas.style.position = "fixed";
+            canvas.style.inset = "0";
+            canvas.style.pointerEvents = "none";
+            canvas.style.zIndex = "9999";
+            document.body.appendChild(canvas);
+
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+                const colors = ["#16a34a", "#0ea5e9", "#8b5cf6", "#f59e0b", "#ec4899"];
+                const particles = Array.from({ length: 80 }, () => ({
+                    x: Math.random() * canvas.width,
+                    y: -20 - Math.random() * canvas.height * 0.35,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: 2 + Math.random() * 3,
+                    size: 4 + Math.random() * 6,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    rotation: Math.random() * Math.PI,
+                }));
+
+                const startedAt = performance.now();
+                const draw = (time: number) => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    particles.forEach((particle) => {
+                        particle.x += particle.vx;
+                        particle.y += particle.vy;
+                        particle.rotation += 0.05;
+                        ctx.save();
+                        ctx.translate(particle.x, particle.y);
+                        ctx.rotate(particle.rotation);
+                        ctx.fillStyle = particle.color;
+                        ctx.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size * 1.8);
+                        ctx.restore();
+                    });
+
+                    if (time - startedAt < 1400) {
+                        requestAnimationFrame(draw);
+                    } else {
+                        canvas.remove();
+                    }
+                };
+
+                requestAnimationFrame(draw);
+            } else {
+                canvas.remove();
+            }
+
+            localStorage.removeItem("xurl_pending_grants_applied");
+            setGrantNotified(true);
+        } catch {
+            localStorage.removeItem("xurl_pending_grants_applied");
+        }
+    }, [user, grantNotified]);
 
     useEffect(() => {
         if (shortUrl && resultRef.current) {

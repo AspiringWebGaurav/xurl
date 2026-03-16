@@ -404,7 +404,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                     )}
                     {user && canAccessAdmin && (
                         <Link
-                            href="/admin/promo-codes"
+                            href="/admin"
                             className={cn(
                                 navActionBase,
                                 secondaryAction,
@@ -506,7 +506,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                                         </DropdownMenuItem>
                                         {canAccessAdmin && (
                                             <DropdownMenuItem asChild>
-                                                <Link href="/admin/promo-codes" className="w-full cursor-pointer text-[13px]">
+                                                <Link href="/admin" className="w-full cursor-pointer text-[13px]">
                                                     <span className="flex-1">Admin</span>
                                                 </Link>
                                             </DropdownMenuItem>

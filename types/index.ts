@@ -24,6 +24,7 @@ export interface UserDocument {
     activeLinks: number;
     cumulativeQuota?: number;
     linksCreated: number;
+    giftQuotas?: { id: string; amount: number; expiresAt: number | null }[];
     apiEnabled?: boolean;
     apiQuotaTotal?: number;
     apiRequestsUsed?: number;

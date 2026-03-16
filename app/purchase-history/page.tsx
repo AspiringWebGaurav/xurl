@@ -14,6 +14,11 @@ type Transaction = {
     planType: string;
     linksAllocated: number;
     createdAt: number;
+    durationOption?: string;
+    customValue?: number;
+    customUnit?: string;
+    overrideExpiryMs?: number | null;
+    expiresAt?: number | null;
     paymentId?: string;
     orderId?: string;
     source?: string;
@@ -103,6 +108,7 @@ export default function PurchaseHistoryPage() {
             case "renew": return "Renewal";
             case "downgrade": return "Downgrade";
             case "expire": return "Expired";
+            case "admin_grant": return "Admin Grant";
             default: return action;
         }
     };
@@ -120,10 +126,41 @@ export default function PurchaseHistoryPage() {
         return names[plan.toLowerCase()] || plan;
     };
 
+    const formatDuration = (transaction: Transaction) => {
+        const isAdminGrant = transaction.action === "admin_grant";
+        if (
+            transaction.overrideExpiryMs === null ||
+            transaction.durationOption === "permanent" ||
+            (isAdminGrant && !transaction.durationOption && !transaction.customValue && !transaction.customUnit)
+        ) {
+            return isAdminGrant ? "Admin Gift - PERMANENT" : "Permanent";
+        }
+        if (transaction.durationOption && transaction.durationOption !== "custom") {
+            const map: Record<string, string> = {
+                "1d": "1 day",
+                "5d": "5 days",
+                "10d": "10 days",
+                "30d": "30 days",
+                "1d_gift": "1 day",
+            };
+            return map[transaction.durationOption] || transaction.durationOption;
+        }
+        if (transaction.durationOption === "custom" && transaction.customValue && transaction.customUnit) {
+            return `${transaction.customValue} ${transaction.customUnit}`;
+        }
+        if (transaction.planType && (transaction.action === "upgrade" || transaction.action === "renew")) {
+            return "30 days";
+        }
+        if (transaction.action === "admin_grant") {
+            return "Admin gift";
+        }
+        return "—";
+    };
+
     return (
         <div className="min-h-screen flex flex-col bg-slate-50">
             <TopNavbar />
-            <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-12">
+            <main className="flex-1 w-full px-4 py-12">
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Purchase History</h1>
                     <p className="text-slate-500 mt-2">View your past transactions and plan usage over time.</p>
@@ -136,56 +173,58 @@ export default function PurchaseHistoryPage() {
                 )}
 
                 <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-medium">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-medium">
+                            <tr>
+                                <th className="px-6 py-4">Date</th>
+                                <th className="px-6 py-4">Action</th>
+                                <th className="px-6 py-4">Plan</th>
+                                <th className="px-6 py-4">Duration</th>
+                                <th className="px-6 py-4">Links Granted</th>
+                                <th className="px-6 py-4">Source</th>
+                                <th className="px-6 py-4 text-right">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-slate-700">
+                            {transactions.length === 0 ? (
                                 <tr>
-                                    <th className="px-6 py-4 whitespace-nowrap">Date</th>
-                                    <th className="px-6 py-4 whitespace-nowrap">Action</th>
-                                    <th className="px-6 py-4 whitespace-nowrap">Plan</th>
-                                    <th className="px-6 py-4 whitespace-nowrap">Links Granted</th>
-                                    <th className="px-6 py-4 whitespace-nowrap">Source</th>
-                                    <th className="px-6 py-4 whitespace-nowrap text-right">Amount</th>
+                                    <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
+                                        No transaction history found.
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 text-slate-700">
-                                {transactions.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
-                                            No transaction history found.
+                            ) : (
+                                transactions.map((t) => (
+                                    <tr key={t.id} className="hover:bg-slate-50/50 transition-colors">
+                                        <td className="px-6 py-4 text-slate-900 font-medium">
+                                            {format(t.createdAt, "MMM d, yyyy h:mm a")}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`inline-flex items-center px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider
+                                                ${t.action === 'upgrade' || t.action === 'renew' || t.action === 'admin_grant' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' :
+                                                  t.action === 'downgrade' || t.action === 'expire' ? 'bg-amber-50 text-amber-700 border border-amber-200/60' :
+                                                  'bg-slate-100 text-slate-600 border border-slate-200'}
+                                            `}>
+                                                {formatAction(t.action)}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 font-medium">
+                                            {formatPlan(t.planType)}
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-500">
+                                            {formatDuration(t)}
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-500">
+                                            {t.linksAllocated > 0 ? `+${t.linksAllocated}` : t.linksAllocated}
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-500 capitalize">{t.source || "-"}</td>
+                                        <td className="px-6 py-4 text-right text-slate-500">
+                                            {t.amount !== undefined ? (t.amount === 0 ? "₹0" : `₹${t.amount / 100}`) : "-"}
                                         </td>
                                     </tr>
-                                ) : (
-                                    transactions.map((t) => (
-                                        <tr key={t.id} className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="px-6 py-4 whitespace-nowrap text-slate-900 font-medium">
-                                                {format(t.createdAt, "MMM d, yyyy h:mm a")}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`inline-flex items-center px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider
-                                                    ${t.action === 'upgrade' || t.action === 'renew' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' :
-                                                      t.action === 'downgrade' || t.action === 'expire' ? 'bg-amber-50 text-amber-700 border border-amber-200/60' :
-                                                      'bg-slate-100 text-slate-600 border border-slate-200'}
-                                                `}>
-                                                    {formatAction(t.action)}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap font-medium">
-                                                {formatPlan(t.planType)}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-slate-500">
-                                                {t.linksAllocated > 0 ? `+${t.linksAllocated}` : t.linksAllocated}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-slate-500 capitalize">{t.source || "-"}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right text-slate-500">
-                                                {t.amount !== undefined ? (t.amount === 0 ? "₹0" : `₹${t.amount / 100}`) : "-"}
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
                 </div>
 
                 {transactions.length > 0 && hasMore && (

@@ -44,6 +44,24 @@ export async function ensureUserDocument(user: User) {
             if (!response.ok) {
                 return;
             }
+
+            try {
+                const applyRes = await fetch("/api/user/apply-grants", {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+                const data = await applyRes.json().catch(() => ({}));
+                if (applyRes.ok && Array.isArray(data.applied) && typeof window !== "undefined") {
+                    localStorage.setItem(
+                        "xurl_pending_grants_applied",
+                        JSON.stringify({ items: data.applied, ts: Date.now() })
+                    );
+                }
+            } catch {
+                // Best-effort; ignore failures
+            }
         } catch {
             return;
         }

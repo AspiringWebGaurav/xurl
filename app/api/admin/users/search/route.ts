@@ -29,8 +29,11 @@ export async function GET(request: NextRequest) {
             id: doc.id,
             email: data.email || "",
             plan: data.plan || "free",
-            planExpiry: data.planExpiry || null,
-            planStatus: data.planStatus || "active",
+            planExpiry: data.planExpiry ?? null,
+            createdAt: data.createdAt ?? null,
+            activeLinks: data.activeLinks ?? null,
+            linksCreated: data.linksCreated ?? null,
+            cumulativeQuota: data.cumulativeQuota ?? null,
         };
     });
 
