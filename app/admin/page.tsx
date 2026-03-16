@@ -36,6 +36,7 @@ export default function AdminDashboardPage() {
     const [activity, setActivity] = useState<ActivityItem[]>([]);
     const [summary, setSummary] = useState<ActivitySummary | null>(null);
     const [activityLoading, setActivityLoading] = useState(true);
+    const [activityModalOpen, setActivityModalOpen] = useState(false);
 
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (user) => {
@@ -146,10 +147,14 @@ export default function AdminDashboardPage() {
                             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">System activity</p>
                             <p className="mt-1 text-lg font-semibold text-slate-900">Recent events</p>
                         </div>
-                        <Link href="/admin/logs" className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 hover:text-indigo-700">
+                        <button
+                            type="button"
+                            onClick={() => setActivityModalOpen(true)}
+                            className="inline-flex items-center gap-1 text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+                        >
                             View all
                             <ArrowUpRight className="h-4 w-4" />
-                        </Link>
+                        </button>
                     </div>
                     <div className="mt-4 space-y-3">
                         {activityLoading ? (
@@ -157,7 +162,7 @@ export default function AdminDashboardPage() {
                         ) : activity.length === 0 ? (
                             <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">No recent admin activity found.</div>
                         ) : (
-                            activity.slice(0, 8).map((item) => (
+                            activity.slice(0, 2).map((item) => (
                                 <div key={item.id} className="flex items-start justify-between rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3">
                                     <div>
                                         <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">{item.type.replace("_", " ")}</p>
@@ -170,6 +175,57 @@ export default function AdminDashboardPage() {
                     </div>
                 </div>
             </section>
+
+            {activityModalOpen && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4 py-6"
+                    onClick={() => setActivityModalOpen(false)}
+                    role="presentation"
+                >
+                    <div
+                        className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.45)]"
+                        onClick={(event) => event.stopPropagation()}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Recent activity"
+                    >
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">System activity</p>
+                                <p className="mt-1 text-lg font-semibold text-slate-900">Recent events</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setActivityModalOpen(false)}
+                                className="text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+                            >
+                                Close
+                            </button>
+                        </div>
+                        <div className="mt-5 max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+                            {activityLoading ? (
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">Loading activity…</div>
+                            ) : activity.length === 0 ? (
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                                    No recent admin activity found.
+                                </div>
+                            ) : (
+                                activity.map((item) => (
+                                    <div key={item.id} className="flex items-start justify-between rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+                                        <div>
+                                            <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                                {item.type.replace("_", " ")}
+                                            </p>
+                                            <p className="mt-1 text-sm font-medium leading-5 text-slate-900">{item.message}</p>
+                                        </div>
+                                        <span className="text-xs text-slate-500">{new Date(item.timestamp).toLocaleString()}</span>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <section
                 className="col-span-12 rounded-[18px] border border-slate-200 bg-white/80 px-5 py-4 shadow-sm"
