@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { onAuthStateChanged } from "firebase/auth";
 import { ArrowUpRight, Sparkles, Percent, Gift, ClipboardList, Activity, Wand2, KeyRound, History } from "lucide-react";
+import { ActivityModal } from "@/components/admin/ActivityModal";
 import { auth } from "@/lib/firebase/config";
+import type { ActivityEvent } from "@/lib/admin/activity-events";
 
 const cardMotion = "transition duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_24px_70px_-48px_rgba(15,23,42,0.22)]";
 
@@ -13,6 +15,12 @@ type ActivityItem = {
     type: "billing" | "grant" | "promo_redemption" | "promo_created";
     message: string;
     timestamp: number;
+};
+
+const mapActivitySeverity = (type: ActivityItem["type"]): ActivityEvent["severity"] => {
+    if (type === "billing") return "BILLING";
+    if (type === "grant") return "ADMIN";
+    return "INFO";
 };
 
 type ActivitySummary = {
@@ -81,6 +89,18 @@ export default function AdminDashboardPage() {
             { label: "Limits reached", value: summary.promo.limitsReached },
         ];
     }, [summary]);
+
+    const modalEvents = useMemo<ActivityEvent[]>(() => {
+        return activity.map((item) => ({
+            id: `admin_activity:${item.id}`,
+            type: item.type.toUpperCase(),
+            actor: null,
+            timestamp: item.timestamp,
+            sourceCollection: "admin_activity",
+            metadata: { message: item.message },
+            severity: mapActivitySeverity(item.type),
+        }));
+    }, [activity]);
 
     const grantStats = useMemo(() => {
         if (!summary) return null;
@@ -176,56 +196,14 @@ export default function AdminDashboardPage() {
                 </div>
             </section>
 
-            {activityModalOpen && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4 py-6"
-                    onClick={() => setActivityModalOpen(false)}
-                    role="presentation"
-                >
-                    <div
-                        className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.45)]"
-                        onClick={(event) => event.stopPropagation()}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label="Recent activity"
-                    >
-                        <div className="flex items-center justify-between gap-3">
-                            <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">System activity</p>
-                                <p className="mt-1 text-lg font-semibold text-slate-900">Recent events</p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setActivityModalOpen(false)}
-                                className="text-sm font-semibold text-indigo-600 hover:text-indigo-700"
-                            >
-                                Close
-                            </button>
-                        </div>
-                        <div className="mt-5 max-h-[70vh] space-y-3 overflow-y-auto pr-1">
-                            {activityLoading ? (
-                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">Loading activity…</div>
-                            ) : activity.length === 0 ? (
-                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                                    No recent admin activity found.
-                                </div>
-                            ) : (
-                                activity.map((item) => (
-                                    <div key={item.id} className="flex items-start justify-between rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3">
-                                        <div>
-                                            <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                                {item.type.replace("_", " ")}
-                                            </p>
-                                            <p className="mt-1 text-sm font-medium leading-5 text-slate-900">{item.message}</p>
-                                        </div>
-                                        <span className="text-xs text-slate-500">{new Date(item.timestamp).toLocaleString()}</span>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ActivityModal
+                open={activityModalOpen}
+                title="Recent events"
+                subtitle="System activity"
+                items={modalEvents}
+                loading={activityLoading}
+                onClose={() => setActivityModalOpen(false)}
+            />
 
             <section
                 className="col-span-12 rounded-[18px] border border-slate-200 bg-white/80 px-5 py-4 shadow-sm"

@@ -2,18 +2,59 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email in ["gauravpatil9262@gmail.com"];
+    }
+
     // ─── Links ────────────────────────────────────────────────────────
     // All writes go through the admin SDK (server-side API routes).
     // Client reads are allowed for any authenticated user on their own links.
     match /links/{slug} {
       allow read: if true;  // Needed for redirect lookups
+      allow list: if isAdmin();
       allow write: if false; // All writes via admin SDK
     }
 
     // ─── Users ────────────────────────────────────────────────────────
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
       allow write: if false; // All writes via admin SDK
+    }
+
+    // ─── Admin Activity Streams (read-only) ─────────────────────────────
+    match /transactions/{docId} {
+      allow read, list: if isAdmin();
+      allow write: if false;
+    }
+    match /orders/{docId} {
+      allow read, list: if isAdmin();
+      allow write: if false;
+    }
+    match /promo_codes/{docId} {
+      allow read, list: if isAdmin();
+      allow write: if false;
+    }
+    match /promo_redemptions/{docId} {
+      allow read, list: if isAdmin();
+      allow write: if false;
+    }
+    match /promo_activity/{docId} {
+      allow read, list: if isAdmin();
+      allow write: if false;
+    }
+    match /dev_flags/{docId} {
+      allow read, list: if isAdmin();
+      allow write: if false;
+    }
+    match /api_logs/{docId} {
+      allow read, list: if isAdmin();
+      allow write: if false;
+    }
+    match /activity_events/{docId} {
+      allow read, list: if isAdmin();
+      allow write: if false;
     }
 
     // ─── Analytics ────────────────────────────────────────────────────

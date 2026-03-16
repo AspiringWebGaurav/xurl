@@ -13,6 +13,8 @@ import { PLAN_CONFIGS } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
 import { adminDb } from "@/lib/firebase/admin";
 import { createTransaction, type TransactionSource } from "./transactions";
+import { writeActivityEvent } from "@/lib/admin/activity-events-writer";
+import { logger } from "@/lib/utils/logger";
 import { encryptApiKey, generateApiKey, hashApiKey } from "@/lib/api/crypto";
 import type { OrderDocument, PromoCodeDocument, PromoRedemptionDocument } from "@/types";
 import { FieldValue } from "firebase-admin/firestore";
@@ -293,9 +295,42 @@ export async function applyPlanUpgrade(
         return result;
     };
 
+    let result: PlanUpgradeResult;
     if (t) {
-        return await executeLogic(t);
+        result = await executeLogic(t);
     } else {
-        return await adminDb.runTransaction(executeLogic);
+        result = await adminDb.runTransaction(executeLogic);
     }
+
+    const eventType = options?.source === "admin_grant" ? "ADMIN_GRANTED_PLAN" : "PLAN_PURCHASED";
+    try {
+        await writeActivityEvent({
+            type: eventType,
+            actor: userId,
+            sourceCollection: "orders",
+            metadata: {
+                planId,
+                source: options?.source ?? null,
+                orderId: orderId ?? null,
+                amountPaise: options?.amountPaise ?? null,
+                reason: options?.reason ?? null,
+                recipientEmail: options?.recipientEmail ?? null,
+                adminEmail: options?.adminEmail ?? null,
+                grantType: options?.grantType ?? null,
+                durationOption: options?.durationOption ?? null,
+                customValue: options?.customValue ?? null,
+                customUnit: options?.customUnit ?? null,
+            },
+            severity: options?.source === "admin_grant" ? "ADMIN" : "BILLING",
+        });
+    } catch (error) {
+        logger.error("activity_event_write", `Failed to write ${eventType} event`, {
+            userId,
+            planId,
+            source: options?.source ?? null,
+            error: String(error),
+        });
+    }
+
+    return result;
 }

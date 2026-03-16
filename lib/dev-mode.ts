@@ -1,5 +1,7 @@
 import { adminDb } from "@/lib/firebase/admin";
 import { ADMIN_EMAILS } from "@/lib/admin-config";
+import { writeActivityEvent } from "@/lib/admin/activity-events-writer";
+import { logger } from "@/lib/utils/logger";
 
 const DEV_EMAIL = "gauravpatil9262@gmail.com";
 
@@ -39,6 +41,23 @@ export async function setDevModeForUser(userId: string, enabled: boolean): Promi
         },
         { merge: true }
     );
+
+    try {
+        await writeActivityEvent({
+            type: "DEV_MODE_TOGGLED",
+            actor: userId,
+            sourceCollection: "dev_flags",
+            metadata: {
+                enabled,
+            },
+            severity: "ADMIN",
+        });
+    } catch (error) {
+        logger.error("activity_event_write", "Failed to write DEV_MODE_TOGGLED event", {
+            userId,
+            error: String(error),
+        });
+    }
 
     return enabled;
 }

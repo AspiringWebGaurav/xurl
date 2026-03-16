@@ -18,6 +18,7 @@ import { cacheInvalidate, setRedirectCache, negCacheInvalidate } from "@/lib/red
 import { recordSuccessfulGuestLink } from "@/lib/redis/protection";
 import { rateLimitLinkCreation } from "@/lib/utils/rate-limiter";
 import { logger } from "@/lib/utils/logger";
+import { writeActivityEvent } from "@/lib/admin/activity-events-writer";
 import type { LinkDocument, CreateLinkInput as OriginalCreateLinkInput, CreateLinkResponse, UserDocument } from "@/types";
 import type { PlanType } from "@/lib/plans";
 import { PLAN_CONFIGS, GUEST_CONFIG, resolvePlanType } from "@/lib/plans";
@@ -358,6 +359,26 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
     }
 
     logger.linkCreated(slug, userId);
+    try {
+        await writeActivityEvent({
+            type: "LINK_CREATED",
+            actor: userId || null,
+            sourceCollection: "links",
+            metadata: {
+                slug,
+                shortUrl: buildShortUrl(slug),
+                originalUrl: urlCheck.url,
+                plan: txResult?.resolvedPlan ?? null,
+            },
+            severity: "INFO",
+        });
+    } catch (error) {
+        logger.error("activity_event_write", "Failed to write LINK_CREATED event", {
+            slug,
+            userId,
+            error: String(error),
+        });
+    }
 
     return {
         slug,

@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { adminDb } from "@/lib/firebase/admin";
 import { logger } from "@/lib/utils/logger";
+import { writeActivityEvent } from "@/lib/admin/activity-events-writer";
 import type { ApiLogDocument } from "@/types";
 
 export interface ApiLogInput {
@@ -35,6 +36,31 @@ export async function logApiRequest(input: ApiLogInput): Promise<void> {
 
     try {
         await adminDb.collection("api_logs").doc(entry.requestId).set(entry);
+        try {
+            await writeActivityEvent({
+                type: "API_REQUEST",
+                actor: entry.userId,
+                sourceCollection: "api_logs",
+                metadata: {
+                    requestId: entry.requestId,
+                    endpoint: entry.endpoint,
+                    method: entry.method,
+                    statusCode: entry.statusCode,
+                    responseTimeMs: entry.responseTimeMs,
+                    ip: entry.ip,
+                    quotaUsage: entry.quotaUsage,
+                    quotaTotal: entry.quotaTotal,
+                },
+                severity: entry.statusCode >= 500 || entry.statusCode === 401 || entry.statusCode === 403 ? "SECURITY" : entry.endpoint.startsWith("/api/admin") || entry.endpoint.startsWith("/api/dev") ? "ADMIN" : entry.endpoint.startsWith("/api/payments") || entry.endpoint.startsWith("/api/user/upgrade") ? "BILLING" : "INFO",
+            });
+        } catch (error) {
+            logger.error("activity_event_write", "Failed to write API_REQUEST event", {
+                requestId: entry.requestId,
+                userId: entry.userId,
+                endpoint: entry.endpoint,
+                error: String(error),
+            });
+        }
     } catch (error) {
         logger.error("api_log_write", "Failed to persist API log", {
             requestId: entry.requestId,

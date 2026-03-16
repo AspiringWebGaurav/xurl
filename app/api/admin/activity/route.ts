@@ -3,9 +3,26 @@ import { verifyAdminRequest } from "@/lib/admin-access";
 import { adminDb } from "@/lib/firebase/admin";
 import type { PlanTransaction, TransactionSource } from "@/services/transactions";
 import type { PromoCodeDocument, PromoRedemptionDocument } from "@/types";
+import {
+    getActivityTimestampField,
+    normalizeActivityEvent,
+    type ActivityEvent,
+} from "@/lib/admin/activity-events";
 
 const DEFAULT_LIMIT = 25;
+const WHOLE_APP_DEFAULT_LIMIT = 60;
 const MAX_LIMIT = 100;
+const WHOLE_APP_COLLECTIONS = [
+    "links",
+    "transactions",
+    "orders",
+    "promo_codes",
+    "promo_redemptions",
+    "promo_activity",
+    "dev_flags",
+    "api_logs",
+    "users",
+] as const;
 
 type ActivityItem = {
     id: string;
@@ -57,7 +74,80 @@ export async function GET(request: NextRequest) {
     }
 
     const limitParam = Number(request.nextUrl.searchParams.get("limit"));
-    const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), MAX_LIMIT) : DEFAULT_LIMIT;
+    const mode = request.nextUrl.searchParams.get("mode");
+    const includeCount = request.nextUrl.searchParams.get("includeCount") === "true";
+    const cursorParam = Number(request.nextUrl.searchParams.get("cursor"));
+    const cursor = Number.isFinite(cursorParam) ? cursorParam : null;
+    const defaultLimit = mode === "whole" ? WHOLE_APP_DEFAULT_LIMIT : DEFAULT_LIMIT;
+    const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), MAX_LIMIT) : defaultLimit;
+
+    if (mode === "whole") {
+        const perCollectionLimit = Math.min(limit, 30);
+        try {
+            try {
+                const timestampField = getActivityTimestampField("activity_events");
+                let aggregatedQuery = adminDb
+                    .collection("activity_events")
+                    .orderBy(timestampField, "desc");
+                if (cursor !== null) {
+                    aggregatedQuery = aggregatedQuery.startAfter(cursor);
+                }
+                const aggregatedSnap = await aggregatedQuery
+                    .limit(perCollectionLimit)
+                    .get();
+                if (!aggregatedSnap.empty) {
+                    const items = aggregatedSnap.docs
+                        .map((doc) => normalizeActivityEvent("activity_events", doc.id, doc.data()))
+                        .filter(Boolean) as ActivityEvent[];
+                    const combined = items
+                        .filter((item) => item.timestamp && (cursor === null || item.timestamp < cursor))
+                        .sort((a, b) => b.timestamp - a.timestamp)
+                        .slice(0, limit);
+                    if (includeCount) {
+                        const totalSnap = await adminDb.collection("activity_events").count().get();
+                        return NextResponse.json({ items: combined, totalCount: totalSnap.data().count });
+                    }
+                    return NextResponse.json({ items: combined });
+                }
+            } catch (error) {
+                console.warn("activity_events aggregation failed", error);
+            }
+
+            const snapshots = await Promise.all(
+                WHOLE_APP_COLLECTIONS.map((collectionName) =>
+                    adminDb
+                        .collection(collectionName)
+                        .orderBy(getActivityTimestampField(collectionName), "desc")
+                        .limit(perCollectionLimit)
+                        .get()
+                )
+            );
+
+            const items = snapshots.flatMap((snap, index) => {
+                const collectionName = WHOLE_APP_COLLECTIONS[index];
+                return snap.docs
+                    .map((doc) => normalizeActivityEvent(collectionName, doc.id, doc.data()))
+                    .filter(Boolean) as ActivityEvent[];
+            });
+
+            const combined = items
+                .filter((item) => item.timestamp && (cursor === null || item.timestamp < cursor))
+                .sort((a, b) => b.timestamp - a.timestamp)
+                .slice(0, limit);
+
+            if (includeCount) {
+                const countSnaps = await Promise.all(
+                    WHOLE_APP_COLLECTIONS.map((collectionName) => adminDb.collection(collectionName).count().get())
+                );
+                const totalCount = countSnaps.reduce((sum, snap) => sum + snap.data().count, 0);
+                return NextResponse.json({ items: combined, totalCount });
+            }
+            return NextResponse.json({ items: combined });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Failed to load whole app activity";
+            return NextResponse.json({ message }, { status: 500 });
+        }
+    }
 
     try {
         const [txSnap, redemptionSnap, promoSnap, promoActionSnap] = await Promise.all([

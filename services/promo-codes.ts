@@ -1,6 +1,8 @@
 import crypto from "crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
+import { writeActivityEvent } from "@/lib/admin/activity-events-writer";
+import { logger } from "@/lib/utils/logger";
 import { getPricePaise, PLAN_CONFIGS, resolvePlanType, type PlanType } from "@/lib/plans";
 import type { PromoCodeDocument, PromoRedemptionDocument } from "@/types";
 
@@ -532,6 +534,28 @@ export async function createPromoRedemption(
     if (data.promoCodeId) {
         const promoRef = adminDb.collection("promo_codes").doc(data.promoCodeId);
         await promoRef.set({ redemptionCount: FieldValue.increment(1) }, { merge: true });
+    }
+    try {
+        await writeActivityEvent({
+            type: "PROMO_REDEEMED",
+            actor: data.userId ? String(data.userId) : null,
+            sourceCollection: "promo_redemptions",
+            metadata: {
+                promoCodeId: data.promoCodeId,
+                promoCode: data.promoCode,
+                planId: data.planId,
+                orderId: data.orderId ?? null,
+                discountType: data.discountType,
+                discountValue: data.discountValue,
+            },
+            severity: "INFO",
+        });
+    } catch (error) {
+        logger.error("activity_event_write", "Failed to write PROMO_REDEEMED event", {
+            promoCodeId: data.promoCodeId,
+            userId: data.userId,
+            error: String(error),
+        });
     }
     return ref.id;
 }
