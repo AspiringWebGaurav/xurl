@@ -26,13 +26,18 @@ export async function POST(request: NextRequest) {
                 code: body.code,
                 discountType: body.discountType,
                 discountValue: Number.isFinite(discountValue) ? discountValue : undefined,
+                startsAt: body.startsAt ? Number(body.startsAt) : null,
                 expiresAt: body.expiresAt ? Number(body.expiresAt) : null,
                 usageLimit: body.usageLimit ? Number(body.usageLimit) : null,
                 planRestriction: body.planRestriction || null,
+                planRestrictions: Array.isArray(body.planRestrictions) ? body.planRestrictions : null,
+                status: body.status,
                 isActive: body.isActive !== false,
                 perUserLimit: body.perUserLimit === undefined ? null : Number(body.perUserLimit) || null,
+                firstTimeOnly: Boolean(body.firstTimeOnly),
             },
-            admin.uid
+            admin.uid,
+            admin.email
         );
 
         return NextResponse.json({ success: true, item: { id: created.id, ...created.data } });

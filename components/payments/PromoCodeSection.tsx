@@ -11,7 +11,7 @@ export interface AppliedPromo {
     originalAmount: number;
     discountAmount: number;
     finalAmount: number;
-    discountType: "percentage" | "fixed";
+    discountType: "percentage" | "fixed" | "free_plan";
     discountValue: number;
 }
 

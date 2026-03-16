@@ -9,10 +9,28 @@ const MAX_LIMIT = 100;
 
 type ActivityItem = {
     id: string;
-    type: "billing" | "grant" | "promo_redemption" | "promo_created";
+    type:
+        | "billing"
+        | "grant"
+        | "promo_redemption"
+        | "promo_created"
+        | "promo_create"
+        | "promo_update"
+        | "promo_pause"
+        | "promo_disable"
+        | "promo_delete";
     message: string;
     timestamp: number;
     details?: Record<string, unknown>;
+};
+
+type PromoAdminAction = {
+    action: "PROMO_CREATE" | "PROMO_UPDATE" | "PROMO_PAUSE" | "PROMO_DISABLE" | "PROMO_DELETE";
+    promoId: string;
+    promoCode: string;
+    adminUid: string;
+    adminEmail: string | null;
+    createdAt: number;
 };
 
 type ActivitySummary = {
@@ -42,10 +60,11 @@ export async function GET(request: NextRequest) {
     const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), MAX_LIMIT) : DEFAULT_LIMIT;
 
     try {
-        const [txSnap, redemptionSnap, promoSnap] = await Promise.all([
+        const [txSnap, redemptionSnap, promoSnap, promoActionSnap] = await Promise.all([
             adminDb.collection("transactions").orderBy("createdAt", "desc").limit(limit).get(),
             adminDb.collection("promo_redemptions").orderBy("redeemedAt", "desc").limit(limit).get(),
             adminDb.collection("promo_codes").orderBy("createdAt", "desc").limit(limit).get(),
+            adminDb.collection("promo_activity").orderBy("createdAt", "desc").limit(limit).get(),
         ]);
 
         const txItems: ActivityItem[] = txSnap.docs.map((doc) => {
@@ -100,7 +119,32 @@ export async function GET(request: NextRequest) {
             };
         });
 
-        const combined = [...txItems, ...redemptionItems, ...promoItems]
+        const promoActionItems: ActivityItem[] = promoActionSnap.docs.map((doc) => {
+            const data = doc.data() as PromoAdminAction;
+            const typeMap: Record<PromoAdminAction["action"], ActivityItem["type"]> = {
+                PROMO_CREATE: "promo_create",
+                PROMO_UPDATE: "promo_update",
+                PROMO_PAUSE: "promo_pause",
+                PROMO_DISABLE: "promo_disable",
+                PROMO_DELETE: "promo_delete",
+            };
+            const adminLabel = data.adminEmail ?? data.adminUid;
+            const actionLabel = data.action.replace("PROMO_", "").toLowerCase();
+            return {
+                id: doc.id,
+                type: typeMap[data.action],
+                message: `Promo ${data.promoCode} ${actionLabel} by ${adminLabel}`,
+                timestamp: data.createdAt,
+                details: {
+                    action: data.action,
+                    promoId: data.promoId,
+                    promoCode: data.promoCode,
+                    adminEmail: data.adminEmail ?? null,
+                },
+            };
+        });
+
+        const combined = [...txItems, ...redemptionItems, ...promoItems, ...promoActionItems]
             .filter((item) => item.timestamp)
             .sort((a, b) => b.timestamp - a.timestamp)
             .slice(0, limit);

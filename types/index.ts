@@ -70,6 +70,7 @@ export interface PromoRedemptionDocument {
     promoCodeId: string;
     promoCode: string;
     userId: string;
+    userEmail?: string | null;
     planId: PlanType;
     orderId?: string | null;
     discountType: "percentage" | "fixed" | "free_plan";
@@ -80,13 +81,17 @@ export interface PromoRedemptionDocument {
 export interface PromoCodeDocument {
     code: string;
     normalizedCode: string;
+    status?: "ACTIVE" | "PAUSED" | "DISABLED";
     discountType: "percentage" | "fixed" | "free_plan";
     discountValue: number;
+    startsAt?: number | null;
     expiresAt: number | null;
     usageLimit: number | null;
     perUserLimit?: number | null;
+    firstTimeOnly?: boolean;
     usageCount: number;
     planRestriction: PlanType | null;
+    planRestrictions?: PlanType[] | null;
     isActive: boolean;
     createdAt: number;
     updatedAt: number;

@@ -6,20 +6,25 @@ import { auth } from "@/lib/firebase/config";
 import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Pencil, Plus, TicketPercent, Trash2, Eye } from "lucide-react";
+import { Loader2, Pencil, Plus, TicketPercent, Trash2, Eye, PauseCircle, PlayCircle, AlertTriangle } from "lucide-react";
 import { isAdminEmail } from "@/lib/admin-config";
+import { PLAN_CONFIGS } from "@/lib/plans";
 
 type PromoCodeItem = {
     id: string;
     code: string;
     discountType: "percentage" | "fixed" | "free_plan";
     discountValue: number;
+    status?: "ACTIVE" | "PAUSED" | "DISABLED";
+    startsAt?: number | null;
     expiresAt: number | null;
     usageLimit: number | null;
     usageCount: number;
     planRestriction: string | null;
+    planRestrictions?: string[] | null;
     isActive: boolean;
     perUserLimit: number | null;
+    firstTimeOnly?: boolean;
     redemptionCount?: number;
     updatedAt: number;
 };
@@ -32,7 +37,11 @@ type RedemptionItem = {
     id: string;
     promoCode: string;
     userId: string;
+    userEmail?: string | null;
     planId: string;
+    orderId?: string | null;
+    discountType: "percentage" | "fixed" | "free_plan";
+    discountValue: number;
     redeemedAt: number;
 };
 
@@ -40,27 +49,50 @@ type PromoFormState = {
     code: string;
     discountType: "percentage" | "fixed" | "free_plan";
     discountValue: string;
+    startsAt: string;
     expiresAt: string;
     usageLimit: string;
     perUserLimit: string;
-    planRestriction: string;
-    isActive: boolean;
+    planRestrictions: string[];
+    status: "ACTIVE" | "PAUSED" | "DISABLED";
+    firstTimeOnly: boolean;
 };
 
 const initialForm: PromoFormState = {
     code: "",
     discountType: "percentage",
     discountValue: "10",
+    startsAt: "",
     expiresAt: "",
     usageLimit: "",
     perUserLimit: "",
-    planRestriction: "",
-    isActive: true,
+    planRestrictions: [],
+    status: "ACTIVE",
+    firstTimeOnly: false,
 };
 
 function formatExpiry(value: number | null): string {
     if (!value) return "No expiry";
     return new Date(value).toLocaleString();
+}
+
+function resolvePromoStatus(item: PromoCodeItem): "ACTIVE" | "PAUSED" | "DISABLED" | "EXPIRED" {
+    if (item.status) {
+        if (item.status === "ACTIVE" && item.expiresAt && item.expiresAt <= Date.now()) {
+            return "EXPIRED";
+        }
+        return item.status;
+    }
+    if (!item.isActive) return "DISABLED";
+    if (item.expiresAt && item.expiresAt <= Date.now()) return "EXPIRED";
+    return "ACTIVE";
+}
+
+const planOptions = ["starter", "pro", "business", "enterprise", "bigenterprise"] as const;
+
+function formatPlanName(planId: string) {
+    const config = PLAN_CONFIGS[planId as keyof typeof PLAN_CONFIGS];
+    return config?.label ?? planId;
 }
 
 export default function AdminPromoCodesPage() {
@@ -79,7 +111,7 @@ export default function AdminPromoCodesPage() {
     const canAccess = isAdminEmail(user?.email);
     const analyticsSummary = useMemo(() => {
         const totalRedemptions = items.reduce((sum, item) => sum + item.usageCount, 0);
-        const activeCodes = items.filter((item) => item.isActive).length;
+        const activeCodes = items.filter((item) => resolvePromoStatus(item) === "ACTIVE").length;
         const exhaustedCodes = items.filter(
             (item) => item.usageLimit !== null && item.usageCount >= item.usageLimit
         ).length;
@@ -139,15 +171,22 @@ export default function AdminPromoCodesPage() {
 
     function startEditing(item: PromoCodeItem) {
         setEditingId(item.id);
+        const planRestrictions = item.planRestrictions?.length
+            ? item.planRestrictions
+            : item.planRestriction
+                ? [item.planRestriction]
+                : [];
         setForm({
             code: item.code,
             discountType: item.discountType,
             discountValue: String(item.discountValue),
+            startsAt: item.startsAt ? new Date(item.startsAt).toISOString().slice(0, 16) : "",
             expiresAt: item.expiresAt ? new Date(item.expiresAt).toISOString().slice(0, 16) : "",
             usageLimit: item.usageLimit ? String(item.usageLimit) : "",
             perUserLimit: item.perUserLimit ? String(item.perUserLimit) : "",
-            planRestriction: item.planRestriction || "",
-            isActive: item.isActive,
+            planRestrictions,
+            status: item.status ?? (item.isActive ? "ACTIVE" : "DISABLED"),
+            firstTimeOnly: Boolean(item.firstTimeOnly),
         });
         setSuccess("");
         setError("");
@@ -162,15 +201,20 @@ export default function AdminPromoCodesPage() {
 
         try {
             const token = await user.getIdToken();
+            const planRestriction = form.planRestrictions.length === 1 ? form.planRestrictions[0] : null;
             const payload = {
                 code: form.code || undefined,
                 discountType: form.discountType,
                 discountValue: Number(form.discountValue),
+                startsAt: form.startsAt ? new Date(form.startsAt).getTime() : null,
                 expiresAt: form.expiresAt ? new Date(form.expiresAt).getTime() : null,
                 usageLimit: form.usageLimit ? Number(form.usageLimit) : null,
                 perUserLimit: form.perUserLimit ? Number(form.perUserLimit) : null,
-                planRestriction: form.planRestriction || null,
-                isActive: form.isActive,
+                planRestriction,
+                planRestrictions: form.planRestrictions.length ? form.planRestrictions : null,
+                status: form.status,
+                isActive: form.status === "ACTIVE",
+                firstTimeOnly: form.firstTimeOnly,
             };
 
             const response = await fetch(editingId ? `/api/admin/promo-codes/${editingId}` : "/api/admin/promo-codes", {
@@ -193,6 +237,32 @@ export default function AdminPromoCodesPage() {
             setError(saveError instanceof Error ? saveError.message : "Failed to save promo code.");
         } finally {
             setSaving(false);
+        }
+    }
+
+    async function disablePromoNow(id: string) {
+        if (!user) return;
+
+        setError("");
+        setSuccess("");
+        try {
+            const token = await user.getIdToken();
+            const response = await fetch(`/api/admin/promo-codes/${id}`, {
+                method: "PATCH",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ status: "DISABLED", isActive: false }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || "Failed to disable promo code.");
+            }
+            setSuccess("Promo code disabled.");
+            await loadItems(user);
+        } catch (disableError) {
+            setError(disableError instanceof Error ? disableError.message : "Failed to disable promo code.");
         }
     }
 
@@ -227,13 +297,14 @@ export default function AdminPromoCodesPage() {
         setSuccess("");
         try {
             const token = await user.getIdToken();
+            const nextStatus = resolvePromoStatus(item) === "ACTIVE" ? "PAUSED" : "ACTIVE";
             const response = await fetch(`/api/admin/promo-codes/${item.id}`, {
                 method: "PATCH",
                 headers: {
                     Authorization: `Bearer ${token}`,
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ isActive: !item.isActive }),
+                body: JSON.stringify({ status: nextStatus, isActive: nextStatus === "ACTIVE" }),
             });
             const data = await response.json();
             if (!response.ok) {
@@ -352,26 +423,61 @@ export default function AdminPromoCodesPage() {
                                     <Input value={form.usageLimit} onChange={(event) => setForm((current) => ({ ...current, usageLimit: event.target.value }))} type="number" min="1" placeholder="Unlimited" className="rounded-xl" />
                                 </div>
                                 <div>
+                                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Per-user limit</label>
+                                    <Input value={form.perUserLimit} onChange={(event) => setForm((current) => ({ ...current, perUserLimit: event.target.value }))} type="number" min="1" placeholder="Unlimited" className="rounded-xl" />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Starts at</label>
+                                    <Input value={form.startsAt} onChange={(event) => setForm((current) => ({ ...current, startsAt: event.target.value }))} type="datetime-local" className="rounded-xl" />
+                                </div>
+                                <div>
                                     <label className="mb-1.5 block text-sm font-medium text-slate-700">Expires at</label>
                                     <Input value={form.expiresAt} onChange={(event) => setForm((current) => ({ ...current, expiresAt: event.target.value }))} type="datetime-local" className="rounded-xl" />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="mb-1.5 block text-sm font-medium text-slate-700">Plan restriction</label>
-                                <select value={form.planRestriction} onChange={(event) => setForm((current) => ({ ...current, planRestriction: event.target.value }))} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none">
-                                    <option value="">All paid plans</option>
-                                    <option value="starter">Starter</option>
-                                    <option value="pro">Pro</option>
-                                    <option value="business">Business</option>
-                                    <option value="enterprise">Enterprise</option>
-                                    <option value="bigenterprise">Big Enterprise</option>
+                                <label className="mb-1.5 block text-sm font-medium text-slate-700">Status</label>
+                                <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as PromoFormState["status"] }))} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none">
+                                    <option value="ACTIVE">Active</option>
+                                    <option value="PAUSED">Paused</option>
+                                    <option value="DISABLED">Disabled</option>
                                 </select>
                             </div>
 
+                            <div>
+                                <label className="mb-2 block text-sm font-medium text-slate-700">Plan restriction</label>
+                                <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                                    {planOptions.map((plan) => {
+                                        const checked = form.planRestrictions.includes(plan);
+                                        return (
+                                            <label key={plan} className="flex items-center justify-between text-sm text-slate-700">
+                                                <span>{formatPlanName(plan)}</span>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    onChange={(event) => {
+                                                        const next = event.target.checked
+                                                            ? [...form.planRestrictions, plan]
+                                                            : form.planRestrictions.filter((value) => value !== plan);
+                                                        setForm((current) => ({ ...current, planRestrictions: next }));
+                                                    }}
+                                                />
+                                            </label>
+                                        );
+                                    })}
+                                    {!form.planRestrictions.length && (
+                                        <p className="text-xs text-slate-400">Applies to all paid plans.</p>
+                                    )}
+                                </div>
+                            </div>
+
                             <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                <input type="checkbox" checked={form.isActive} onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked }))} />
-                                Promo code is active
+                                <input type="checkbox" checked={form.firstTimeOnly} onChange={(event) => setForm((current) => ({ ...current, firstTimeOnly: event.target.checked }))} />
+                                First-time customers only
                             </label>
 
                             <div className="flex gap-3 pt-2">
@@ -384,6 +490,25 @@ export default function AdminPromoCodesPage() {
                                         Cancel
                                     </Button>
                                 )}
+                            </div>
+
+                            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4">
+                                <div className="flex items-center gap-2 text-rose-700">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    <p className="text-sm font-semibold">Danger Zone</p>
+                                </div>
+                                <p className="mt-2 text-xs text-rose-600">
+                                    Immediately disables the selected promo without removing redemption history. Select an existing promo to enable this action.
+                                </p>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="mt-3 w-full border-rose-200 text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-70"
+                                    onClick={() => editingId && disablePromoNow(editingId)}
+                                    disabled={!editingId}
+                                >
+                                    Disable promo now
+                                </Button>
                             </div>
                         </div>
                     </section>
@@ -406,11 +531,11 @@ export default function AdminPromoCodesPage() {
                                     <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
                                         <tr>
                                             <th className="px-6 py-4 font-medium">Code</th>
+                                            <th className="px-6 py-4 font-medium">Status</th>
                                             <th className="px-6 py-4 font-medium">Discount</th>
-                                            <th className="px-6 py-4 font-medium">Plan</th>
                                             <th className="px-6 py-4 font-medium">Usage</th>
                                             <th className="px-6 py-4 font-medium">Expiry</th>
-                                            <th className="px-6 py-4 font-medium">Status</th>
+                                            <th className="px-6 py-4 font-medium">Plans</th>
                                             <th className="px-6 py-4 font-medium">Actions</th>
                                         </tr>
                                     </thead>
@@ -419,22 +544,46 @@ export default function AdminPromoCodesPage() {
                                             <tr key={item.id} className="hover:bg-slate-50/70">
                                                 <td className="px-4 py-3 whitespace-nowrap font-mono text-xs text-slate-500">{item.code}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap">
+                                                    {(() => {
+                                                        const status = resolvePromoStatus(item);
+                                                        const styles =
+                                                            status === "ACTIVE"
+                                                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                                                : status === "PAUSED"
+                                                                    ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                                                    : status === "EXPIRED"
+                                                                        ? "bg-slate-100 text-slate-500 border border-slate-200"
+                                                                        : "bg-rose-50 text-rose-700 border border-rose-200";
+                                                        return (
+                                                            <span className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${styles}`}>
+                                                                {status}
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap">
                                                     {item.discountType === "percentage"
                                                         ? `${item.discountValue}%`
                                                         : item.discountType === "free_plan"
                                                             ? "Free plan"
                                                             : `₹${item.discountValue}`}
                                                 </td>
-                                                <td className="px-4 py-3 whitespace-nowrap">{formatExpiry(item.expiresAt)}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap">{item.usageCount}{item.usageLimit ? ` / ${item.usageLimit}` : ""}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap">{item.perUserLimit ?? "∞"}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap capitalize">{item.planRestriction || "Any"}</td>
                                                 <td className="px-4 py-3 whitespace-nowrap">
-                                                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${item.isActive ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>
-                                                        {item.isActive ? "Active" : "Disabled"}
-                                                    </span>
+                                                    <div className="text-slate-900">
+                                                        {item.usageCount}{item.usageLimit ? ` / ${item.usageLimit}` : " / ∞"}
+                                                    </div>
+                                                    <div className="text-xs text-slate-400">
+                                                        Remaining: {item.usageLimit ? Math.max(item.usageLimit - item.usageCount, 0) : "∞"}
+                                                    </div>
                                                 </td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-right text-slate-500 text-xs">{item.redemptionCount ?? item.usageCount ?? 0}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap">{formatExpiry(item.expiresAt)}</td>
+                                                <td className="px-4 py-3 whitespace-nowrap capitalize">
+                                                    {item.planRestrictions?.length
+                                                        ? item.planRestrictions.map(formatPlanName).join(", ")
+                                                        : item.planRestriction
+                                                            ? formatPlanName(item.planRestriction)
+                                                            : "All paid"}
+                                                </td>
                                                 <td className="px-4 py-3 whitespace-nowrap text-right">
                                                     <div className="flex justify-end gap-2">
                                                         <Button
@@ -448,6 +597,19 @@ export default function AdminPromoCodesPage() {
                                                             }}
                                                         >
                                                             <Eye className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            title={resolvePromoStatus(item) === "ACTIVE" ? "Pause promo" : "Activate promo"}
+                                                            onClick={() => togglePromo(item)}
+                                                        >
+                                                            {resolvePromoStatus(item) === "ACTIVE" ? (
+                                                                <PauseCircle className="h-4 w-4" />
+                                                            ) : (
+                                                                <PlayCircle className="h-4 w-4" />
+                                                            )}
                                                         </Button>
                                                         <Button
                                                             type="button"
@@ -478,14 +640,29 @@ export default function AdminPromoCodesPage() {
                                             <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
                                                 <tr>
                                                     <th className="px-6 py-4 font-medium">User</th>
+                                                    <th className="px-6 py-4 font-medium">Plan</th>
+                                                    <th className="px-6 py-4 font-medium">Discount</th>
+                                                    <th className="px-6 py-4 font-medium">Order</th>
                                                     <th className="px-6 py-4 font-medium">Redeemed at</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 text-slate-700">
                                                 {(redemptions[showRedemptionsFor] || []).map((redemption) => (
                                                     <tr key={redemption.id} className="hover:bg-slate-50/70">
-                                                        <td className="px-6 py-4 font-mono text-[11px]">{redemption.userId}</td>
-                                                        <td className="px-6 py-4">{formatDate(redemption.redeemedAt)}</td>
+                                                        <td className="px-6 py-4 text-xs">
+                                                            <div className="font-medium text-slate-900">{redemption.userEmail || redemption.userId}</div>
+                                                            <div className="font-mono text-[11px] text-slate-400">{redemption.userId}</div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-xs">{formatPlanName(redemption.planId)}</td>
+                                                        <td className="px-6 py-4 text-xs">
+                                                            {redemption.discountType === "percentage"
+                                                                ? `${redemption.discountValue}%`
+                                                                : redemption.discountType === "free_plan"
+                                                                    ? "Free plan"
+                                                                    : `₹${redemption.discountValue}`}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-xs font-mono text-slate-500">{redemption.orderId || "—"}</td>
+                                                        <td className="px-6 py-4 text-xs">{formatDate(redemption.redeemedAt)}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
