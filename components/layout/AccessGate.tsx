@@ -25,6 +25,21 @@ function isAccessBanned(access: AccessInfo | null): boolean {
 
 const FAIL_CLOSED_TIMEOUT_MS = 8000;
 
+const BOOT_STYLES = `
+    @keyframes xurl-fadein {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes xurl-scan {
+        0%   { left: -40%; width: 40%; }
+        100% { left: 140%; width: 40%; }
+    }
+    @keyframes xurl-dot {
+        0%,80%,100% { opacity: .2; transform: scale(.75); }
+        40%         { opacity: 1;  transform: scale(1); }
+    }
+`;
+
 export function AccessGate({ children }: { children: React.ReactNode }) {
     const [gate, setGate] = useState<GateState>("booting");
     const [accessInfo, setAccessInfo] = useState<AccessInfo | null>(null);
@@ -69,14 +84,9 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
                     setGate("active");
                     return;
                 }
-
                 const data = snap.data() as PublicGuestAccess;
-
-                if (data.version < highestVersion.current) {
-                    return;
-                }
+                if (data.version < highestVersion.current) return;
                 highestVersion.current = data.version;
-
                 applyAccessInfo({
                     status: data.status,
                     reason: data.reason,
@@ -86,7 +96,6 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
             },
             () => {
                 // Snapshot error — guest projection unreadable, allow through
-                // (guest enforcement is best-effort; server-side is authoritative)
                 setGate("active");
             }
         );
@@ -100,16 +109,12 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
                 return;
             }
             const data = await res.json();
-
             if (data.banned) {
                 setVariant("banned");
                 setGate("locked");
-                if (data.publicAccessKey) {
-                    subscribeToGuestAccess(data.publicAccessKey);
-                }
+                if (data.publicAccessKey) subscribeToGuestAccess(data.publicAccessKey);
                 return;
             }
-
             if (data.publicAccessKey) {
                 subscribeToGuestAccess(data.publicAccessKey);
             } else {
@@ -151,20 +156,14 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
                         setGate("active");
                         return;
                     }
-
                     const data = snap.data();
                     const access = data?.access as SubjectAccess | undefined;
-
                     if (!access) {
                         setGate("active");
                         return;
                     }
-
-                    if (access.version < highestVersion.current) {
-                        return;
-                    }
+                    if (access.version < highestVersion.current) return;
                     highestVersion.current = access.version;
-
                     applyAccessInfo({
                         status: access.status,
                         reason: access.reason,
@@ -187,7 +186,77 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
     }, [clearFailTimer, cleanupFirestore, applyAccessInfo, bootstrapGuest]);
 
     if (gate === "booting") {
-        return <div className="min-h-screen bg-background" />;
+        return (
+            <div
+                style={{
+                    minHeight: "100vh",
+                    background: "#f4f4f5",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                }}
+            >
+                <style>{BOOT_STYLES}</style>
+
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", animation: "xurl-fadein .4s ease both" }}>
+
+                    {/* Logo — matches navbar */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "28px" }}>
+                        <div style={{
+                            width: "32px",
+                            height: "32px",
+                            background: "#18181b",
+                            borderRadius: "7px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                        }}>
+                            <span style={{ color: "#fff", fontWeight: 700, fontSize: "15px" }}>X</span>
+                        </div>
+                        <span style={{ fontSize: "20px", fontWeight: 600, color: "#18181b", letterSpacing: "-0.3px" }}>
+                            URL
+                        </span>
+                    </div>
+
+                    {/* Scanning bar */}
+                    <div style={{
+                        width: "140px",
+                        height: "2px",
+                        background: "#e4e4e7",
+                        borderRadius: "99px",
+                        overflow: "hidden",
+                        position: "relative",
+                        animation: "xurl-fadein .4s .1s ease both",
+                        opacity: 0,
+                    }}>
+                        <div style={{
+                            position: "absolute",
+                            top: 0,
+                            height: "100%",
+                            background: "linear-gradient(90deg, transparent, #18181b, transparent)",
+                            borderRadius: "99px",
+                            animation: "xurl-scan 1.4s cubic-bezier(.4,0,.6,1) infinite",
+                        }} />
+                    </div>
+
+                    {/* Dots */}
+                    <div style={{ display: "flex", gap: "5px", marginTop: "16px", animation: "xurl-fadein .4s .2s ease both", opacity: 0 }}>
+                        {([0, 0.15, 0.3] as const).map((delay, i) => (
+                            <div key={i} style={{
+                                width: "4px",
+                                height: "4px",
+                                borderRadius: "50%",
+                                background: "#a1a1aa",
+                                animation: `xurl-dot 1.2s ${delay}s ease-in-out infinite`,
+                            }} />
+                        ))}
+                    </div>
+
+                </div>
+            </div>
+        );
     }
 
     if (gate === "locked") {
