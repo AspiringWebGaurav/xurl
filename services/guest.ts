@@ -90,7 +90,28 @@ export async function resolveGuestEntity(
     const now = Date.now();
 
     const ref = adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(guestId);
+
+    // Fetch existing entity by computed guestId first
     const snap = await ref.get();
+
+    if (!snap.exists && fingerprintHash) {
+        // If fingerprint exists but guestId was IP-based, try fingerprint guestId as well
+        const fpRef = adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(fingerprintHash);
+        const fpSnap = await fpRef.get();
+        if (fpSnap.exists) {
+            const existing = fpSnap.data() as GuestEntity;
+            const updates: Record<string, unknown> = {
+                lastSeenAt: now,
+                lastInteractionAt: now,
+            };
+            if (userAgentHash) updates.lastUserAgentHash = userAgentHash;
+            if (!existing.fingerprintHash) updates.fingerprintHash = fingerprintHash;
+            if (!existing.ipHash) updates.ipHash = ipHash;
+            await fpRef.update(updates);
+            const merged = { ...existing, ...updates } as GuestEntity;
+            return { entity: merged, banned: isSubjectBanned(merged.access) };
+        }
+    }
 
     if (snap.exists) {
         const existing = snap.data() as GuestEntity;
@@ -100,14 +121,18 @@ export async function resolveGuestEntity(
             lastInteractionAt: now,
         };
 
-        if (userAgentHash) updates.lastUserAgentHash = userAgentHash;
+        if (userAgentHash) {
+            updates.lastUserAgentHash = userAgentHash;
+        }
 
         if (fingerprintHash && !existing.fingerprintHash) {
             updates.fingerprintHash = fingerprintHash;
             updates.canonicalIdentityStrength = "fingerprint";
         }
 
-        if (ipHash && !existing.ipHash) updates.ipHash = ipHash;
+        if (ipHash && !existing.ipHash) {
+            updates.ipHash = ipHash;
+        }
 
         if (fingerprintHash && existing.guestId !== fingerprintHash && existing.canonicalIdentityStrength === "ip") {
             const aliasSet = new Set(existing.aliasGuestIds || []);
@@ -118,16 +143,6 @@ export async function resolveGuestEntity(
         await ref.update(updates);
 
         const merged = { ...existing, ...updates } as GuestEntity;
-
-        // Defensive: if entity still shows banned, cross-check the projection
-        // in case a ban/unban write didn't fully propagate
-        if (isSubjectBanned(merged.access) && merged.publicAccessKey) {
-            const repaired = await repairEntityFromProjection(guestId, merged.access, merged.publicAccessKey);
-            if (repaired) {
-                return { entity: { ...merged, access: repaired }, banned: false };
-            }
-        }
-
         return { entity: merged, banned: isSubjectBanned(merged.access) };
     }
 
