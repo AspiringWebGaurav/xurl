@@ -13,6 +13,7 @@ import { PLAN_CONFIGS } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
 import { adminDb } from "@/lib/firebase/admin";
 import { createTransaction, type TransactionSource } from "./transactions";
+import { createNotificationForUser } from "@/services/notifications";
 import { writeActivityEvent } from "@/lib/admin/activity-events-writer";
 import { logger } from "@/lib/utils/logger";
 import { encryptApiKey, generateApiKey, hashApiKey } from "@/lib/api/crypto";
@@ -34,6 +35,12 @@ export interface PlanUpgradeResult {
     apiKeyEncrypted?: string | null;
     apiKeyLastRotatedAt?: number | null;
     updatedAt: number;
+    transactionId?: string | null;
+    promoInfo?: {
+        code: string;
+        discountType: string;
+        discountValue: number;
+    } | null;
 }
 
 export interface PlanUpgradeOptions {
@@ -183,6 +190,8 @@ export async function applyPlanUpgrade(
             apiKeyEncrypted,
             apiKeyLastRotatedAt,
             updatedAt: now,
+            transactionId: null,
+            promoInfo: null,
         };
 
         if (isRenewal) {
@@ -220,6 +229,7 @@ export async function applyPlanUpgrade(
             }
         }
 
+        let promoInfo: PlanUpgradeResult["promoInfo"] = null;
         if (promoRef) {
             const currentPromoUsage = promoSnap?.exists ? ((promoSnap.data() as PromoCodeDocument).usageCount || 0) : 0;
             transaction.set(
@@ -246,6 +256,11 @@ export async function applyPlanUpgrade(
                 redeemedAt: now,
             };
             transaction.set(redemptionRef, redemption);
+            promoInfo = {
+                code: redemption.promoCode,
+                discountType: String(redemption.discountType),
+                discountValue: Number(redemption.discountValue || 0),
+            };
         }
 
         // Log transaction history
@@ -257,7 +272,7 @@ export async function applyPlanUpgrade(
             if (planId === "free" && existingUser?.plan !== "free") action = "downgrade";
         }
 
-        await createTransaction(
+        const transactionId = await createTransaction(
             {
                 userId,
                 planType: planId,
@@ -292,6 +307,9 @@ export async function applyPlanUpgrade(
             transaction
         );
 
+        result.transactionId = transactionId;
+        result.promoInfo = promoInfo;
+
         return result;
     };
 
@@ -300,6 +318,27 @@ export async function applyPlanUpgrade(
         result = await executeLogic(t);
     } else {
         result = await adminDb.runTransaction(executeLogic);
+    }
+
+    if (result.promoInfo && result.transactionId) {
+        const actionUrl = `/dashboard/purchase-history?highlight=${result.transactionId}`;
+        await createNotificationForUser({
+            userId,
+            type: "PROMO",
+            title: "Promo redeemed",
+            message: `Promo ${result.promoInfo.code} was applied to your purchase.`,
+            data: {
+                promoCode: result.promoInfo.code,
+                discountType: result.promoInfo.discountType,
+                discountValue: result.promoInfo.discountValue,
+                transactionId: result.transactionId,
+            },
+            action: {
+                type: "REDIRECT",
+                url: actionUrl,
+                label: "View Gift",
+            },
+        });
     }
 
     const eventType = options?.source === "admin_grant" ? "ADMIN_GRANTED_PLAN" : "PLAN_PURCHASED";

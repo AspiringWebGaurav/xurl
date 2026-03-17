@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
 import {
@@ -17,6 +17,8 @@ import { cn } from "@/lib/utils";
 import { History, LogOut, Loader2, ArrowLeft, BarChart3 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { usePathname, useRouter } from "next/navigation";
+import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, runTransaction } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
 
 import { HistorySidebar } from "./HistorySidebar";
 import {
@@ -26,9 +28,19 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { PLAN_CONFIGS, resolvePlanType } from "@/lib/plans";
 import { isAdminEmail } from "@/lib/admin-config";
 import { DeveloperModeToggle } from "@/components/dev/DeveloperModeToggle";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
+import type { NotificationRecord } from "@/components/notifications/NotificationItem";
 
 interface TopNavbarProps {
     isCreateDisabled?: boolean;
@@ -45,6 +57,24 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
     const [hasGuestHistory, setHasGuestHistory] = useState(false);
     const [linkCount, setLinkCount] = useState<number | null>(null);
     const [pulseBadge, setPulseBadge] = useState(false);
+    const [notificationCount, setNotificationCount] = useState(0);
+    const [notificationOpen, setNotificationOpen] = useState(false);
+    const [notificationLoading, setNotificationLoading] = useState(false);
+    const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+    const [isBellShaking, setIsBellShaking] = useState(false);
+    const [autoPopupMessage, setAutoPopupMessage] = useState<string | null>(null);
+    const [autoOpenActive, setAutoOpenActive] = useState(false);
+    const [isNotifHovered, setIsNotifHovered] = useState(false);
+    const [notificationModalOpen, setNotificationModalOpen] = useState(false);
+    const sessionInitializedRef = useRef(false);
+    const prevUnreadCountRef = useRef(0);
+    const lastHandledCountRef = useRef(0);
+    const popupDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null); // offline first-load open
+    const liveOpenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // burst collapse timer
+    const pendingDeltaRef = useRef(0);
+    const autoCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const shakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const notificationOpenRef = useRef(false);
     const [plan, setPlan] = useState<string>("free");
     const [quota, setQuota] = useState<{ limit: number, currentActive: number, ttlHours: number | "Unlimited" } | null>(null);
     const [pricingLabelIndex, setPricingLabelIndex] = useState(0);
@@ -197,6 +227,24 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
             setUser(u);
             setLoading(false);
             setHasNewHistory(false);
+            setNotifications([]);
+            setNotificationCount(0);
+            setNotificationOpen(false);
+            setAutoPopupMessage(null);
+            setAutoOpenActive(false);
+            setIsBellShaking(false);
+            prevUnreadCountRef.current = 0;
+            lastHandledCountRef.current = 0;
+            sessionInitializedRef.current = false;
+            if (popupDebounceRef.current) {
+                clearTimeout(popupDebounceRef.current);
+                popupDebounceRef.current = null;
+            }
+            if (liveOpenTimerRef.current) {
+                clearTimeout(liveOpenTimerRef.current);
+                liveOpenTimerRef.current = null;
+            }
+            pendingDeltaRef.current = 0;
             if (u) {
                 void ensureUserDocument(u);
                 void syncUserHistoryState(u);
@@ -208,6 +256,213 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
         });
         return () => unsubscribe();
     }, [syncGuestHistoryState, syncUserHistoryState]);
+
+    const triggerBellShake = useCallback(() => {
+        if (shakeTimerRef.current) {
+            clearTimeout(shakeTimerRef.current);
+        }
+        setIsBellShaking(true);
+        shakeTimerRef.current = setTimeout(() => {
+            setIsBellShaking(false);
+        }, 600);
+    }, []);
+
+    const fetchNotifications = useCallback(async () => {
+        if (!user) {
+            return;
+        }
+        setNotificationLoading(true);
+        try {
+            const itemsRef = collection(db, "notifications", user.uid, "items");
+            const notificationsQuery = query(itemsRef, orderBy("createdAt", "desc"), limit(40));
+            const snapshot = await getDocs(notificationsQuery);
+            const items = snapshot.docs.map((docSnap) => {
+                const data = docSnap.data() as NotificationRecord;
+                return {
+                    ...data,
+                    id: data.id ?? docSnap.id,
+                };
+            });
+            setNotifications(items);
+        } catch (error) {
+            console.error("Failed to fetch notifications", error);
+        } finally {
+            setNotificationLoading(false);
+        }
+    }, [user]);
+
+    useEffect(() => {
+        if (!user) {
+            return;
+        }
+
+        const metaRef = doc(db, "users", user.uid, "meta", "notifications");
+        const unsubscribe = onSnapshot(metaRef, (snap) => {
+            const unreadCount = snap.exists() ? Number(snap.data()?.unreadCount ?? 0) : 0;
+            setNotificationCount(unreadCount);
+
+            if (notificationOpenRef.current && unreadCount > prevUnreadCountRef.current) {
+                void fetchNotifications();
+            }
+
+            if (!sessionInitializedRef.current) {
+                sessionInitializedRef.current = true;
+                prevUnreadCountRef.current = unreadCount;
+                if (unreadCount > 0 && lastHandledCountRef.current < unreadCount) {
+                    lastHandledCountRef.current = unreadCount;
+                    if (popupDebounceRef.current) {
+                        clearTimeout(popupDebounceRef.current);
+                    }
+                    popupDebounceRef.current = setTimeout(() => {
+                        if (notificationOpenRef.current) {
+                            return;
+                        }
+                        setAutoPopupMessage(unreadCount > 1 ? `You received ${unreadCount} new notifications` : null);
+                        triggerBellShake();
+                        setAutoOpenActive(true);
+                        setNotificationOpen(true);
+                    }, 1000);
+                }
+                return;
+            }
+
+            if (unreadCount > prevUnreadCountRef.current && lastHandledCountRef.current < unreadCount) {
+                const delta = unreadCount - prevUnreadCountRef.current;
+                lastHandledCountRef.current = unreadCount;
+                if (notificationOpenRef.current) {
+                    prevUnreadCountRef.current = unreadCount;
+                    return;
+                }
+                pendingDeltaRef.current += delta;
+                if (liveOpenTimerRef.current) {
+                    clearTimeout(liveOpenTimerRef.current);
+                }
+                liveOpenTimerRef.current = setTimeout(() => {
+                    const burstDelta = pendingDeltaRef.current;
+                    pendingDeltaRef.current = 0;
+                    setAutoPopupMessage(burstDelta > 1 ? `You received ${burstDelta} new notifications` : null);
+                    triggerBellShake();
+                    setAutoOpenActive(true);
+                    setNotificationOpen(true);
+                    liveOpenTimerRef.current = null;
+                }, 120);
+            }
+
+            prevUnreadCountRef.current = unreadCount;
+        });
+
+        return () => unsubscribe();
+        }, [user, fetchNotifications, triggerBellShake]);
+
+    useEffect(() => {
+        return () => {
+            if (popupDebounceRef.current) {
+                clearTimeout(popupDebounceRef.current);
+            }
+            if (liveOpenTimerRef.current) {
+                clearTimeout(liveOpenTimerRef.current);
+            }
+            if (autoCloseRef.current) {
+                clearTimeout(autoCloseRef.current);
+            }
+            if (shakeTimerRef.current) {
+                clearTimeout(shakeTimerRef.current);
+            }
+            pendingDeltaRef.current = 0;
+        };
+    }, []);
+
+
+    useEffect(() => {
+        notificationOpenRef.current = notificationOpen;
+        if (notificationOpen) {
+            void fetchNotifications();
+        }
+    }, [notificationOpen, fetchNotifications]);
+
+    useEffect(() => {
+        if (!notificationOpen || !autoOpenActive) {
+            return;
+        }
+
+        if (autoCloseRef.current) {
+            clearTimeout(autoCloseRef.current);
+        }
+
+        if (isNotifHovered) {
+            return;
+        }
+
+        autoCloseRef.current = setTimeout(() => {
+            setNotificationOpen(false);
+            setAutoOpenActive(false);
+            setAutoPopupMessage(null);
+        }, 3000);
+    }, [notificationOpen, autoOpenActive, isNotifHovered]);
+
+    const markNotificationRead = useCallback(async (notification: NotificationRecord) => {
+        if (!user || notification.read) {
+            return;
+        }
+
+        try {
+            const notificationRef = doc(db, "notifications", user.uid, "items", notification.id);
+            const metaRef = doc(db, "users", user.uid, "meta", "notifications");
+            await runTransaction(db, async (tx) => {
+                const notifSnap = await tx.get(notificationRef);
+                if (!notifSnap.exists()) {
+                    return;
+                }
+                const notifData = notifSnap.data() as NotificationRecord;
+                if (notifData.read) {
+                    return;
+                }
+                const metaSnap = await tx.get(metaRef);
+                const currentUnread = metaSnap.exists() ? Number(metaSnap.data()?.unreadCount ?? 0) : 0;
+                const nextUnread = Math.max(currentUnread - 1, 0);
+                tx.update(notificationRef, { read: true, updatedAt: Date.now() });
+                tx.set(metaRef, { unreadCount: nextUnread, lastUpdated: Date.now() }, { merge: true });
+            });
+        } catch (error) {
+            console.error("Failed to mark notification as read", error);
+        }
+    }, [user]);
+
+    const markLocalNotificationRead = useCallback((id: string) => {
+        setNotifications((prev) => prev.map((item) => (item.id === id ? { ...item, read: true } : item)));
+    }, []);
+
+    const handleNotificationAction = useCallback(
+        async (notification: NotificationRecord) => {
+            if (!notification.read) {
+                markLocalNotificationRead(notification.id);
+                void markNotificationRead(notification);
+            }
+
+            if (notification.action?.url) {
+                setNotificationOpen(false);
+                setAutoOpenActive(false);
+                setAutoPopupMessage(null);
+                setNotificationModalOpen(false);
+                router.push(notification.action.url);
+            }
+        },
+        [markLocalNotificationRead, markNotificationRead, router]
+    );
+
+    const handleViewAllNotifications = useCallback(() => {
+        setNotificationOpen(false);
+        setAutoOpenActive(false);
+        setAutoPopupMessage(null);
+        setNotificationModalOpen(true);
+    }, []);
+
+    const handleMarkAllAsRead = useCallback(async () => {
+        const unreadItems = notifications.filter((item) => !item.read);
+        for (const item of unreadItems) {
+            await markNotificationRead(item);
+        }
+    }, [markNotificationRead, notifications]);
 
     useEffect(() => {
         const handleProfileUpdated = (event: Event) => {
@@ -468,6 +723,93 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                                         <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
                                     )}
                                 </button>
+
+                                <DropdownMenu open={notificationOpen} onOpenChange={(open) => {
+                                    setNotificationOpen(open);
+                                    if (!open) {
+                                        setAutoOpenActive(false);
+                                        setAutoPopupMessage(null);
+                                    }
+                                }}>
+                                    <DropdownMenuTrigger asChild>
+                                        <div className="flex items-center">
+                                            <NotificationBell
+                                                unreadCount={notificationCount}
+                                                isShaking={isBellShaking}
+                                                isOpen={notificationOpen}
+                                                onClick={() => {
+                                                    setNotificationOpen((prev) => !prev);
+                                                    setAutoOpenActive(false);
+                                                    setAutoPopupMessage(null);
+                                                }}
+                                            />
+                                        </div>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                        align="end"
+                                        sideOffset={8}
+                                        className="mt-2 w-max min-w-[280px] max-w-[360px] rounded-2xl bg-white/95 p-3 shadow-sm ring-1 ring-slate-100/80"
+                                    >
+                                        <div
+                                            onMouseEnter={() => setIsNotifHovered(true)}
+                                            onMouseLeave={() => setIsNotifHovered(false)}
+                                            className="max-h-[360px] overflow-y-auto pr-1"
+                                        >
+                                            {autoPopupMessage && (
+                                                <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+                                                    {autoPopupMessage}
+                                                </div>
+                                            )}
+                                            <NotificationDropdown
+                                                notifications={notifications}
+                                                loading={notificationLoading}
+                                                onAction={handleNotificationAction}
+                                                onMarkRead={(notification: NotificationRecord) => {
+                                                    if (!notification.read) {
+                                                        markLocalNotificationRead(notification.id);
+                                                        void markNotificationRead(notification);
+                                                    }
+                                                }}
+                                                onViewAll={handleViewAllNotifications}
+                                            />
+                                        </div>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+
+                                <Dialog open={notificationModalOpen} onOpenChange={setNotificationModalOpen}>
+                                    <DialogContent className="max-w-[640px] gap-0 rounded-2xl border border-slate-200 bg-white p-0 shadow-xl" showCloseButton={false}>
+                                        <DialogHeader className="flex-row items-center justify-between border-b border-slate-100 px-6 py-4">
+                                            <DialogTitle className="text-base font-semibold text-slate-900">Notifications</DialogTitle>
+                                            <DialogClose className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+                                                ✕
+                                            </DialogClose>
+                                        </DialogHeader>
+                                        <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
+                                            <NotificationDropdown
+                                                notifications={notifications}
+                                                loading={notificationLoading}
+                                                onAction={handleNotificationAction}
+                                                onMarkRead={(notification: NotificationRecord) => {
+                                                    if (!notification.read) {
+                                                        markLocalNotificationRead(notification.id);
+                                                        void markNotificationRead(notification);
+                                                    }
+                                                }}
+                                                showHeader={false}
+                                                showFooter={false}
+                                            />
+                                        </div>
+                                        <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
+                                            <button
+                                                type="button"
+                                                onClick={handleMarkAllAsRead}
+                                                className="text-xs font-semibold text-slate-600 transition hover:text-slate-900"
+                                            >
+                                                Mark all as read
+                                            </button>
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
 
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>

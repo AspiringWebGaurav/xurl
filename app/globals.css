@@ -47,6 +47,27 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
+@keyframes notification-shake {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-8deg); }
+  40% { transform: rotate(6deg); }
+  60% { transform: rotate(-4deg); }
+  80% { transform: rotate(3deg); }
+}
+
+@keyframes highlight-pulse {
+  0%, 100% { background-color: rgba(148, 163, 184, 0.18); }
+  50% { background-color: rgba(148, 163, 184, 0.32); }
+}
+
+.animate-notification-shake {
+  animation: notification-shake 0.6s ease-in-out;
+}
+
+.animate-highlight-pulse {
+  animation: highlight-pulse 1.8s ease-in-out 2;
+}
+
 :root {
   --background: #FAFAFA;
   --foreground: #111827;

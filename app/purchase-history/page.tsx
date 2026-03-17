@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
 import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { useSearchParams } from "next/navigation";
 
 type Transaction = {
     id: string;
@@ -32,6 +33,8 @@ export default function PurchaseHistoryPage() {
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState("");
+    const searchParams = useSearchParams();
+    const highlightId = useMemo(() => searchParams.get("highlight"), [searchParams]);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -194,7 +197,10 @@ export default function PurchaseHistoryPage() {
                                 </tr>
                             ) : (
                                 transactions.map((t) => (
-                                    <tr key={t.id} className="hover:bg-slate-50/50 transition-colors">
+                                    <tr
+                                        key={t.id}
+                                        className={`hover:bg-slate-50/50 transition-colors ${highlightId === t.id ? "animate-highlight-pulse" : ""}`}
+                                    >
                                         <td className="px-6 py-4 text-slate-900 font-medium">
                                             {format(t.createdAt, "MMM d, yyyy h:mm a")}
                                         </td>

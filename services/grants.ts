@@ -3,6 +3,8 @@ import { adminDb } from "@/lib/firebase/admin";
 import { resolvePlanType, type PlanType } from "@/lib/plans";
 import { applyPlanUpgrade } from "@/services/plan-upgrade";
 import { createTransaction } from "@/services/transactions";
+import { createNotificationForUser } from "@/services/notifications";
+import { PLAN_CONFIGS } from "@/lib/plans";
 
 export type PendingGrantType = "plan" | "link_gift";
 
@@ -21,14 +23,23 @@ export type PendingGrantDocument = {
     userId?: string;
 };
 
-export type AppliedGrantSummary = {
-    id: string;
-    type: PendingGrantType;
-    planId?: PlanType;
-    quantity?: number;
-    expiresAt?: number | null;
-    reason?: string;
-};
+export type AppliedGrantSummary =
+    | {
+        id: string;
+        type: "plan";
+        planId: PlanType;
+        quantity?: never;
+        expiresAt?: number | null;
+        reason?: string;
+    }
+    | {
+        id: string;
+        type: "link_gift";
+        planId?: never;
+        quantity: number;
+        expiresAt?: number | null;
+        reason?: string;
+    };
 
 async function applyLinkGift(
     grantId: string,
@@ -45,11 +56,11 @@ async function applyLinkGift(
         customValue?: number;
         customUnit?: string;
     }
-) {
+): Promise<string | null> {
     const now = Date.now();
     const userRef = adminDb.collection("users").doc(userId);
 
-    const execute = async (tx: Transaction) => {
+    const execute = async (tx: Transaction): Promise<string | null> => {
         const userSnap = await tx.get(userRef);
         const userData = userSnap.exists ? (userSnap.data() as any) : null;
         const currentPlan = resolvePlanType(userData?.plan || "free");
@@ -60,7 +71,7 @@ async function applyLinkGift(
         const filtered = existingGifts.filter((g) => !g.expiresAt || g.expiresAt > now);
         const alreadyApplied = filtered.find((g) => g.id === grantId);
         if (alreadyApplied) {
-            return;
+            return null;
         }
 
         const updatedGifts = [...filtered, { id: grantId, amount: quantity, expiresAt: expiresAt ?? null }];
@@ -74,7 +85,7 @@ async function applyLinkGift(
             { merge: true }
         );
 
-        await createTransaction(
+        const transactionId = await createTransaction(
             {
                 userId,
                 planType: currentPlan,
@@ -94,13 +105,14 @@ async function applyLinkGift(
             },
             tx
         );
+        return transactionId;
     };
 
     if (transaction) {
-        await execute(transaction);
-    } else {
-        await adminDb.runTransaction(async (tx) => execute(tx));
+        return await execute(transaction);
     }
+
+    return await adminDb.runTransaction(async (tx) => execute(tx));
 }
 
 export async function applyPendingGrantsForEmail(email: string | null | undefined, userId: string) {
@@ -119,6 +131,8 @@ export async function applyPendingGrantsForEmail(email: string | null | undefine
 
     for (const doc of snap.docs) {
         const grantId = doc.id;
+        let appliedGrant: AppliedGrantSummary | null = null;
+        let transactionId: string | null = null;
         await adminDb.runTransaction(async (tx) => {
             const fresh = await tx.get(doc.ref);
             if (!fresh.exists) return;
@@ -128,13 +142,13 @@ export async function applyPendingGrantsForEmail(email: string | null | undefine
             const now = Date.now();
 
             if (data.type === "plan" && data.planId) {
-                await applyPlanUpgrade(data.planId, userId, undefined, undefined, tx, {
+                const result = await applyPlanUpgrade(data.planId, userId, undefined, undefined, tx, {
                     overrideExpiryMs: data.overrideExpiryMs ?? undefined,
                     source: "admin_grant",
                     amountPaise: 0,
                     reason: data.reason || "admin_grant",
                 });
-                applied.push({
+                appliedGrant = {
                     id: grantId,
                     type: "plan",
                     planId: data.planId,
@@ -145,7 +159,8 @@ export async function applyPendingGrantsForEmail(email: string | null | undefine
                                 ? now + data.overrideExpiryMs
                                 : null,
                     reason: data.reason,
-                });
+                };
+                transactionId = result.transactionId ?? null;
             }
 
             let shouldConsumeWithoutApply = false;
@@ -153,14 +168,77 @@ export async function applyPendingGrantsForEmail(email: string | null | undefine
                 if (typeof data.expiresAt === "number" && data.expiresAt <= now) {
                     shouldConsumeWithoutApply = true;
                 } else {
-                    await applyLinkGift(grantId, userId, data.quantity, data.expiresAt ?? null, data.reason, data.source, tx);
-                    applied.push({ id: grantId, type: "link_gift", quantity: data.quantity, expiresAt: data.expiresAt ?? null, reason: data.reason });
+                    transactionId = await applyLinkGift(
+                        grantId,
+                        userId,
+                        data.quantity,
+                        data.expiresAt ?? null,
+                        data.reason,
+                        data.source,
+                        tx
+                    );
+                    appliedGrant = {
+                        id: grantId,
+                        type: "link_gift",
+                        quantity: data.quantity,
+                        expiresAt: data.expiresAt ?? null,
+                        reason: data.reason,
+                    };
                 }
             }
 
             if (shouldConsumeWithoutApply || data.type === "plan" || data.type === "link_gift") {
                 tx.update(doc.ref, { status: "consumed", consumedAt: now, userId });
             }
+        });
+
+        const resolvedGrant = appliedGrant as AppliedGrantSummary | null;
+        if (!resolvedGrant) {
+            continue;
+        }
+
+        applied.push(resolvedGrant);
+        const actionUrl = transactionId
+            ? `/dashboard/purchase-history?highlight=${transactionId}`
+            : "/dashboard/purchase-history";
+
+        if (resolvedGrant.type === "plan") {
+            const planId = resolvedGrant.planId as PlanType;
+            const planLabel = PLAN_CONFIGS[planId]?.label ?? planId;
+            await createNotificationForUser({
+                userId,
+                type: "ADMIN_GRANT",
+                title: "Plan granted",
+                message: `You have been granted ${planLabel} access.`,
+                data: {
+                    grantId: resolvedGrant.id,
+                    transactionId,
+                    planId: resolvedGrant.planId,
+                },
+                action: {
+                    type: "REDIRECT",
+                    url: actionUrl,
+                    label: "View Gift",
+                },
+            });
+            continue;
+        }
+
+        await createNotificationForUser({
+            userId,
+            type: "ADMIN_GRANT",
+            title: "Links added",
+            message: `You received ${resolvedGrant.quantity} bonus links.`,
+            data: {
+                grantId: resolvedGrant.id,
+                transactionId,
+                quantity: resolvedGrant.quantity,
+            },
+            action: {
+                type: "REDIRECT",
+                url: actionUrl,
+                label: "View Gift",
+            },
         });
     }
 
@@ -191,14 +269,33 @@ export async function grantLinkGiftToUserOrPending(options: {
     const { email, userId, quantity, expiresAt, reason, adminEmail, durationOption, customValue, customUnit } = options;
     const normalizedEmail = email.toLowerCase();
     if (userId) {
-        await adminDb.runTransaction(async (tx) => {
-            await applyLinkGift(`gift_${Date.now()}`, userId, quantity, expiresAt, reason, "admin_grant", tx, {
+        const transactionId = await adminDb.runTransaction(async (tx) => {
+            return await applyLinkGift(`gift_${Date.now()}`, userId, quantity, expiresAt, reason, "admin_grant", tx, {
                 recipientEmail: normalizedEmail,
                 adminEmail: adminEmail || null,
                 durationOption,
                 customValue,
                 customUnit,
             });
+        });
+        const actionUrl = transactionId
+            ? `/dashboard/purchase-history?highlight=${transactionId}`
+            : "/dashboard/purchase-history";
+        await createNotificationForUser({
+            userId,
+            type: "ADMIN_GRANT",
+            title: "Links added",
+            message: `You received ${quantity} bonus links.`,
+            data: {
+                transactionId,
+                quantity,
+                expiresAt,
+            },
+            action: {
+                type: "REDIRECT",
+                url: actionUrl,
+                label: "View Gift",
+            },
         });
         return { applied: true, pendingId: null };
     }
@@ -228,7 +325,7 @@ export async function grantPlanToUserOrPending(options: {
     const { email, userId, planId, overrideExpiryMs, reason, adminEmail, durationOption, customValue, customUnit } = options;
     const normalizedEmail = email.toLowerCase();
     if (userId) {
-        await applyPlanUpgrade(planId, userId, undefined, undefined, undefined, {
+        const result = await applyPlanUpgrade(planId, userId, undefined, undefined, undefined, {
             overrideExpiryMs,
             source: "admin_grant",
             amountPaise: 0,
@@ -239,6 +336,26 @@ export async function grantPlanToUserOrPending(options: {
             durationOption,
             customValue,
             customUnit,
+        });
+        const actionUrl = result.transactionId
+            ? `/dashboard/purchase-history?highlight=${result.transactionId}`
+            : "/dashboard/purchase-history";
+        const planLabel = PLAN_CONFIGS[planId]?.label ?? planId;
+        await createNotificationForUser({
+            userId,
+            type: "ADMIN_GRANT",
+            title: "Plan granted",
+            message: `You have been granted ${planLabel} access.`,
+            data: {
+                transactionId: result.transactionId ?? null,
+                planId,
+                overrideExpiryMs,
+            },
+            action: {
+                type: "REDIRECT",
+                url: actionUrl,
+                label: "View Gift",
+            },
         });
         return { applied: true, pendingId: null };
     }

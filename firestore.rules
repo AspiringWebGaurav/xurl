@@ -23,6 +23,27 @@ service cloud.firestore {
       allow write: if false; // All writes via admin SDK
     }
 
+    // ─── Notifications (user scoped) ──────────────────────────────────
+    match /users/{userId}/meta/notifications {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(["unreadCount", "lastUpdated"])
+        && request.resource.data.unreadCount is number
+        && request.resource.data.unreadCount >= 0
+        && request.resource.data.unreadCount <= resource.data.unreadCount;
+      allow create, delete: if false;
+    }
+    match /notifications/{userId}/items/{notificationId} {
+      allow read, list: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.read == true
+        && resource.data.read == false
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(["read", "updatedAt"]);
+      allow create, delete: if false;
+    }
+
     // ─── Admin Activity Streams (read-only) ─────────────────────────────
     match /transactions/{docId} {
       allow read, list: if isAdmin();
