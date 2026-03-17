@@ -1,7 +1,12 @@
 import { adminDb } from "@/lib/firebase/admin";
 import crypto from "crypto";
+import { DEFAULT_ACCESS, type GuestEntity, type PublicGuestAccess, type SubjectAccess } from "@/types";
+import { writeActivityEvent } from "@/lib/admin/activity-events-writer";
+import { isSubjectBanned } from "@/lib/admin-access";
 
 const GUEST_USAGE_COLLECTION = "guest_usage";
+const GUEST_ENTITIES_COLLECTION = "guest_entities";
+const PUBLIC_GUEST_ACCESS_COLLECTION = "public_guest_access";
 
 export interface GuestUsageRecord {
     ipHash: string;
@@ -12,18 +17,10 @@ export interface GuestUsageRecord {
     createdAt: number;
 }
 
-/**
- * Creates a SHA-256 hash for privacy-preserving tracking
- */
 function hashData(data: string, salt: string = ""): string {
     return crypto.createHash("sha256").update(`${data}${salt}`).digest("hex");
 }
 
-/**
- * Checks if a guest (identified by IP or fingerprint) has an active link.
- * Returns an object with `allowed` = true if no active link exists.
- * Returns `allowed` = false and `expiresIn` (in seconds) if an active link exists.
- */
 export async function checkGuestLimit(
     ip: string,
     fingerprint: string | undefined
@@ -32,16 +29,13 @@ export async function checkGuestLimit(
     const fingerprintHash = fingerprint ? hashData(fingerprint) : null;
     const now = Date.now();
 
-    // Query 1: Check by IP
-    const ipQuery = adminDb
+    const ipSnap = await adminDb
         .collection(GUEST_USAGE_COLLECTION)
         .where("ipHash", "==", ipHash)
         .where("expiresAt", ">", now)
-        .limit(1);
+        .limit(1)
+        .get();
 
-    const ipSnap = await ipQuery.get();
-
-    // Check if IP query found an active link
     if (!ipSnap.empty) {
         const data = ipSnap.docs[0].data() as GuestUsageRecord;
         return {
@@ -49,19 +43,18 @@ export async function checkGuestLimit(
             expiresIn: Math.ceil((data.expiresAt - now) / 1000),
             slug: data.slug,
             originalUrl: data.originalUrl,
-            createdAt: data.createdAt
+            createdAt: data.createdAt,
         };
     }
 
-    // Query 2: Check by Fingerprint (if provided)
     if (fingerprintHash) {
-        const fpQuery = adminDb
+        const fpSnap = await adminDb
             .collection(GUEST_USAGE_COLLECTION)
             .where("fingerprintHash", "==", fingerprintHash)
             .where("expiresAt", ">", now)
-            .limit(1);
+            .limit(1)
+            .get();
 
-        const fpSnap = await fpQuery.get();
         if (!fpSnap.empty) {
             const data = fpSnap.docs[0].data() as GuestUsageRecord;
             return {
@@ -69,7 +62,7 @@ export async function checkGuestLimit(
                 expiresIn: Math.ceil((data.expiresAt - now) / 1000),
                 slug: data.slug,
                 originalUrl: data.originalUrl,
-                createdAt: data.createdAt
+                createdAt: data.createdAt,
             };
         }
     }
@@ -77,3 +70,247 @@ export async function checkGuestLimit(
     return { allowed: true };
 }
 
+function generatePublicAccessKey(): string {
+    return crypto.randomBytes(24).toString("hex");
+}
+
+export function resolveGuestId(ipHash: string, fingerprintHash: string | null): string {
+    return fingerprintHash || ipHash;
+}
+
+export async function resolveGuestEntity(
+    ip: string,
+    fingerprint: string | undefined,
+    userAgent?: string | null
+): Promise<{ entity: GuestEntity; banned: boolean }> {
+    const ipHash = hashData(ip);
+    const fingerprintHash = fingerprint ? hashData(fingerprint) : null;
+    const userAgentHash = userAgent ? hashData(userAgent) : null;
+    const guestId = resolveGuestId(ipHash, fingerprintHash);
+    const now = Date.now();
+
+    const ref = adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(guestId);
+    const snap = await ref.get();
+
+    if (snap.exists) {
+        const existing = snap.data() as GuestEntity;
+
+        const updates: Record<string, unknown> = {
+            lastSeenAt: now,
+            lastInteractionAt: now,
+        };
+
+        if (userAgentHash) updates.lastUserAgentHash = userAgentHash;
+
+        if (fingerprintHash && !existing.fingerprintHash) {
+            updates.fingerprintHash = fingerprintHash;
+            updates.canonicalIdentityStrength = "fingerprint";
+        }
+
+        if (ipHash && !existing.ipHash) updates.ipHash = ipHash;
+
+        if (fingerprintHash && existing.guestId !== fingerprintHash && existing.canonicalIdentityStrength === "ip") {
+            const aliasSet = new Set(existing.aliasGuestIds || []);
+            aliasSet.add(existing.guestId);
+            updates.aliasGuestIds = Array.from(aliasSet);
+        }
+
+        await ref.update(updates);
+
+        const merged = { ...existing, ...updates } as GuestEntity;
+
+        // Defensive: if entity still shows banned, cross-check the projection
+        // in case a ban/unban write didn't fully propagate
+        if (isSubjectBanned(merged.access) && merged.publicAccessKey) {
+            const repaired = await repairEntityFromProjection(guestId, merged.access, merged.publicAccessKey);
+            if (repaired) {
+                return { entity: { ...merged, access: repaired }, banned: false };
+            }
+        }
+
+        return { entity: merged, banned: isSubjectBanned(merged.access) };
+    }
+
+    const newEntity: GuestEntity = {
+        guestId,
+        fingerprintHash,
+        ipHash,
+        firstSeenAt: now,
+        lastSeenAt: now,
+        lastInteractionAt: now,
+        lastUserAgentHash: userAgentHash,
+        activeSlug: null,
+        activeLinkExpiresAt: null,
+        aliasGuestIds: [],
+        access: { ...DEFAULT_ACCESS, updatedAt: now },
+        publicAccessKey: generatePublicAccessKey(),
+        canonicalIdentityStrength: fingerprintHash ? "fingerprint" : "ip",
+    };
+
+    await ref.set(newEntity);
+    await writePublicGuestAccess(newEntity.publicAccessKey, newEntity.access);
+
+    return { entity: newEntity, banned: false };
+}
+
+/**
+ * Cross-checks a banned entity against its public projection.
+ * If the projection says "active" but the entity says "banned", a previous
+ * unban write reached public_guest_access but didn't fully commit to
+ * guest_entities. This repairs the entity and unblocks the guest.
+ * Returns the repaired access if a repair was made, null otherwise.
+ */
+async function repairEntityFromProjection(
+    guestId: string,
+    currentAccess: SubjectAccess,
+    publicAccessKey: string
+): Promise<SubjectAccess | null> {
+    try {
+        const projSnap = await adminDb
+            .collection(PUBLIC_GUEST_ACCESS_COLLECTION)
+            .doc(publicAccessKey)
+            .get();
+
+        if (!projSnap.exists || projSnap.data()?.status !== "active") {
+            return null; // projection also says banned — no repair
+        }
+
+        const repairedAccess: SubjectAccess = {
+            ...currentAccess,
+            status: "active",
+            mode: null,
+            expiresAt: null,
+            updatedAt: Date.now(),
+            updatedBy: "system_repair_sync",
+        };
+
+        await adminDb
+            .collection(GUEST_ENTITIES_COLLECTION)
+            .doc(guestId)
+            .update({ access: repairedAccess });
+
+        console.warn(`[guest] repaired stale banned entity for guestId=${guestId}`);
+        return repairedAccess;
+    } catch (err) {
+        console.error("[guest] repairEntityFromProjection failed:", err);
+        return null; // fail-safe: don't unblock if repair errors
+    }
+}
+
+export async function checkGuestBanned(
+    ip: string,
+    fingerprint: string | undefined
+): Promise<{ banned: boolean; access: SubjectAccess | null; publicAccessKey: string | null }> {
+    try {
+        const ipHash = hashData(ip);
+        const fingerprintHash = fingerprint ? hashData(fingerprint) : null;
+        const guestId = resolveGuestId(ipHash, fingerprintHash);
+
+        const snap = await adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(guestId).get();
+        if (!snap.exists) return { banned: true, access: null, publicAccessKey: null };
+
+        const data = snap.data() as GuestEntity;
+        const access = data.access ?? null;
+
+        // Auto-expire temporary bans inline
+        if (access?.status === "banned" && access.mode === "temporary" && access.expiresAt && access.expiresAt <= Date.now()) {
+            const next = await autoExpireGuestAccess(data.guestId, access, data.publicAccessKey);
+            return { banned: false, access: next, publicAccessKey: data.publicAccessKey };
+        }
+
+        // Defensive: if entity still shows banned, cross-check the projection
+        // to catch any entity/projection divergence from a prior unban
+        if (isSubjectBanned(access) && data.publicAccessKey) {
+            const repaired = await repairEntityFromProjection(data.guestId, access, data.publicAccessKey);
+            if (repaired) {
+                return { banned: false, access: repaired, publicAccessKey: data.publicAccessKey };
+            }
+        }
+
+        return {
+            banned: isSubjectBanned(access),
+            access,
+            publicAccessKey: data.publicAccessKey,
+        };
+    } catch (err) {
+        console.error("[guest] checkGuestBanned error:", err);
+        return { banned: true, access: null, publicAccessKey: null };
+    }
+}
+
+export async function checkGuestBannedByHash(
+    ipHash: string | null,
+    fingerprintHash: string | null
+): Promise<{ banned: boolean; access: SubjectAccess | null }> {
+    try {
+        const guestId = resolveGuestId(ipHash || "", fingerprintHash);
+        const snap = await adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(guestId).get();
+        if (!snap.exists) return { banned: true, access: null };
+
+        const data = snap.data() as GuestEntity;
+        const access = data.access ?? null;
+
+        if (access?.status === "banned" && access.mode === "temporary" && access.expiresAt && access.expiresAt <= Date.now()) {
+            const next = await autoExpireGuestAccess(data.guestId, access, data.publicAccessKey);
+            return { banned: false, access: next };
+        }
+
+        if (isSubjectBanned(access) && data.publicAccessKey) {
+            const repaired = await repairEntityFromProjection(data.guestId, access, data.publicAccessKey);
+            if (repaired) {
+                return { banned: false, access: repaired };
+            }
+        }
+
+        return { banned: isSubjectBanned(access), access };
+    } catch (err) {
+        console.error("[guest] checkGuestBannedByHash error:", err);
+        return { banned: true, access: null };
+    }
+}
+
+export async function writePublicGuestAccess(publicAccessKey: string, access: SubjectAccess): Promise<void> {
+    const projection: PublicGuestAccess = {
+        status: access.status,
+        reason: access.reason,
+        expiresAt: access.expiresAt,
+        version: access.version,
+        updatedAt: access.updatedAt,
+    };
+    await adminDb.collection(PUBLIC_GUEST_ACCESS_COLLECTION).doc(publicAccessKey).set(projection);
+}
+
+async function autoExpireGuestAccess(guestId: string, current: SubjectAccess, publicAccessKey?: string) {
+    const now = Date.now();
+    const nextVersion = (current.version ?? 0) + 1;
+    const nextAccess: SubjectAccess = {
+        status: "active",
+        mode: null,
+        reason: null,
+        expiresAt: null,
+        updatedAt: now,
+        updatedBy: "system_auto_expiry",
+        version: nextVersion,
+        banId: null,
+    };
+
+    await adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(guestId).update({ access: nextAccess });
+    if (publicAccessKey) {
+        await writePublicGuestAccess(publicAccessKey, nextAccess);
+    }
+    await writeActivityEvent({
+        type: "ACCESS_EXPIRE_AUTO",
+        actor: "system_auto_expiry",
+        sourceCollection: GUEST_ENTITIES_COLLECTION,
+        severity: "INFO",
+        metadata: {
+            subjectType: "guest",
+            subjectId: guestId,
+            action: "expire_auto_unban",
+            prevVersion: current.version ?? 0,
+            nextVersion,
+            prevStatus: current.status,
+        },
+    });
+    return nextAccess;
+}

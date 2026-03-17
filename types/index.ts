@@ -1,3 +1,30 @@
+// ─── Access Control Types ───────────────────────────────────────────────────
+
+export type AccessStatus = "active" | "banned";
+export type AccessMode = "temporary" | "permanent" | null;
+
+export interface SubjectAccess {
+    status: AccessStatus;
+    mode: AccessMode;
+    reason: string | null;
+    expiresAt: number | null;
+    updatedAt: number;
+    updatedBy: string | null;
+    version: number;
+    banId: string | null;
+}
+
+export const DEFAULT_ACCESS: SubjectAccess = {
+    status: "active",
+    mode: null,
+    reason: null,
+    expiresAt: null,
+    updatedAt: 0,
+    updatedBy: null,
+    version: 0,
+    banId: null,
+};
+
 // ─── Firestore Document Types ───────────────────────────────────────────────
 
 /**
@@ -36,6 +63,7 @@ export interface UserDocument {
     /** Free plan: timestamp of last link creation (for 24h cooldown) */
     free_last_used_at?: number | null;
     settings: UserSettings;
+    access?: SubjectAccess;
 }
 
 export interface UserSettings {
@@ -148,6 +176,40 @@ export interface AnalyticsDocument {
  */
 export interface CounterDocument {
     currentId: number;
+}
+
+/**
+ * Guest entity document — first-class guest record for access control.
+ * Collection: `guest_entities`
+ * Document ID: guestId (fingerprintHash preferred, ipHash fallback)
+ */
+export interface GuestEntity {
+    guestId: string;
+    fingerprintHash: string | null;
+    ipHash: string | null;
+    firstSeenAt: number;
+    lastSeenAt: number;
+    lastInteractionAt: number;
+    lastUserAgentHash: string | null;
+    activeSlug: string | null;
+    activeLinkExpiresAt: number | null;
+    aliasGuestIds: string[];
+    access: SubjectAccess;
+    publicAccessKey: string;
+    canonicalIdentityStrength: "fingerprint" | "ip";
+}
+
+/**
+ * Public guest access projection — minimal, no PII.
+ * Collection: `public_guest_access`
+ * Document ID: publicAccessKey
+ */
+export interface PublicGuestAccess {
+    status: AccessStatus;
+    reason: string | null;
+    expiresAt: number | null;
+    version: number;
+    updatedAt: number;
 }
 
 // ─── API Types ──────────────────────────────────────────────────────────────

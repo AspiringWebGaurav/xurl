@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkGuestLimit } from "@/services/guest";
+import { checkGuestLimit, resolveGuestEntity } from "@/services/guest";
 
 // ─── Rate limiter for guest-status checks (self-cleaning) ────────────────
 const guestStatusLimiter = new Map<string, { count: number; windowStart: number }>();
@@ -47,6 +47,27 @@ export async function GET(request: NextRequest) {
     }
 
     const fingerprint = request.headers.get("x-device-fingerprint") || undefined;
+    const userAgent = request.headers.get("user-agent") || undefined;
+
+    let publicAccessKey: string | null = null;
+    let guestBanned = false;
+
+    try {
+        const { entity, banned } = await resolveGuestEntity(ip, fingerprint, userAgent);
+        publicAccessKey = entity.publicAccessKey;
+        guestBanned = banned;
+    } catch {
+        // If entity resolution fails, fail-closed for ban but allow the rest to proceed
+        // so existing guest-status behavior is preserved
+    }
+
+    if (guestBanned) {
+        return NextResponse.json({
+            active: false,
+            banned: true,
+            publicAccessKey,
+        });
+    }
 
     const status = await checkGuestLimit(ip, fingerprint);
 
@@ -57,8 +78,9 @@ export async function GET(request: NextRequest) {
             originalUrl: status.originalUrl,
             createdAt: status.createdAt,
             expiresIn: status.expiresIn,
+            publicAccessKey,
         });
     }
 
-    return NextResponse.json({ active: false });
+    return NextResponse.json({ active: false, publicAccessKey });
 }

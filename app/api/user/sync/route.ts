@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase/admin";
+import { checkUserBanned } from "@/lib/admin-access";
 import { FieldValue } from "firebase-admin/firestore";
 import crypto from "crypto";
 
@@ -18,6 +19,11 @@ export async function POST(request: NextRequest) {
             uid = decoded.uid;
         } catch {
             return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+        }
+
+        const { banned } = await checkUserBanned(uid);
+        if (banned) {
+            return NextResponse.json({ error: "Access suspended" }, { status: 403 });
         }
 
         // 2. Extract Device Identifiers (IP / Fingerprint)

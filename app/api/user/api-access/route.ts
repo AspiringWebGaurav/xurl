@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
+import { checkUserBanned } from "@/lib/admin-access";
 import { PLAN_CONFIGS, resolvePlanType } from "@/lib/plans";
 import { logger } from "@/lib/utils/logger";
 import { ensureApiProvisioning, getApiLogsPage, getEffectiveApiPlan, getRecentApiLogs, regenerateApiKeyForUser } from "@/services/api-access";
@@ -25,6 +26,11 @@ export async function GET(request: NextRequest) {
         const userId = await verifyUser(request);
         if (!userId) {
             return NextResponse.json({ code: "UNAUTHORIZED", message: "Authentication required." }, { status: 401 });
+        }
+
+        const { banned } = await checkUserBanned(userId);
+        if (banned) {
+            return NextResponse.json({ code: "ACCESS_SUSPENDED", message: "Access suspended." }, { status: 403 });
         }
 
         const url = new URL(request.url);
@@ -88,6 +94,11 @@ export async function POST(request: NextRequest) {
         const userId = await verifyUser(request);
         if (!userId) {
             return NextResponse.json({ code: "UNAUTHORIZED", message: "Authentication required." }, { status: 401 });
+        }
+
+        const { banned } = await checkUserBanned(userId);
+        if (banned) {
+            return NextResponse.json({ code: "ACCESS_SUSPENDED", message: "Access suspended." }, { status: 403 });
         }
 
         const userSnap = await adminDb.collection("users").doc(userId).get();

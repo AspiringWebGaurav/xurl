@@ -12,7 +12,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase/admin";
 import { createLink, getUserLinks, deleteLink } from "@/services/links";
-import { checkGuestLimit } from "@/services/guest";
+import { checkGuestLimit, checkGuestBanned } from "@/services/guest";
+import { checkUserBanned } from "@/lib/admin-access";
 import { PLAN_CONFIGS, GUEST_CONFIG, resolvePlanType } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
 import { logger } from "@/lib/utils/logger";
@@ -57,6 +58,16 @@ export async function POST(request: NextRequest) {
         if (process.env.NODE_ENV !== "production") {
             const testHeader = request.headers.get("x-test-user-id");
             if (testHeader) verifiedUid = testHeader;
+        }
+
+        if (verifiedUid) {
+            const { banned } = await checkUserBanned(verifiedUid);
+            if (banned) {
+                return NextResponse.json(
+                    { code: "ACCESS_SUSPENDED", message: "Access suspended." },
+                    { status: 403 }
+                );
+            }
         }
 
         const isGuest = !verifiedUid;
@@ -122,6 +133,14 @@ export async function POST(request: NextRequest) {
 
         // ── Server-side link-limit enforcement ──
         if (isGuest) {
+            const { banned: guestBanned } = await checkGuestBanned(ip, fingerprint);
+            if (guestBanned) {
+                return NextResponse.json(
+                    { code: "ACCESS_SUSPENDED", message: "Access suspended." },
+                    { status: 403 }
+                );
+            }
+
             // Block custom alias for guests
             if (customSlug) {
                 return NextResponse.json(
@@ -212,6 +231,14 @@ export async function GET(request: NextRequest) {
             return NextResponse.json(
                 { code: "UNAUTHORIZED", message: "Authentication required." },
                 { status: 401 }
+            );
+        }
+
+        const { banned } = await checkUserBanned(verifiedUid);
+        if (banned) {
+            return NextResponse.json(
+                { code: "ACCESS_SUSPENDED", message: "Access suspended." },
+                { status: 403 }
             );
         }
 
@@ -318,6 +345,15 @@ export async function DELETE(request: NextRequest) {
                 { status: 401 }
             );
         }
+
+        const { banned } = await checkUserBanned(verifiedUid);
+        if (banned) {
+            return NextResponse.json(
+                { code: "ACCESS_SUSPENDED", message: "Access suspended." },
+                { status: 403 }
+            );
+        }
+
         const body = await request.json();
         const { slug } = body;
 
