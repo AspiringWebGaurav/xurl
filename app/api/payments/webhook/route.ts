@@ -92,8 +92,9 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error("WEBHOOK FATAL:", error);
-        logger.error("webhook_error", error instanceof Error ? error.message : "Webhook processing failed");
+        logger.error("webhook_error", error instanceof Error ? error.message : "Webhook processing failed", {
+            error: error instanceof Error ? error.stack : String(error),
+        });
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }

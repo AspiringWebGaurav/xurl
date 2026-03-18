@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { Sparkles, Percent, Gift, ClipboardList, ListChecks, Loader2, ShieldCheck, ShieldBan } from "lucide-react";
+import { Sparkles, Percent, Gift, ClipboardList, ListChecks, Loader2, ShieldCheck, ShieldBan, Mail } from "lucide-react";
 import { auth } from "@/lib/firebase/config";
 import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
     { href: "/admin/promo-codes", label: "Promo Codes", icon: Percent },
     { href: "/admin/grant-plan", label: "Grant Plan", icon: Gift },
     { href: "/admin/purchase-history", label: "Purchase History", icon: ClipboardList },
+    { href: "/admin/contact", label: "Contact", icon: Mail },
     { href: "/admin/logs", label: "Admin Logs", icon: ListChecks },
     { href: "/admin/access-control", label: "Access Control", icon: ShieldBan },
 ] as const;

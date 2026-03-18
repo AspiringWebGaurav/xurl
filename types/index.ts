@@ -64,6 +64,8 @@ export interface UserDocument {
     free_last_used_at?: number | null;
     settings: UserSettings;
     access?: SubjectAccess;
+    /** Points to guest_entities document ID for bidirectional linking */
+    guestId?: string;
 }
 
 export interface UserSettings {
@@ -266,4 +268,25 @@ export interface CacheEntry {
     cachedAt: number;
     ttl: number;           // milliseconds
     hitCount: number;       // for adaptive TTL
+}
+
+// ─── Contact Types ──────────────────────────────────────────────────────────
+
+/**
+ * Contact submission document.
+ * Collection: `contact_submissions`
+ * Document ID: Auto-generated
+ */
+export interface ContactSubmissionDocument {
+    id: string;
+    name: string;
+    email: string;
+    subject: string | null;
+    message: string;
+    status: "new" | "read";
+    isResolved: boolean;
+    createdAt: number;
+    updatedAt: number;
+    userAgent?: string | null;
+    ipHash?: string | null;
 }

@@ -146,6 +146,8 @@ CLEANUP_SECRET=your_cleanup_secret
 
 See the [Deployment Guide](Documentation/Deployment.md) for the full environment variable reference.
 
+**Note**: The `scripts/` folder contains local developer tools and test utilities. It is intentionally excluded from the repository and not required for production deployment.
+
 ### Local Development
 
 ```bash

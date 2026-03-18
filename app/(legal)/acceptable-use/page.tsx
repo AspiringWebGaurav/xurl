@@ -47,7 +47,7 @@ export default function AcceptableUsePage() {
                     <p>Creating shortened links for bulk unsolicited messaging, inflating engagement metrics, or generating links designed to redirect through multiple URL shorteners to obscure the final destination is strictly prohibited.</p>
 
                     <h3>Enforcement</h3>
-                    <p>We employ automated abuse scoring, rate limiting, and negative caching systems, along with manual reviews, to enforce this policy. Depending on the severity of the violation, we may issue warnings, disable offending URLs, suspend accounts, or permanently terminate accounts without prior notice or refund of any subscription fees.</p>
+                    <p>We employ automated abuse scoring, rate limiting, and negative caching systems, along with manual reviews, to enforce this policy. Depending on the severity of the violation, we may issue warnings, disable offending URLs, suspend accounts, or permanently terminate accounts without prior notice or refund of any subscription fees. For details on enforcement actions, ban types, and the appeal process, see our <a href="/ban-policy" target="_blank" rel="noopener noreferrer">Ban Policy</a>.</p>
 
                     <h3>Reporting Abuse</h3>
                     <p>If you encounter a shortened link that violates this policy, please report it through the contact information provided on our website. Include the shortened URL and a description of the violation.</p>

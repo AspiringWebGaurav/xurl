@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
+import { logger } from "@/lib/utils/logger";
 
 // ─── Rate limiter for slug checks (self-cleaning) ──────────────────────────
 
@@ -66,7 +67,10 @@ export async function GET(request: NextRequest) {
         const snap = await adminDb.collection("links").doc(slug).get();
         return NextResponse.json({ available: !snap.exists });
     } catch (e) {
-        console.error("Check slug error:", e);
+        logger.error("check_slug_error", "Failed to check slug availability", {
+            slug,
+            error: e instanceof Error ? e.message : String(e),
+        });
         return NextResponse.json({ error: "Server error" }, { status: 500 });
     }
 }

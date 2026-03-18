@@ -3,6 +3,7 @@ import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { checkUserBanned } from "@/lib/admin-access";
 import { logger } from "@/lib/utils/logger";
 import { DEFAULT_ACCESS } from "@/types";
+import { ensureUserGuestEntity } from "@/services/guest";
 
 export async function GET(request: NextRequest) {
     try {
@@ -38,6 +39,17 @@ export async function GET(request: NextRequest) {
                 },
                 { merge: true }
             );
+
+            // Ensure guest_entity exists and is linked
+            try {
+                await ensureUserGuestEntity(decoded.uid);
+            } catch (err) {
+                logger.error("profile_guest_entity_creation", "Failed to ensure guest entity", {
+                    userId: decoded.uid,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+                // Don't fail profile creation - this is best-effort
+            }
 
             return NextResponse.json({
                 displayName: fallbackDisplayName,

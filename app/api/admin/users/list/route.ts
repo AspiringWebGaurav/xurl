@@ -24,8 +24,28 @@ export async function GET(request: NextRequest) {
     }
 
     const snap = await query.get();
+    
+    // Fetch access state from guest_entities (single source of truth)
+    const userIds = snap.docs.map(doc => doc.id);
+    const guestEntitiesSnap = await adminDb
+        .collection("guest_entities")
+        .where("userId", "in", userIds.length > 0 ? userIds : ["__none__"])
+        .get();
+    
+    const userIdToGuestMap = new Map<string, { access: any; guestId: string }>();
+    guestEntitiesSnap.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.userId) {
+            userIdToGuestMap.set(data.userId, {
+                access: data.access || null,
+                guestId: data.guestId || doc.id
+            });
+        }
+    });
+    
     const items = snap.docs.map((doc) => {
         const data = doc.data();
+        const guestData = userIdToGuestMap.get(doc.id);
         return {
             id: doc.id,
             email: data.email || "",
@@ -35,6 +55,8 @@ export async function GET(request: NextRequest) {
             activeLinks: data.activeLinks ?? null,
             linksCreated: data.linksCreated ?? null,
             cumulativeQuota: data.cumulativeQuota ?? null,
+            access: guestData?.access || null,
+            guestId: guestData?.guestId || null,
         };
     });
 
@@ -42,6 +64,16 @@ export async function GET(request: NextRequest) {
         const hasAdmin = items.some((item) => item.email?.toLowerCase() === admin.email?.toLowerCase());
         if (!hasAdmin) {
             const adminSnap = await adminDb.collection("users").doc(admin.uid).get();
+            
+            // Fetch admin's guest entity for access state
+            const adminGuestSnap = await adminDb
+                .collection("guest_entities")
+                .where("userId", "==", admin.uid)
+                .limit(1)
+                .get();
+            
+            const adminGuestData = !adminGuestSnap.empty ? adminGuestSnap.docs[0].data() : null;
+            
             if (adminSnap.exists) {
                 const data = adminSnap.data() || {};
                 items.unshift({
@@ -53,6 +85,8 @@ export async function GET(request: NextRequest) {
                     activeLinks: data.activeLinks ?? null,
                     linksCreated: data.linksCreated ?? null,
                     cumulativeQuota: data.cumulativeQuota ?? null,
+                    access: adminGuestData?.access || null,
+                    guestId: adminGuestData?.guestId || adminGuestSnap.docs[0]?.id || null,
                 });
             } else {
                 items.unshift({
@@ -64,6 +98,8 @@ export async function GET(request: NextRequest) {
                     activeLinks: null,
                     linksCreated: null,
                     cumulativeQuota: null,
+                    access: adminGuestData?.access || null,
+                    guestId: adminGuestData?.guestId || adminGuestSnap.docs[0]?.id || null,
                 });
             }
 

@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
             code = "PLAN_LIMIT";
         }
 
-        console.error(`[CREATE LINK ERROR] ${status} - ${message}`);
+        logger.error("create_link_error", message, { status, code, errorName });
         return NextResponse.json({ code, message }, { status });
     }
 }

@@ -8,6 +8,7 @@ import {
     normalizeActivityEvent,
     type ActivityEvent,
 } from "@/lib/admin/activity-events";
+import { logger } from "@/lib/utils/logger";
 
 const DEFAULT_LIMIT = 25;
 const WHOLE_APP_DEFAULT_LIMIT = 60;
@@ -110,7 +111,9 @@ export async function GET(request: NextRequest) {
                     return NextResponse.json({ items: combined });
                 }
             } catch (error) {
-                console.warn("activity_events aggregation failed", error);
+                logger.warn("activity_events_aggregation_failed", "Activity events aggregation failed", {
+                    error: error instanceof Error ? error.message : String(error),
+                });
             }
 
             const snapshots = await Promise.all(

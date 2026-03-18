@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordClick } from "@/services/analytics";
+import { logger } from "@/lib/utils/logger";
 
 export const runtime = "nodejs";
 
@@ -57,7 +58,9 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error("Analytics click error:", error);
+        logger.error("analytics_click_error", "Failed to record analytics click", {
+            error: error instanceof Error ? error.message : String(error),
+        });
         return new NextResponse("Internal Server Error", { status: 500 });
     }
 }

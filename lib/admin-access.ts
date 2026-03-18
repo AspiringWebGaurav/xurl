@@ -161,6 +161,22 @@ export async function checkUserBanned(uid: string): Promise<{ banned: boolean; a
             return { banned: false, access };
         }
 
+        // CRITICAL: Also check linked guest entity's ban status
+        // This prevents ban bypass when a banned guest signs up
+        const guestId = data?.guestId;
+        if (guestId) {
+            const guestSnap = await adminDb.collection("guest_entities").doc(guestId).get();
+            if (guestSnap.exists) {
+                const guestData = guestSnap.data();
+                const guestAccess = guestData?.access;
+                
+                // If guest entity is banned, user is banned (single source of truth)
+                if (isSubjectBanned(guestAccess)) {
+                    return { banned: true, access: guestAccess };
+                }
+            }
+        }
+
         return { banned: isSubjectBanned(access), access };
     } catch {
         return { banned: true, access: null };

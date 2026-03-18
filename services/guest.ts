@@ -384,3 +384,161 @@ async function autoExpireGuestAccess(guestId: string, current: SubjectAccess, pu
     });
     return nextAccess;
 }
+
+/**
+ * Ensures a user has exactly one guest_entity linked to their account.
+ * Creates a new guest_entity if none exists, or returns the existing one.
+ * Implements bidirectional linking: user.guestId ↔ guest_entity.userId
+ * 
+ * @param userId - Firebase Auth UID
+ * @param ipHash - Optional IP hash for metadata only
+ * @param fingerprintHash - Optional fingerprint hash for metadata only
+ * @returns Object containing guestId and entity
+ */
+export async function ensureUserGuestEntity(
+    userId: string,
+    ipHash?: string,
+    fingerprintHash?: string
+): Promise<{ guestId: string; entity: GuestEntity }> {
+    const now = Date.now();
+
+    // Step 1: Query for existing guest_entity by userId (primary resolution)
+    const existingSnap = await adminDb
+        .collection(GUEST_ENTITIES_COLLECTION)
+        .where("userId", "==", userId)
+        .limit(1)
+        .get();
+
+    if (!existingSnap.empty) {
+        const doc = existingSnap.docs[0];
+        const entity = doc.data() as GuestEntity;
+        const guestId = doc.id;
+
+        // Verify bidirectional link exists
+        const userRef = adminDb.collection("users").doc(userId);
+        const userSnap = await userRef.get();
+        
+        if (userSnap.exists && !userSnap.data()?.guestId) {
+            // Repair missing user.guestId
+            await userRef.update({ guestId, updatedAt: now });
+            console.log(`[ensureUserGuestEntity] Repaired missing user.guestId for ${userId}`);
+        }
+
+        return { guestId, entity };
+    }
+
+    // Step 2: Check if IP/fingerprint already has an entity (even if banned)
+    // This prevents ban bypass when a banned guest signs up
+    if (ipHash || fingerprintHash) {
+        const guestId = resolveGuestId(ipHash ?? "", fingerprintHash ?? null);
+        const existingByHashSnap = await adminDb
+            .collection(GUEST_ENTITIES_COLLECTION)
+            .doc(guestId)
+            .get();
+        
+        if (existingByHashSnap.exists) {
+            const existingEntity = existingByHashSnap.data() as GuestEntity;
+            
+            // Link this user to the existing entity (preserves ban status)
+            try {
+                await adminDb.runTransaction(async (tx) => {
+                    const freshSnap = await tx.get(existingByHashSnap.ref);
+                    if (!freshSnap.exists) {
+                        throw new Error("Entity disappeared during transaction");
+                    }
+                    
+                    // Update entity with userId
+                    tx.update(existingByHashSnap.ref, {
+                        userId,
+                        updatedAt: now
+                    });
+                    
+                    // Update user with guestId
+                    const userRefTx = adminDb.collection("users").doc(userId);
+                    tx.set(userRefTx, { guestId: existingEntity.guestId, updatedAt: now }, { merge: true });
+                });
+                
+                console.log(`[ensureUserGuestEntity] Linked user ${userId} to existing entity ${existingEntity.guestId} (preserving access state)`);
+                
+                return { 
+                    guestId: existingEntity.guestId, 
+                    entity: { ...existingEntity, userId } 
+                };
+            } catch (err) {
+                console.error(`[ensureUserGuestEntity] Failed to link user ${userId} to existing entity:`, err);
+                // Fall through to create new entity if linking fails
+            }
+        }
+    }
+
+    // Step 3: No existing guest_entity found - create new one
+    // Use transaction to prevent duplicates from concurrent requests
+    const result = await adminDb.runTransaction(async (tx) => {
+        // Double-check within transaction by userId
+        const userRefCheck = adminDb.collection("users").doc(userId);
+        const txUserSnap = await tx.get(userRefCheck);
+        
+        // If user already has a guestId, try to use that entity
+        if (txUserSnap.exists && txUserSnap.data()?.guestId) {
+            const existingGuestId = txUserSnap.data()!.guestId;
+            const existingGuestRef = adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(existingGuestId);
+            const existingGuestSnap = await tx.get(existingGuestRef);
+            
+            if (existingGuestSnap.exists) {
+                return { guestId: existingGuestId, entity: existingGuestSnap.data() as GuestEntity };
+            }
+        }
+
+        // Generate unique guestId (not based on IP/fingerprint)
+        const guestId = crypto.randomUUID();
+        const publicAccessKey = crypto
+            .createHash("sha256")
+            .update(`guest_access_v1_${guestId}`)
+            .digest("hex")
+            .substring(0, 48);
+
+        // Create new guest_entity
+        const newEntity: GuestEntity = {
+            guestId,
+            fingerprintHash: fingerprintHash || null,
+            ipHash: ipHash || null,
+            userId,
+            firstSeenAt: now,
+            lastSeenAt: now,
+            lastInteractionAt: now,
+            lastUserAgentHash: null,
+            activeSlug: null,
+            activeLinkExpiresAt: null,
+            aliasGuestIds: [],
+            access: { ...DEFAULT_ACCESS, updatedAt: now },
+            publicAccessKey,
+            canonicalIdentityStrength: "fingerprint",
+        };
+
+        const guestRef = adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(guestId);
+        tx.set(guestRef, newEntity);
+
+        // Create public projection
+        const projection: PublicGuestAccess = {
+            status: newEntity.access.status,
+            reason: newEntity.access.reason,
+            expiresAt: newEntity.access.expiresAt,
+            version: newEntity.access.version,
+            updatedAt: newEntity.access.updatedAt,
+        };
+        tx.set(
+            adminDb.collection(PUBLIC_GUEST_ACCESS_COLLECTION).doc(publicAccessKey),
+            projection
+        );
+
+        // Update user.guestId (bidirectional link)
+        const userRefCreate = adminDb.collection("users").doc(userId);
+        tx.set(userRefCreate, { guestId, updatedAt: now }, { merge: true });
+
+        console.log(`[ensureUserGuestEntity] Created new guest_entity ${guestId} for user ${userId}`);
+
+        return { guestId, entity: newEntity };
+    });
+
+    return result;
+}

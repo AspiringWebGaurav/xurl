@@ -1,6 +1,6 @@
 import { adminDb } from "@/lib/firebase/admin";
 import { writeActivityEvent } from "@/lib/admin/activity-events-writer";
-import { writePublicGuestAccess } from "@/services/guest";
+import { writePublicGuestAccess, ensureUserGuestEntity } from "@/services/guest";
 import { cacheInvalidate, negCacheInvalidate } from "@/lib/redis/redirect-cache";
 import type { SubjectAccess, AccessMode, PublicGuestAccess } from "@/types";
 import { DEFAULT_ACCESS } from "@/types";
@@ -75,53 +75,117 @@ function toPublicProjection(access: SubjectAccess): PublicGuestAccess {
 
 export async function banSubject(input: BanInput): Promise<AccessMutationResult> {
     const { subjectType, subjectId, reason, mode, expiresAt, ownerEmail } = input;
-    const collection = collectionForSubject(subjectType);
-    const ref = adminDb.collection(collection).doc(subjectId);
     const now = Date.now();
     const banId = crypto.randomUUID();
 
     try {
-        const result = await adminDb.runTransaction(async (tx) => {
-            const snap = await tx.get(ref);
-            if (!snap.exists) {
-                return { ok: false, message: `${subjectType} not found` } as AccessMutationResult;
+        // If banning a user, find their guest entity first (single source of truth)
+        let targetGuestId = subjectId;
+        if (subjectType === "user") {
+            // Try to find existing guest_entity by userId
+            const guestSnap = await adminDb
+                .collection("guest_entities")
+                .where("userId", "==", subjectId)
+                .limit(1)
+                .get();
+            
+            if (!guestSnap.empty) {
+                targetGuestId = guestSnap.docs[0].id;
+            } else {
+                // FALLBACK: Create guest_entity if missing
+                console.warn(`[ban] User ${subjectId} has no guest_entity, creating one`);
+                const { guestId } = await ensureUserGuestEntity(subjectId);
+                targetGuestId = guestId;
+                
+                // REPAIR: Ensure user.guestId is set correctly
+                const userRef = adminDb.collection("users").doc(subjectId);
+                const userSnap = await userRef.get();
+                if (userSnap.exists && userSnap.data()?.guestId !== guestId) {
+                    await userRef.update({ 
+                        guestId, 
+                        updatedAt: Date.now() 
+                    });
+                    console.log(`[ban] Repaired user.guestId for ${subjectId}`);
+                }
             }
+        }
+        
+        // Always ban the guest entity (single source of truth)
+        const ref = adminDb.collection("guest_entities").doc(targetGuestId);
+        
+        // Retry loop for optimistic locking
+        let attempts = 0;
+        const maxAttempts = 3;
+        let result: any;
 
-            const data = snap.data()!;
-            const prevAccess: SubjectAccess = data.access ?? { ...DEFAULT_ACCESS };
-            const nextVersion = (prevAccess.version ?? 0) + 1;
+        while (attempts < maxAttempts) {
+            try {
+                result = await adminDb.runTransaction(async (tx) => {
+                    const snap = await tx.get(ref);
+                    if (!snap.exists) {
+                        return { ok: false, message: `Guest entity not found` } as AccessMutationResult;
+                    }
 
-            const nextAccess: SubjectAccess = {
-                status: "banned",
-                mode: mode ?? "permanent",
-                reason: reason ?? null,
-                expiresAt: mode === "temporary" ? (expiresAt ?? null) : null,
-                updatedAt: now,
-                updatedBy: ownerEmail,
-                version: nextVersion,
-                banId,
-            };
+                    const data = snap.data()!;
+                    const prevAccess: SubjectAccess = data.access ?? { ...DEFAULT_ACCESS };
+                    const expectedVersion = prevAccess.version ?? 0;
+                    const nextVersion = expectedVersion + 1;
 
-            tx.update(ref, { access: nextAccess });
+                    const nextAccess: SubjectAccess = {
+                        status: "banned",
+                        mode: mode ?? "permanent",
+                        reason: reason ?? null,
+                        expiresAt: mode === "temporary" ? (expiresAt ?? null) : null,
+                        updatedAt: now,
+                        updatedBy: ownerEmail,
+                        version: nextVersion,
+                        banId,
+                    };
 
-            // Atomically sync the public projection for guests
-            if (subjectType === "guest" && data.publicAccessKey) {
-                const projRef = adminDb
-                    .collection("public_guest_access")
-                    .doc(data.publicAccessKey);
-                tx.set(projRef, toPublicProjection(nextAccess));
+                    // Verify version hasn't changed (optimistic locking)
+                    const currentVersion = data.access?.version ?? 0;
+                    if (currentVersion !== expectedVersion) {
+                        throw new Error("VERSION_CONFLICT");
+                    }
+
+                    tx.update(ref, { access: nextAccess });
+
+                    // Atomically sync the public projection
+                    if (data.publicAccessKey) {
+                        const projRef = adminDb
+                            .collection("public_guest_access")
+                            .doc(data.publicAccessKey);
+                        tx.set(projRef, toPublicProjection(nextAccess));
+                    }
+
+                    return {
+                        ok: true,
+                        message: "Banned",
+                        access: nextAccess,
+                        prevAccess,
+                        publicAccessKey: (data.publicAccessKey as string) ?? null,
+                        ipHash: (data.ipHash as string) ?? null,
+                        fingerprintHash: (data.fingerprintHash as string) ?? null,
+                        actualGuestId: targetGuestId,
+                    };
+                });
+                
+                // Transaction succeeded, break retry loop
+                break;
+            } catch (err) {
+                if (err instanceof Error && err.message === "VERSION_CONFLICT") {
+                    attempts++;
+                    if (attempts >= maxAttempts) {
+                        return { ok: false, message: "Version conflict - too many retries" };
+                    }
+                    // Wait briefly before retry with exponential backoff
+                    await new Promise(resolve => setTimeout(resolve, 50 * attempts));
+                    continue;
+                }
+                // Other error, don't retry
+                throw err;
             }
-
-            return {
-                ok: true,
-                message: "Banned",
-                access: nextAccess,
-                prevAccess,
-                publicAccessKey: (data.publicAccessKey as string) ?? null,
-                ipHash: (data.ipHash as string) ?? null,
-                fingerprintHash: (data.fingerprintHash as string) ?? null,
-            };
-        });
+        }
 
         if (!result.ok) return result as AccessMutationResult;
 
@@ -147,11 +211,12 @@ export async function banSubject(input: BanInput): Promise<AccessMutationResult>
         await writeActivityEvent({
             type: "ACCESS_BAN",
             actor: ownerEmail,
-            sourceCollection: collection,
+            sourceCollection: "guest_entities",
             severity: "SECURITY",
             metadata: {
                 subjectType,
                 subjectId,
+                actualGuestId: (result as any).actualGuestId,
                 action: "ban",
                 mode: nextAccess.mode,
                 reason: nextAccess.reason,
@@ -186,52 +251,114 @@ export async function banSubject(input: BanInput): Promise<AccessMutationResult>
 
 export async function unbanSubject(input: UnbanInput): Promise<AccessMutationResult> {
     const { subjectType, subjectId, ownerEmail } = input;
-    const collection = collectionForSubject(subjectType);
-    const ref = adminDb.collection(collection).doc(subjectId);
     const now = Date.now();
 
     try {
-        const result = await adminDb.runTransaction(async (tx) => {
-            const snap = await tx.get(ref);
-            if (!snap.exists) {
-                return { ok: false, message: `${subjectType} not found` } as AccessMutationResult;
+        // If unbanning a user, find their guest entity first (single source of truth)
+        let targetGuestId = subjectId;
+        if (subjectType === "user") {
+            // Try to find existing guest_entity by userId
+            const guestSnap = await adminDb
+                .collection("guest_entities")
+                .where("userId", "==", subjectId)
+                .limit(1)
+                .get();
+            
+            if (!guestSnap.empty) {
+                targetGuestId = guestSnap.docs[0].id;
+            } else {
+                // FALLBACK: Create guest_entity if missing
+                console.warn(`[unban] User ${subjectId} has no guest_entity, creating one`);
+                const { guestId } = await ensureUserGuestEntity(subjectId);
+                targetGuestId = guestId;
+                
+                // REPAIR: Ensure user.guestId is set correctly
+                const userRef = adminDb.collection("users").doc(subjectId);
+                const userSnap = await userRef.get();
+                if (userSnap.exists && userSnap.data()?.guestId !== guestId) {
+                    await userRef.update({ 
+                        guestId, 
+                        updatedAt: Date.now() 
+                    });
+                    console.log(`[unban] Repaired user.guestId for ${subjectId}`);
+                }
             }
+        }
+        
+        // Always unban the guest entity (single source of truth)
+        const ref = adminDb.collection("guest_entities").doc(targetGuestId);
+        
+        // Retry loop for optimistic locking
+        let attempts = 0;
+        const maxAttempts = 3;
+        let result: any;
 
-            const data = snap.data()!;
-            const prevAccess: SubjectAccess = data.access ?? { ...DEFAULT_ACCESS };
-            const nextVersion = (prevAccess.version ?? 0) + 1;
+        while (attempts < maxAttempts) {
+            try {
+                result = await adminDb.runTransaction(async (tx) => {
+                    const snap = await tx.get(ref);
+                    if (!snap.exists) {
+                        return { ok: false, message: `Guest entity not found` } as AccessMutationResult;
+                    }
 
-            const nextAccess: SubjectAccess = {
-                status: "active",
-                mode: null,
-                reason: null,
-                expiresAt: null,
-                updatedAt: now,
-                updatedBy: ownerEmail,
-                version: nextVersion,
-                banId: null,
-            };
+                    const data = snap.data()!;
+                    const prevAccess: SubjectAccess = data.access ?? { ...DEFAULT_ACCESS };
+                    const expectedVersion = prevAccess.version ?? 0;
+                    const nextVersion = expectedVersion + 1;
 
-            tx.update(ref, { access: nextAccess });
+                    const nextAccess: SubjectAccess = {
+                        status: "active",
+                        mode: null,
+                        reason: null,
+                        expiresAt: null,
+                        updatedAt: now,
+                        updatedBy: ownerEmail,
+                        version: nextVersion,
+                        banId: null,
+                    };
 
-            // Atomically sync the public projection for guests inside the same transaction.
-            // This eliminates the window where guest_entities is active but
-            // public_guest_access still shows banned (or vice-versa).
-            if (subjectType === "guest" && data.publicAccessKey) {
-                const projRef = adminDb
-                    .collection("public_guest_access")
-                    .doc(data.publicAccessKey);
-                tx.set(projRef, toPublicProjection(nextAccess));
+                    // Verify version hasn't changed (optimistic locking)
+                    const currentVersion = data.access?.version ?? 0;
+                    if (currentVersion !== expectedVersion) {
+                        throw new Error("VERSION_CONFLICT");
+                    }
+
+                    tx.update(ref, { access: nextAccess });
+
+                    // Atomically sync the public projection
+                    if (data.publicAccessKey) {
+                        const projRef = adminDb
+                            .collection("public_guest_access")
+                            .doc(data.publicAccessKey);
+                        tx.set(projRef, toPublicProjection(nextAccess));
+                    }
+
+                    return {
+                        ok: true,
+                        message: "Unbanned",
+                        access: nextAccess,
+                        prevAccess,
+                        publicAccessKey: (data.publicAccessKey as string) ?? null,
+                        actualGuestId: targetGuestId,
+                    };
+                });
+                
+                // Transaction succeeded, break retry loop
+                break;
+            } catch (err) {
+                if (err instanceof Error && err.message === "VERSION_CONFLICT") {
+                    attempts++;
+                    if (attempts >= maxAttempts) {
+                        return { ok: false, message: "Version conflict - too many retries" };
+                    }
+                    // Wait briefly before retry with exponential backoff
+                    await new Promise(resolve => setTimeout(resolve, 50 * attempts));
+                    continue;
+                }
+                // Other error, don't retry
+                throw err;
             }
-
-            return {
-                ok: true,
-                message: "Unbanned",
-                access: nextAccess,
-                prevAccess,
-                publicAccessKey: (data.publicAccessKey as string) ?? null,
-            };
-        });
+        }
 
         if (!result.ok) return result as AccessMutationResult;
 
@@ -255,11 +382,12 @@ export async function unbanSubject(input: UnbanInput): Promise<AccessMutationRes
         await writeActivityEvent({
             type: "ACCESS_UNBAN",
             actor: ownerEmail,
-            sourceCollection: collection,
+            sourceCollection: "guest_entities",
             severity: "SECURITY",
             metadata: {
                 subjectType,
                 subjectId,
+                actualGuestId: (result as any).actualGuestId,
                 action: "unban",
                 prevStatus: prevAccess.status,
                 prevVersion: prevAccess.version,

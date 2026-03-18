@@ -318,9 +318,9 @@ export function BannedScreen({ variant, reason, expiresAt }: BannedScreenProps) 
                     <div className="bs-actions bs-fi">
                         {isBanned ? (
                             <>
-                                <a href="mailto:support@xurl.eu.cc" className="bs-btn-p">
+                                <Link href="/contact?from=ban" target="_blank" rel="noopener noreferrer" className="bs-btn-p">
                                     <Mail size={12} strokeWidth={2} /> Contact support
-                                </a>
+                                </Link>
                                 <Link href="/" className="bs-btn-s">
                                     <ArrowLeft size={12} strokeWidth={2} /> Go home
                                 </Link>
@@ -341,9 +341,11 @@ export function BannedScreen({ variant, reason, expiresAt }: BannedScreenProps) 
 
                     <p className="bs-help bs-fi">
                         Read our{" "}
-                        <Link href="/acceptable-use">acceptable use policy</Link>
+                        <Link href="/acceptable-use" target="_blank" rel="noopener noreferrer">acceptable use policy</Link>
                         {" · "}
-                        <Link href="/terms">terms of service</Link>
+                        <Link href="/ban-policy" target="_blank" rel="noopener noreferrer">ban policy</Link>
+                        {" · "}
+                        <Link href="/terms" target="_blank" rel="noopener noreferrer">terms of service</Link>
                     </p>
 
                 </main>
@@ -358,9 +360,10 @@ export function BannedScreen({ variant, reason, expiresAt }: BannedScreenProps) 
                         <span className="bs-footer-name">URL</span>
                     </Link>
                     <div className="bs-footer-links">
-                        <Link href="/terms" className="bs-footer-link">Terms</Link>
-                        <Link href="/privacy" className="bs-footer-link">Privacy</Link>
-                        <Link href="/acceptable-use" className="bs-footer-link">Acceptable Use</Link>
+                        <Link href="/terms" target="_blank" rel="noopener noreferrer" className="bs-footer-link">Terms</Link>
+                        <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="bs-footer-link">Privacy</Link>
+                        <Link href="/acceptable-use" target="_blank" rel="noopener noreferrer" className="bs-footer-link">Acceptable Use</Link>
+                        <Link href="/ban-policy" target="_blank" rel="noopener noreferrer" className="bs-footer-link">Ban Policy</Link>
                     </div>
                 </footer>
             </div>

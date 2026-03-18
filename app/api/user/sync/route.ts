@@ -4,7 +4,7 @@ import { checkUserBanned } from "@/lib/admin-access";
 import { FieldValue } from "firebase-admin/firestore";
 import crypto from "crypto";
 import { getClientIp } from "@/lib/utils/ip-resolver";
-import { resolveGuestId } from "@/services/guest";
+import { resolveGuestId, ensureUserGuestEntity } from "@/services/guest";
 
 export async function POST(request: NextRequest) {
     try {
@@ -103,31 +103,8 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Link guest entity to user account (if exists)
-        const guestId = resolveGuestId(ipHash, fingerprintHash || null);
-        const guestEntityRef = adminDb.collection("guest_entities").doc(guestId);
-
-        try {
-            const guestEntitySnap = await guestEntityRef.get();
-            
-            if (guestEntitySnap.exists) {
-                const guestData = guestEntitySnap.data();
-                
-                // Only link if not already linked (idempotency)
-                if (!guestData?.userId) {
-                    await guestEntityRef.update({
-                        userId: uid,
-                        lastInteractionAt: Date.now()
-                    });
-                    
-                    console.log(`[user-sync] Linked guest entity ${guestId} to user ${uid}`);
-                }
-            }
-            // If entity doesn't exist, skip silently (created lazily on first link)
-        } catch (err) {
-            // Log but don't fail the sync operation
-            console.error(`[user-sync] Failed to link guest entity ${guestId}:`, err);
-        }
+        // ALWAYS ensure guest_entity exists and is linked
+        await ensureUserGuestEntity(uid, ipHash, fingerprintHash);
 
         return NextResponse.json({ success: true, migratedCount });
     } catch (e) {

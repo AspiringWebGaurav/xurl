@@ -979,9 +979,9 @@ export default function HomePage() {
                                                 asChild
                                                 className="w-full max-w-[240px] h-11 bg-emerald-600 text-white hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all rounded-lg font-medium tracking-wide"
                                             >
-                                                <a href="mailto:support@xurl.eu.cc" className="flex items-center justify-center">
+                                                <Link href="/contact" className="flex items-center justify-center">
                                                     Contact Support <ExternalLink className="w-4 h-4 ml-2" />
-                                                </a>
+                                                </Link>
                                             </Button>
                                         ) : (
                                             <Button

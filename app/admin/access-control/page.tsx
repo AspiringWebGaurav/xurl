@@ -15,7 +15,8 @@ interface UserRow {
     plan: string;
     createdAt: number | null;
     activeLinks: number | null;
-    access: { status: string; mode?: string; reason?: string; expiresAt?: number | null; version?: number } | null;
+    access: { status: string; mode?: string | null; reason?: string | null; expiresAt?: number | null; version?: number } | null;
+    guestId?: string | null;
 }
 
 interface GuestRow {
@@ -26,7 +27,7 @@ interface GuestRow {
     firstSeenAt: number | null;
     lastSeenAt: number | null;
     canonicalIdentityStrength: string;
-    access: { status: string; mode?: string; reason?: string; expiresAt?: number | null; version?: number } | null;
+    access: { status: string; mode?: string | null; reason?: string | null; expiresAt?: number | null; version?: number } | null;
 }
 
 type BanTarget = {
@@ -81,7 +82,9 @@ export default function AccessControlPage() {
         const unsub = onAuthStateChanged(auth, async (u) => {
             setUser(u);
             setLoading(false);
-            if (u) await ensureUserDocument(u);
+            if (u) {
+                await ensureUserDocument(u);
+            }
         });
         return () => unsub();
     }, []);
@@ -214,8 +217,25 @@ export default function AccessControlPage() {
             setBanOpen(false);
             setStatusMsg(`Banned ${banTarget.label}`);
             setTimeout(() => setStatusMsg(""), 3000);
-            loadUsers();
-            fetchGuests();
+            
+            if (banTarget.subjectType === "user") {
+                setUsers(prev => prev.map(u => 
+                    u.id === banTarget.subjectId 
+                        ? { ...u, access: { status: "banned", mode: data.access?.mode, reason: data.access?.reason, expiresAt: data.access?.expiresAt, version: data.access?.version } }
+                        : u
+                ));
+            } else {
+                setGuests(prev => prev.map(g => 
+                    g.guestId === banTarget.subjectId 
+                        ? { ...g, access: { status: "banned", mode: data.access?.mode, reason: data.access?.reason, expiresAt: data.access?.expiresAt, version: data.access?.version } }
+                        : g
+                ));
+            }
+            
+            setTimeout(() => {
+                loadUsers();
+                fetchGuests();
+            }, 100);
         } catch (err) {
             setBanError(err instanceof Error ? err.message : "Ban failed");
         } finally {
@@ -241,8 +261,25 @@ export default function AccessControlPage() {
             }
             setStatusMsg(`Unbanned ${subjectId}`);
             setTimeout(() => setStatusMsg(""), 3000);
-            loadUsers();
-            fetchGuests();
+            
+            if (subjectType === "user") {
+                setUsers(prev => prev.map(u => 
+                    u.id === subjectId 
+                        ? { ...u, access: { status: "active", mode: null, reason: null, expiresAt: null, version: (u.access?.version ?? 0) + 1 } }
+                        : u
+                ));
+            } else {
+                setGuests(prev => prev.map(g => 
+                    g.guestId === subjectId 
+                        ? { ...g, access: { status: "active", mode: null, reason: null, expiresAt: null, version: (g.access?.version ?? 0) + 1 } }
+                        : g
+                ));
+            }
+            
+            setTimeout(() => {
+                loadUsers();
+                fetchGuests();
+            }, 100);
         } catch {
             // ignore
         } finally {
@@ -337,6 +374,7 @@ export default function AccessControlPage() {
                                         </div>
                                         <span className="text-xs text-slate-400">
                                             Plan: {u.plan || "free"} · Links: {u.activeLinks ?? "—"}
+                                            {u.guestId && ` · Guest: ${u.guestId.slice(0, 8)}…`}
                                             {isBanned && u.access?.reason && ` · Reason: ${u.access.reason}`}
                                         </span>
                                     </div>
@@ -429,6 +467,9 @@ export default function AccessControlPage() {
                                         <span className="text-xs text-slate-400">
                                             Last seen: {g.lastSeenAt ? new Date(g.lastSeenAt).toLocaleString() : "—"}
                                             {isBanned && g.access?.reason && ` · Reason: ${g.access.reason}`}
+                                        </span>
+                                        <span className="text-[10px] text-slate-300 font-mono">
+                                            Guest ID: {g.guestId} · Doc ID: {g.id}
                                         </span>
                                     </div>
                                     <div>
