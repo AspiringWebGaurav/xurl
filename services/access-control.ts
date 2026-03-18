@@ -4,6 +4,7 @@ import { writePublicGuestAccess, ensureUserGuestEntity } from "@/services/guest"
 import { cacheInvalidate, negCacheInvalidate } from "@/lib/redis/redirect-cache";
 import type { SubjectAccess, AccessMode, PublicGuestAccess } from "@/types";
 import { DEFAULT_ACCESS } from "@/types";
+import { assertNoRandomDocId, assertValidAccessStatus, logAccessOperation } from "@/lib/firestore-strict-update";
 import crypto from "crypto";
 
 export type BanSubjectType = "user" | "guest";
@@ -78,11 +79,17 @@ export async function banSubject(input: BanInput): Promise<AccessMutationResult>
     const now = Date.now();
     const banId = crypto.randomUUID();
 
+    console.log(`[BAN_START] subjectType=${subjectType} subjectId=${subjectId} mode=${mode}`);
+
     try {
-        // If banning a user, find their guest entity first (single source of truth)
+        // Validate inputs
+        assertNoRandomDocId(subjectId, "banSubject");
+        assertValidAccessStatus("banned", "banSubject");
+
+        // Resolve target document ID
         let targetGuestId = subjectId;
         if (subjectType === "user") {
-            // Try to find existing guest_entity by userId
+            // For users, find their linked guest_entity
             const guestSnap = await adminDb
                 .collection("guest_entities")
                 .where("userId", "==", subjectId)
@@ -91,13 +98,14 @@ export async function banSubject(input: BanInput): Promise<AccessMutationResult>
             
             if (!guestSnap.empty) {
                 targetGuestId = guestSnap.docs[0].id;
+                console.log(`[BAN] User ${subjectId} linked to guest_entity ${targetGuestId}`);
             } else {
-                // FALLBACK: Create guest_entity if missing
-                console.warn(`[ban] User ${subjectId} has no guest_entity, creating one`);
+                // User has no guest_entity - create one (legitimate case for new users)
+                console.warn(`[BAN] User ${subjectId} has no guest_entity, creating one`);
                 const { guestId } = await ensureUserGuestEntity(subjectId);
                 targetGuestId = guestId;
                 
-                // REPAIR: Ensure user.guestId is set correctly
+                // Ensure bidirectional link
                 const userRef = adminDb.collection("users").doc(subjectId);
                 const userSnap = await userRef.get();
                 if (userSnap.exists && userSnap.data()?.guestId !== guestId) {
@@ -105,13 +113,25 @@ export async function banSubject(input: BanInput): Promise<AccessMutationResult>
                         guestId, 
                         updatedAt: Date.now() 
                     });
-                    console.log(`[ban] Repaired user.guestId for ${subjectId}`);
+                    console.log(`[BAN] Linked user ${subjectId} to guest_entity ${guestId}`);
                 }
             }
+        } else {
+            // For guests, subjectId IS the document ID (not the guestId field)
+            // Validate document exists
+            const guestRef = adminDb.collection("guest_entities").doc(subjectId);
+            const guestSnap = await guestRef.get();
+            if (!guestSnap.exists) {
+                const error = `Guest entity ${subjectId} does not exist`;
+                console.error(`[BAN_ERROR] ${error}`);
+                return { ok: false, message: error };
+            }
+            console.log(`[BAN] Guest entity ${subjectId} found, proceeding with ban`);
         }
         
         // Always ban the guest entity (single source of truth)
         const ref = adminDb.collection("guest_entities").doc(targetGuestId);
+        console.log(`[BAN] Target document: guest_entities/${targetGuestId}`);
         
         // Retry loop for optimistic locking
         let attempts = 0;
@@ -123,7 +143,9 @@ export async function banSubject(input: BanInput): Promise<AccessMutationResult>
                 result = await adminDb.runTransaction(async (tx) => {
                     const snap = await tx.get(ref);
                     if (!snap.exists) {
-                        return { ok: false, message: `Guest entity not found` } as AccessMutationResult;
+                        const error = `Guest entity ${targetGuestId} not found in transaction`;
+                        console.error(`[BAN_TX_ERROR] ${error}`);
+                        return { ok: false, message: error } as AccessMutationResult;
                     }
 
                     const data = snap.data()!;
@@ -145,8 +167,12 @@ export async function banSubject(input: BanInput): Promise<AccessMutationResult>
                     // Verify version hasn't changed (optimistic locking)
                     const currentVersion = data.access?.version ?? 0;
                     if (currentVersion !== expectedVersion) {
+                        console.warn(`[BAN_VERSION_CONFLICT] Expected v${expectedVersion}, got v${currentVersion}`);
                         throw new Error("VERSION_CONFLICT");
                     }
+
+                    // Log the operation
+                    logAccessOperation("ban", subjectType, subjectId, targetGuestId, expectedVersion, nextVersion);
 
                     tx.update(ref, { access: nextAccess });
 
@@ -242,9 +268,11 @@ export async function banSubject(input: BanInput): Promise<AccessMutationResult>
 
         await invalidateSubjectLinkCaches(subjectType, subjectId);
 
+        console.log(`[BAN_SUCCESS] ${subjectType} ${subjectId} banned successfully (doc: ${targetGuestId})`);
         return { ok: true, message: "Banned", access: nextAccess };
     } catch (err) {
         const msg = err instanceof Error ? err.message : "Ban failed";
+        console.error(`[BAN_ERROR] ${subjectType} ${subjectId}:`, err);
         return { ok: false, message: msg };
     }
 }
@@ -253,11 +281,17 @@ export async function unbanSubject(input: UnbanInput): Promise<AccessMutationRes
     const { subjectType, subjectId, ownerEmail } = input;
     const now = Date.now();
 
+    console.log(`[UNBAN_START] subjectType=${subjectType} subjectId=${subjectId}`);
+
     try {
-        // If unbanning a user, find their guest entity first (single source of truth)
+        // Validate inputs
+        assertNoRandomDocId(subjectId, "unbanSubject");
+        assertValidAccessStatus("active", "unbanSubject");
+
+        // Resolve target document ID
         let targetGuestId = subjectId;
         if (subjectType === "user") {
-            // Try to find existing guest_entity by userId
+            // For users, find their linked guest_entity
             const guestSnap = await adminDb
                 .collection("guest_entities")
                 .where("userId", "==", subjectId)
@@ -266,13 +300,14 @@ export async function unbanSubject(input: UnbanInput): Promise<AccessMutationRes
             
             if (!guestSnap.empty) {
                 targetGuestId = guestSnap.docs[0].id;
+                console.log(`[UNBAN] User ${subjectId} linked to guest_entity ${targetGuestId}`);
             } else {
-                // FALLBACK: Create guest_entity if missing
-                console.warn(`[unban] User ${subjectId} has no guest_entity, creating one`);
+                // User has no guest_entity - create one (legitimate case for new users)
+                console.warn(`[UNBAN] User ${subjectId} has no guest_entity, creating one`);
                 const { guestId } = await ensureUserGuestEntity(subjectId);
                 targetGuestId = guestId;
                 
-                // REPAIR: Ensure user.guestId is set correctly
+                // Ensure bidirectional link
                 const userRef = adminDb.collection("users").doc(subjectId);
                 const userSnap = await userRef.get();
                 if (userSnap.exists && userSnap.data()?.guestId !== guestId) {
@@ -280,13 +315,25 @@ export async function unbanSubject(input: UnbanInput): Promise<AccessMutationRes
                         guestId, 
                         updatedAt: Date.now() 
                     });
-                    console.log(`[unban] Repaired user.guestId for ${subjectId}`);
+                    console.log(`[UNBAN] Linked user ${subjectId} to guest_entity ${guestId}`);
                 }
             }
+        } else {
+            // For guests, subjectId IS the document ID (not the guestId field)
+            // Validate document exists
+            const guestRef = adminDb.collection("guest_entities").doc(subjectId);
+            const guestSnap = await guestRef.get();
+            if (!guestSnap.exists) {
+                const error = `Guest entity ${subjectId} does not exist`;
+                console.error(`[UNBAN_ERROR] ${error}`);
+                return { ok: false, message: error };
+            }
+            console.log(`[UNBAN] Guest entity ${subjectId} found, proceeding with unban`);
         }
         
         // Always unban the guest entity (single source of truth)
         const ref = adminDb.collection("guest_entities").doc(targetGuestId);
+        console.log(`[UNBAN] Target document: guest_entities/${targetGuestId}`);
         
         // Retry loop for optimistic locking
         let attempts = 0;
@@ -298,7 +345,9 @@ export async function unbanSubject(input: UnbanInput): Promise<AccessMutationRes
                 result = await adminDb.runTransaction(async (tx) => {
                     const snap = await tx.get(ref);
                     if (!snap.exists) {
-                        return { ok: false, message: `Guest entity not found` } as AccessMutationResult;
+                        const error = `Guest entity ${targetGuestId} not found in transaction`;
+                        console.error(`[UNBAN_TX_ERROR] ${error}`);
+                        return { ok: false, message: error } as AccessMutationResult;
                     }
 
                     const data = snap.data()!;
@@ -320,8 +369,12 @@ export async function unbanSubject(input: UnbanInput): Promise<AccessMutationRes
                     // Verify version hasn't changed (optimistic locking)
                     const currentVersion = data.access?.version ?? 0;
                     if (currentVersion !== expectedVersion) {
+                        console.warn(`[UNBAN_VERSION_CONFLICT] Expected v${expectedVersion}, got v${currentVersion}`);
                         throw new Error("VERSION_CONFLICT");
                     }
+
+                    // Log the operation
+                    logAccessOperation("unban", subjectType, subjectId, targetGuestId, expectedVersion, nextVersion);
 
                     tx.update(ref, { access: nextAccess });
 
@@ -398,9 +451,11 @@ export async function unbanSubject(input: UnbanInput): Promise<AccessMutationRes
 
         await invalidateSubjectLinkCaches(subjectType, subjectId);
 
+        console.log(`[UNBAN_SUCCESS] ${subjectType} ${subjectId} unbanned successfully (doc: ${targetGuestId})`);
         return { ok: true, message: "Unbanned", access: nextAccess };
     } catch (err) {
         const msg = err instanceof Error ? err.message : "Unban failed";
+        console.error(`[UNBAN_ERROR] ${subjectType} ${subjectId}:`, err);
         return { ok: false, message: msg };
     }
 }

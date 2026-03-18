@@ -226,7 +226,7 @@ export default function AccessControlPage() {
                 ));
             } else {
                 setGuests(prev => prev.map(g => 
-                    g.guestId === banTarget.subjectId 
+                    g.id === banTarget.subjectId 
                         ? { ...g, access: { status: "banned", mode: data.access?.mode, reason: data.access?.reason, expiresAt: data.access?.expiresAt, version: data.access?.version } }
                         : g
                 ));
@@ -270,7 +270,7 @@ export default function AccessControlPage() {
                 ));
             } else {
                 setGuests(prev => prev.map(g => 
-                    g.guestId === subjectId 
+                    g.id === subjectId 
                         ? { ...g, access: { status: "active", mode: null, reason: null, expiresAt: null, version: (g.access?.version ?? 0) + 1 } }
                         : g
                 ));
@@ -478,18 +478,18 @@ export default function AccessControlPage() {
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    onClick={() => handleUnban("guest", g.guestId)}
-                                                    disabled={unbanLoading === g.guestId}
+                                                    onClick={() => handleUnban("guest", g.id)}
+                                                    disabled={unbanLoading === g.id}
                                                     className="h-8 text-xs"
                                                 >
-                                                    {unbanLoading === g.guestId ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldOff className="mr-1 h-3 w-3" />}
+                                                    {unbanLoading === g.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldOff className="mr-1 h-3 w-3" />}
                                                     Unban
                                                 </Button>
                                             ) : (
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    onClick={() => openBanModal({ subjectType: "guest", subjectId: g.guestId, label: idLabel })}
+                                                    onClick={() => openBanModal({ subjectType: "guest", subjectId: g.id, label: idLabel })}
                                                     className="h-8 text-xs border-red-200 text-red-600 hover:bg-red-50"
                                                 >
                                                     <ShieldBan className="mr-1 h-3 w-3" />
