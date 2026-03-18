@@ -80,7 +80,10 @@ function generatePublicAccessKey(guestId: string): string {
 }
 
 export function resolveGuestId(ipHash: string, fingerprintHash: string | null): string {
-    return fingerprintHash || ipHash;
+    // CRITICAL FIX: Always use ipHash as document ID to prevent duplicates
+    // when fingerprint becomes available after initial creation.
+    // Fingerprint is stored as metadata for identity strength tracking.
+    return ipHash;
 }
 
 export async function resolveGuestEntity(
