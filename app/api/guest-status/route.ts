@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkGuestLimit, resolveGuestEntity } from "@/services/guest";
+import { getClientIp } from "@/lib/utils/ip-resolver";
 
 // ─── Rate limiter for guest-status checks (self-cleaning) ────────────────
 const guestStatusLimiter = new Map<string, { count: number; windowStart: number }>();
@@ -37,10 +38,7 @@ function isGuestStatusRateLimited(ip: string): boolean {
  * Uses IP + fingerprint to identify the guest — no localStorage trust.
  */
 export async function GET(request: NextRequest) {
-    const ip =
-        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-        request.headers.get("x-real-ip") ||
-        "unknown";
+    const ip = getClientIp(request);
 
     if (isGuestStatusRateLimited(ip)) {
         return NextResponse.json({ error: "Too many requests" }, { status: 429 });

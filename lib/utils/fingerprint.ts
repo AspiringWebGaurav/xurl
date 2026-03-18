@@ -1,3 +1,5 @@
+const FINGERPRINT_CACHE_KEY = "xurl_device_fp";
+
 /**
  * Generates a lightweight device fingerprint based on stable browser characteristics.
  * This is meant to prevent basic incognito/localStorage clearing bypasses.
@@ -5,6 +7,14 @@
  */
 export async function getDeviceFingerprint(): Promise<string> {
     if (typeof window === "undefined") return "server-side";
+
+    // Check sessionStorage cache first
+    try {
+        const cached = sessionStorage.getItem(FINGERPRINT_CACHE_KEY);
+        if (cached) return cached;
+    } catch {
+        // sessionStorage may be blocked in some browsers
+    }
 
     try {
         const parts = [
@@ -23,6 +33,13 @@ export async function getDeviceFingerprint(): Promise<string> {
         const hashBuffer = await crypto.subtle.digest("SHA-256", dataBuf);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashHex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+
+        // Cache for session
+        try {
+            sessionStorage.setItem(FINGERPRINT_CACHE_KEY, hashHex);
+        } catch {
+            // Ignore storage errors
+        }
 
         return hashHex;
     } catch {

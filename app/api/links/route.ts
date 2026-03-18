@@ -25,6 +25,7 @@ import crypto from "crypto";
 
 import { evaluateRequest } from "@/lib/redis/protection";
 import { getRedisClient, safeRedis } from "@/lib/redis/client";
+import { getClientIp } from "@/lib/utils/ip-resolver";
 
 // ─── Auth Helper ────────────────────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ async function verifyAuth(request: NextRequest): Promise<string | null> {
 export async function POST(request: NextRequest) {
     try {
         // Security Gateway (Redis)
-        const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+        const ip = getClientIp(request);
 
         // Determine authenticated user
         let verifiedUid = await verifyAuth(request);

@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { DEFAULT_ACCESS, type GuestEntity, type PublicGuestAccess, type SubjectAccess } from "@/types";
 import { writeActivityEvent } from "@/lib/admin/activity-events-writer";
 import { isSubjectBanned } from "@/lib/admin-access";
+import { acquireGuestCreationLock, releaseGuestCreationLock } from "@/lib/redis/guest-lock";
 
 const GUEST_USAGE_COLLECTION = "guest_usage";
 const GUEST_ENTITIES_COLLECTION = "guest_entities";
@@ -70,8 +71,12 @@ export async function checkGuestLimit(
     return { allowed: true };
 }
 
-function generatePublicAccessKey(): string {
-    return crypto.randomBytes(24).toString("hex");
+function generatePublicAccessKey(guestId: string): string {
+    return crypto
+        .createHash("sha256")
+        .update(`guest_access_v1_${guestId}`)
+        .digest("hex")
+        .substring(0, 48);
 }
 
 export function resolveGuestId(ipHash: string, fingerprintHash: string | null): string {
@@ -91,81 +96,126 @@ export async function resolveGuestEntity(
 
     const ref = adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(guestId);
 
-    // Fetch existing entity by computed guestId first
-    const snap = await ref.get();
+    // Acquire distributed lock for creation
+    const lockAcquired = await acquireGuestCreationLock(guestId, 10);
 
-    if (!snap.exists && fingerprintHash) {
-        // If fingerprint exists but guestId was IP-based, try fingerprint guestId as well
-        const fpRef = adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(fingerprintHash);
-        const fpSnap = await fpRef.get();
-        if (fpSnap.exists) {
-            const existing = fpSnap.data() as GuestEntity;
+    try {
+        // Fetch existing entity by computed guestId first
+        const snap = await ref.get();
+
+        if (!snap.exists && fingerprintHash) {
+            // If fingerprint exists but guestId was IP-based, try fingerprint guestId as well
+            const fpRef = adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(fingerprintHash);
+            const fpSnap = await fpRef.get();
+            if (fpSnap.exists) {
+                const existing = fpSnap.data() as GuestEntity;
+                const updates: Record<string, unknown> = {
+                    lastSeenAt: now,
+                    lastInteractionAt: now,
+                };
+                if (userAgentHash) updates.lastUserAgentHash = userAgentHash;
+                if (!existing.fingerprintHash) updates.fingerprintHash = fingerprintHash;
+                if (!existing.ipHash) updates.ipHash = ipHash;
+                await fpRef.update(updates);
+                const merged = { ...existing, ...updates } as GuestEntity;
+                return { entity: merged, banned: isSubjectBanned(merged.access) };
+            }
+        }
+
+        if (snap.exists) {
+            const existing = snap.data() as GuestEntity;
+
             const updates: Record<string, unknown> = {
                 lastSeenAt: now,
                 lastInteractionAt: now,
             };
-            if (userAgentHash) updates.lastUserAgentHash = userAgentHash;
-            if (!existing.fingerprintHash) updates.fingerprintHash = fingerprintHash;
-            if (!existing.ipHash) updates.ipHash = ipHash;
-            await fpRef.update(updates);
+
+            if (userAgentHash) {
+                updates.lastUserAgentHash = userAgentHash;
+            }
+
+            if (fingerprintHash && !existing.fingerprintHash) {
+                updates.fingerprintHash = fingerprintHash;
+                updates.canonicalIdentityStrength = "fingerprint";
+            }
+
+            if (ipHash && !existing.ipHash) {
+                updates.ipHash = ipHash;
+            }
+
+            if (fingerprintHash && existing.guestId !== fingerprintHash && existing.canonicalIdentityStrength === "ip") {
+                const aliasSet = new Set(existing.aliasGuestIds || []);
+                aliasSet.add(existing.guestId);
+                updates.aliasGuestIds = Array.from(aliasSet);
+            }
+
+            await ref.update(updates);
+
             const merged = { ...existing, ...updates } as GuestEntity;
             return { entity: merged, banned: isSubjectBanned(merged.access) };
         }
-    }
 
-    if (snap.exists) {
-        const existing = snap.data() as GuestEntity;
+        // Entity does NOT exist - create atomically with transaction
+        if (!lockAcquired) {
+            // Another instance is creating this entity, wait and retry read
+            await new Promise(resolve => setTimeout(resolve, 100));
+            const retrySnap = await ref.get();
+            if (retrySnap.exists) {
+                const entity = retrySnap.data() as GuestEntity;
+                return { entity, banned: isSubjectBanned(entity.access) };
+            }
+            // Still doesn't exist - Redis failed, rely on Firestore transaction only
+        }
 
-        const updates: Record<string, unknown> = {
+        const publicAccessKey = generatePublicAccessKey(guestId);
+        const newEntity: GuestEntity = {
+            guestId,
+            fingerprintHash,
+            ipHash,
+            firstSeenAt: now,
             lastSeenAt: now,
             lastInteractionAt: now,
+            lastUserAgentHash: userAgentHash,
+            activeSlug: null,
+            activeLinkExpiresAt: null,
+            aliasGuestIds: [],
+            access: { ...DEFAULT_ACCESS, updatedAt: now },
+            publicAccessKey,
+            canonicalIdentityStrength: fingerprintHash ? "fingerprint" : "ip",
         };
 
-        if (userAgentHash) {
-            updates.lastUserAgentHash = userAgentHash;
+        // Use Firestore transaction for atomic multi-collection write
+        const finalEntity = await adminDb.runTransaction(async (tx) => {
+            const txSnap = await tx.get(ref);
+            if (txSnap.exists) {
+                // Entity was created by another request, return it
+                return txSnap.data() as GuestEntity;
+            }
+
+            tx.set(ref, newEntity);
+
+            const projection: PublicGuestAccess = {
+                status: newEntity.access.status,
+                reason: newEntity.access.reason,
+                expiresAt: newEntity.access.expiresAt,
+                version: newEntity.access.version,
+                updatedAt: newEntity.access.updatedAt,
+            };
+            tx.set(
+                adminDb.collection(PUBLIC_GUEST_ACCESS_COLLECTION).doc(publicAccessKey),
+                projection
+            );
+
+            return newEntity;
+        });
+
+        return { entity: finalEntity, banned: false };
+    } finally {
+        // Always release lock
+        if (lockAcquired) {
+            await releaseGuestCreationLock(guestId);
         }
-
-        if (fingerprintHash && !existing.fingerprintHash) {
-            updates.fingerprintHash = fingerprintHash;
-            updates.canonicalIdentityStrength = "fingerprint";
-        }
-
-        if (ipHash && !existing.ipHash) {
-            updates.ipHash = ipHash;
-        }
-
-        if (fingerprintHash && existing.guestId !== fingerprintHash && existing.canonicalIdentityStrength === "ip") {
-            const aliasSet = new Set(existing.aliasGuestIds || []);
-            aliasSet.add(existing.guestId);
-            updates.aliasGuestIds = Array.from(aliasSet);
-        }
-
-        await ref.update(updates);
-
-        const merged = { ...existing, ...updates } as GuestEntity;
-        return { entity: merged, banned: isSubjectBanned(merged.access) };
     }
-
-    const newEntity: GuestEntity = {
-        guestId,
-        fingerprintHash,
-        ipHash,
-        firstSeenAt: now,
-        lastSeenAt: now,
-        lastInteractionAt: now,
-        lastUserAgentHash: userAgentHash,
-        activeSlug: null,
-        activeLinkExpiresAt: null,
-        aliasGuestIds: [],
-        access: { ...DEFAULT_ACCESS, updatedAt: now },
-        publicAccessKey: generatePublicAccessKey(),
-        canonicalIdentityStrength: fingerprintHash ? "fingerprint" : "ip",
-    };
-
-    await ref.set(newEntity);
-    await writePublicGuestAccess(newEntity.publicAccessKey, newEntity.access);
-
-    return { entity: newEntity, banned: false };
 }
 
 /**
@@ -222,7 +272,12 @@ export async function checkGuestBanned(
         const guestId = resolveGuestId(ipHash, fingerprintHash);
 
         const snap = await adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(guestId).get();
-        if (!snap.exists) return { banned: true, access: null, publicAccessKey: null };
+
+        // CRITICAL FIX: Missing entity = NOT banned (allow through)
+        // Entity creation happens lazily on first link creation, not on access check
+        if (!snap.exists) {
+            return { banned: false, access: null, publicAccessKey: null };
+        }
 
         const data = snap.data() as GuestEntity;
         const access = data.access ?? null;

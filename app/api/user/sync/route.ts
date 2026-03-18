@@ -3,6 +3,8 @@ import { adminDb, adminAuth } from "@/lib/firebase/admin";
 import { checkUserBanned } from "@/lib/admin-access";
 import { FieldValue } from "firebase-admin/firestore";
 import crypto from "crypto";
+import { getClientIp } from "@/lib/utils/ip-resolver";
+import { resolveGuestId } from "@/services/guest";
 
 export async function POST(request: NextRequest) {
     try {
@@ -27,12 +29,17 @@ export async function POST(request: NextRequest) {
         }
 
         // 2. Extract Device Identifiers (IP / Fingerprint)
-        const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-        const ipHash = crypto.createHash("sha256").update(ip).digest("hex");
+        const ip = getClientIp(request);
+        
+        function hashData(data: string): string {
+            return crypto.createHash("sha256").update(data).digest("hex");
+        }
+        
+        const ipHash = hashData(ip);
         
         const body = await request.json().catch(() => ({}));
         const fingerprintArg = body.fingerprint || request.headers.get("x-device-fingerprint") || undefined;
-        const fingerprintHash = fingerprintArg ? crypto.createHash("sha256").update(fingerprintArg).digest("hex") : undefined;
+        const fingerprintHash = fingerprintArg ? hashData(fingerprintArg) : undefined;
 
         const batch = adminDb.batch();
         let migratedCount = 0;
@@ -94,6 +101,32 @@ export async function POST(request: NextRequest) {
                 await batch.commit();
                 migratedCount = 1;
             }
+        }
+
+        // Link guest entity to user account (if exists)
+        const guestId = resolveGuestId(ipHash, fingerprintHash || null);
+        const guestEntityRef = adminDb.collection("guest_entities").doc(guestId);
+
+        try {
+            const guestEntitySnap = await guestEntityRef.get();
+            
+            if (guestEntitySnap.exists) {
+                const guestData = guestEntitySnap.data();
+                
+                // Only link if not already linked (idempotency)
+                if (!guestData?.userId) {
+                    await guestEntityRef.update({
+                        userId: uid,
+                        lastInteractionAt: Date.now()
+                    });
+                    
+                    console.log(`[user-sync] Linked guest entity ${guestId} to user ${uid}`);
+                }
+            }
+            // If entity doesn't exist, skip silently (created lazily on first link)
+        } catch (err) {
+            // Log but don't fail the sync operation
+            console.error(`[user-sync] Failed to link guest entity ${guestId}:`, err);
         }
 
         return NextResponse.json({ success: true, migratedCount });

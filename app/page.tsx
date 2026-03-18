@@ -263,7 +263,7 @@ export default function HomePage() {
         }
     }, [focusTriggered]);
 
-    // ── Server-synced guest state (source of truth is Firestore, NOT localStorage) ──
+    // ── Guest state sync (now handled by GuestManager in AccessGate) ──
     useEffect(() => {
         if (user) {
             setGuestLoading(false);
@@ -275,16 +275,13 @@ export default function HomePage() {
 
         const syncGuestState = async () => {
             try {
-                const fp = await getDeviceFingerprint();
-                const res = await fetch("/api/guest-status", {
-                    headers: { "x-device-fingerprint": fp },
-                });
+                const { guestManager } = await import("@/lib/guest-manager");
+                const data = await guestManager.initialize();
                 if (cancelled) return;
-                const data = await res.json();
 
                 if (data.active && data.slug) {
                     setGuestUsed(true);
-                    const expiresAt = Date.now() + (data.expiresIn * 1000);
+                    const expiresAt = Date.now() + (data.expiresIn! * 1000);
                     setGuestExpiresAt(expiresAt);
                     localStorage.setItem("xurl_guest_link_history", JSON.stringify({ slug: data.slug, expiresAt }));
 

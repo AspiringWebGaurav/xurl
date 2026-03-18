@@ -72,18 +72,15 @@ export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: Histo
             } else if (!isLoadMore) {
                 // Fetch live server state for unauthenticated guest
                 setUserPlan("guest");
-                const fp = await getDeviceFingerprint();
-                const res = await fetch("/api/guest-status", {
-                    headers: { "x-device-fingerprint": fp },
-                });
-                const data = await res.json();
+                const { guestManager } = await import("@/lib/guest-manager");
+                const data = await guestManager.initialize();
 
                 if (data.active && data.slug) {
                     fetchedLinks.push({
                         slug: data.slug,
                         originalUrl: data.originalUrl || "Original URL hidden for guests",
                         createdAt: data.createdAt || Date.now(),
-                        expiresAt: Date.now() + (data.expiresIn * 1000),
+                        expiresAt: Date.now() + (data.expiresIn! * 1000),
                     });
                 }
             }

@@ -103,12 +103,8 @@ export function AccessGate({ children }: { children: React.ReactNode }) {
 
     const bootstrapGuest = useCallback(async () => {
         try {
-            const res = await fetch("/api/guest-status");
-            if (!res.ok) {
-                setGate("active");
-                return;
-            }
-            const data = await res.json();
+            const { guestManager } = await import("@/lib/guest-manager");
+            const data = await guestManager.initialize();
             if (data.banned) {
                 setVariant("banned");
                 setGate("locked");

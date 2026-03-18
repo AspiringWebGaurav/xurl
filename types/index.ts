@@ -187,6 +187,7 @@ export interface GuestEntity {
     guestId: string;
     fingerprintHash: string | null;
     ipHash: string | null;
+    userId?: string | null;
     firstSeenAt: number;
     lastSeenAt: number;
     lastInteractionAt: number;
