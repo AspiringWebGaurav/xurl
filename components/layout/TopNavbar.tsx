@@ -8,7 +8,8 @@ import {
     PROFILE_UPDATED_EVENT,
     type ProfileUpdatedDetail,
 } from "@/lib/firebase/user-profile";
-import { signOut, signInWithGoogle, releasePopupLock } from "@/services/auth";
+import { signOut } from "@/services/auth";
+import { useGoogleLogin } from "@/lib/hooks/useGoogleLogin";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/Logo";
@@ -50,7 +51,6 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-    const [isLoggingIn, setIsLoggingIn] = useState(false);
     const [showOverlay, setShowOverlay] = useState(false);
     const [overlayMessage, setOverlayMessage] = useState<React.ReactNode>("Connecting to Google...");
     const [hasNewHistory, setHasNewHistory] = useState(false);
@@ -170,57 +170,46 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
         };
     }, [syncGuestHistoryState, syncUserHistoryState, user]);
 
-    const resetLoginState = () => {
-        setIsLoggingIn(false);
-        setShowOverlay(false);
-        releasePopupLock();
-    };
-
-    const handleGoogleLogin = async () => {
-        if (isLoggingIn) return;
-
-        setIsLoggingIn(true);
-        setOverlayMessage("Connecting to Google...");
-        setShowOverlay(true);
-
-        try {
-            const { user: loggedInUser, error } = await signInWithGoogle();
-            
-            if (error) {
-                if (error === "auth/popup-blocked") {
-                    setOverlayMessage(
-                        <>
-                            Popup blocked — click to retry login
-                            <br />
-                            <span
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    resetLoginState();
-                                    setTimeout(() => handleGoogleLogin(), 50);
-                                }}
-                                className="underline cursor-pointer hover:text-foreground transition-colors mt-2 inline-block"
-                            >
-                                Open login
-                            </span>
-                        </>
-                    );
-                    // Do not auto-close overlay so user can click it
-                    return;
-                } else {
-                    setOverlayMessage("Login cancelled — returning to dashboard...");
-                    setTimeout(() => resetLoginState(), 700);
-                }
-            } else if (loggedInUser) {
-                setOverlayMessage("Signing in...");
-                setTimeout(() => resetLoginState(), 600);
+    // Unified Google login hook with instant cancel detection
+    const { login: handleGoogleLogin, isLoggingIn } = useGoogleLogin({
+        showToasts: false, // Use custom overlay instead
+        onPopupOpen: () => {
+            setOverlayMessage("Connecting to Google...");
+            setShowOverlay(true);
+        },
+        onCancel: () => {
+            // Instant cancel - UI resets immediately
+            setOverlayMessage("Login cancelled — returning to dashboard...");
+            setTimeout(() => setShowOverlay(false), 500);
+        },
+        onSuccess: () => {
+            setOverlayMessage("Signing in...");
+            setTimeout(() => setShowOverlay(false), 600);
+        },
+        onError: (error) => {
+            if (error === "auth/popup-blocked") {
+                setOverlayMessage(
+                    <>
+                        Popup blocked — click to retry login
+                        <br />
+                        <span
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowOverlay(false);
+                                setTimeout(() => handleGoogleLogin(), 50);
+                            }}
+                            className="underline cursor-pointer hover:text-foreground transition-colors mt-2 inline-block"
+                        >
+                            Open login
+                        </span>
+                    </>
+                );
             } else {
-                resetLoginState();
+                setOverlayMessage("Unable to sign in. Please try again.");
+                setTimeout(() => setShowOverlay(false), 700);
             }
-        } catch (e) {
-            console.error("Login unexpected error", e);
-            resetLoginState();
         }
-    };
+    });
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (u) => {

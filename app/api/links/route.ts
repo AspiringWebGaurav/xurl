@@ -285,6 +285,28 @@ export async function GET(request: NextRequest) {
             return { ...link, status };
         });
 
+        // Free plan specific data
+        let freeUsageCount: number | undefined;
+        let freeMaxUses: number | undefined;
+        let cooldownRemainingMs: number | undefined;
+        let canCreateFreeLink: boolean | undefined;
+
+        if (plan === "free") {
+            const freeConfig = PLAN_CONFIGS.free;
+            freeUsageCount = userData?.free_usage_count || 0;
+            const freeLastUsedAt = userData?.free_last_used_at || null;
+            freeMaxUses = freeConfig.maxUses || 3;
+            const freeCooldownMs = freeConfig.cooldownMs || 0;
+
+            if (freeLastUsedAt && freeCooldownMs) {
+                cooldownRemainingMs = Math.max(0, freeCooldownMs - (now - freeLastUsedAt));
+            } else {
+                cooldownRemainingMs = 0;
+            }
+
+            canCreateFreeLink = (freeUsageCount || 0) < freeMaxUses && cooldownRemainingMs === 0;
+        }
+
         return NextResponse.json({
             links: enrichedLinks,
             hasMore: result.links.length === pageSize,
@@ -297,7 +319,12 @@ export async function GET(request: NextRequest) {
             limit: effectiveLimit,
             plan,
             planRenewals,
-            planTtlHours
+            planTtlHours,
+            // Free plan specific fields
+            freeUsageCount,
+            freeMaxUses,
+            cooldownRemainingMs,
+            canCreateFreeLink
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to fetch links.";

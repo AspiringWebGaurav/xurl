@@ -34,11 +34,6 @@ const footerColumns = [
             { href: "/refund", label: "Refund Policy" },
         ],
     },
-    {
-        label: "Support",
-        links: [],
-        comingSoon: ["Coming Soon"],
-    },
 ];
 
 const minimalLegalLinks = [
@@ -218,17 +213,6 @@ export function HomeFooter() {
                                                 >
                                                     {link.label}
                                                 </Link>
-                                            ))}
-                                            {col.comingSoon?.map((item) => (
-                                                <span
-                                                    key={item}
-                                                    className="flex items-center gap-1.5 text-muted-foreground/50 cursor-default"
-                                                >
-                                                    {item}
-                                                    <span className="rounded-sm border border-border bg-muted/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-                                                        Paid · Soon
-                                                    </span>
-                                                </span>
                                             ))}
                                         </div>
                                     </div>

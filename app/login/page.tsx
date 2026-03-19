@@ -19,8 +19,7 @@ function getDynamicExpiryMessage(planKey?: string | null) {
     }
     return `Expires ${now.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}`;
 }
-import { signInWithGoogle } from "@/services/auth";
-import { releasePopupLock } from "@/services/auth";
+import { useGoogleLogin } from "@/lib/hooks/useGoogleLogin";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { HomeFooter } from "@/components/layout/HomeFooter";
@@ -122,7 +121,6 @@ function LoginContent() {
     const [authLoading, setAuthLoading] = useState(true);
     const [user, setUser] = useState<User | null>(null);
     const [isUpgrading, setIsUpgrading] = useState(false);
-    const [isLoggingIn, setIsLoggingIn] = useState(false);
     const [showLoginOverlay, setShowLoginOverlay] = useState(false);
     const [overlayMessage, setOverlayMessage] = useState<React.ReactNode>("Connecting to Google...");
     const [paymentState, setPaymentState] = useState<"idle" | "upgrading" | "processing" | "success" | "failed" | "cancelled">("idle");
@@ -337,58 +335,46 @@ function LoginContent() {
         }
     };
 
-    const resetLoginState = () => {
-        setIsLoggingIn(false);
-        setShowLoginOverlay(false);
-        releasePopupLock();
-    };
-
-    const handleLogin = async () => {
-        if (authLoading || isLoggingIn) return;
-        setIsLoggingIn(true);
-        setOverlayMessage("Connecting to Google...");
-        setShowLoginOverlay(true);
-        
-        try {
-            const { user: loggedInUser, error } = await signInWithGoogle();
-            
-            if (error) {
-                if (error === "auth/popup-blocked") {
-                    setOverlayMessage(
-                        <>
-                            Popup blocked - click to retry login
-                            <br />
-                            <span 
-                                onClick={(e) => { 
-                                    e.stopPropagation(); 
-                                    resetLoginState();
-                                    setTimeout(() => handleLogin(), 50); 
-                                }} 
-                                className="mt-2 inline-block cursor-pointer underline transition-colors hover:text-foreground"
-                            >
-                                Open login
-                            </span>
-                        </>
-                    );
-                    return;
-                } else if (error === "auth/popup-closed-by-user" || error === "auth/cancelled-popup-request") {
-                    setOverlayMessage("Login cancelled - staying on this page...");
-                    setTimeout(() => resetLoginState(), 500);
-                } else {
-                    setOverlayMessage("Unable to sign in. Please try again.");
-                    setTimeout(() => resetLoginState(), 700);
-                }
-            } else if (loggedInUser) {
-                setOverlayMessage("Signing in...");
-                setTimeout(() => resetLoginState(), 600);
+    // Unified Google login hook with instant cancel detection
+    const { login: handleLogin, isLoggingIn } = useGoogleLogin({
+        showToasts: false, // Use custom overlay instead
+        onPopupOpen: () => {
+            setOverlayMessage("Connecting to Google...");
+            setShowLoginOverlay(true);
+        },
+        onCancel: () => {
+            // Instant cancel - UI resets immediately
+            setOverlayMessage("Login cancelled - staying on this page...");
+            setTimeout(() => setShowLoginOverlay(false), 500);
+        },
+        onSuccess: () => {
+            setOverlayMessage("Signing in...");
+            setTimeout(() => setShowLoginOverlay(false), 600);
+        },
+        onError: (error) => {
+            if (error === "auth/popup-blocked") {
+                setOverlayMessage(
+                    <>
+                        Popup blocked - click to retry login
+                        <br />
+                        <span 
+                            onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setShowLoginOverlay(false);
+                                setTimeout(() => handleLogin(), 50); 
+                            }} 
+                            className="mt-2 inline-block cursor-pointer underline transition-colors hover:text-foreground"
+                        >
+                            Open login
+                        </span>
+                    </>
+                );
             } else {
-                resetLoginState();
+                setOverlayMessage("Unable to sign in. Please try again.");
+                setTimeout(() => setShowLoginOverlay(false), 700);
             }
-        } catch (error) {
-            console.error("Login unexpected error", error);
-            resetLoginState();
         }
-    };
+    });
 
     if (authLoading) {
         return (
