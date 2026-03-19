@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
 import { ensureUserDocument } from "@/lib/firebase/user-profile";
@@ -26,7 +26,7 @@ type Transaction = {
     amount?: number;
 };
 
-export default function PurchaseHistoryPage() {
+function PurchaseHistoryContent() {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -251,5 +251,21 @@ export default function PurchaseHistoryPage() {
                 )}
             </main>
         </div>
+    );
+}
+
+function LoadingFallback() {
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        </div>
+    );
+}
+
+export default function PurchaseHistoryPage() {
+    return (
+        <Suspense fallback={<LoadingFallback />}>
+            <PurchaseHistoryContent />
+        </Suspense>
     );
 }

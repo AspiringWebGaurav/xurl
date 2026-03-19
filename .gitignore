@@ -95,3 +95,7 @@ screenshot/
 
 # Local developer data (indexes, caches)
 .local/
+
+#scripts
+.scripts/
+.script/

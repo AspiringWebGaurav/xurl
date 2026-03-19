@@ -104,8 +104,8 @@ export async function GET(request: NextRequest) {
                         .sort((a, b) => b.timestamp - a.timestamp)
                         .slice(0, limit);
                     if (includeCount) {
-                        const totalSnap = await adminDb.collection("activity_events").count().get();
-                        return NextResponse.json({ items: combined, totalCount: totalSnap.data().count });
+                        const countSnap = await adminDb.collection("activity_events").get();
+                        return NextResponse.json({ items: combined, totalCount: countSnap.size });
                     }
                     return NextResponse.json({ items: combined });
                 }
@@ -137,9 +137,11 @@ export async function GET(request: NextRequest) {
 
             if (includeCount) {
                 const countSnaps = await Promise.all(
-                    WHOLE_APP_COLLECTIONS.map((collectionName) => adminDb.collection(collectionName).count().get())
+                    WHOLE_APP_COLLECTIONS.map((collectionName) => 
+                        adminDb.collection(collectionName).get()
+                    )
                 );
-                const totalCount = countSnaps.reduce((sum, snap) => sum + snap.data().count, 0);
+                const totalCount = countSnaps.reduce((sum, snap) => sum + snap.size, 0);
                 return NextResponse.json({ items: combined, totalCount });
             }
             return NextResponse.json({ items: combined });
