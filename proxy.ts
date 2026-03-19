@@ -102,11 +102,6 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
     const apiUrl = new URL('/api/redirect/' + slug, request.url);
     try {
         const res = await fetch(apiUrl);
-
-        if (res.status === 403) {
-            return NextResponse.redirect(new URL('/expired?reason=suspended', request.url), 302);
-        }
-
         if (res.ok) {
             const data = await res.json();
             if (data && !data.error && data.originalUrl) {

@@ -32,7 +32,6 @@ const footerColumns = [
             { href: "/privacy", label: "Privacy Policy" },
             { href: "/acceptable-use", label: "Acceptable Use" },
             { href: "/refund", label: "Refund Policy" },
-            { href: "/ban-policy", label: "Ban Policy" },
         ],
     },
     {

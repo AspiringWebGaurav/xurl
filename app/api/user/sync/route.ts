@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase/admin";
-import { checkUserBanned } from "@/lib/admin-access";
 import { FieldValue } from "firebase-admin/firestore";
 import crypto from "crypto";
-import { getClientIp } from "@/lib/utils/ip-resolver";
-import { resolveGuestId, ensureUserGuestEntity } from "@/services/guest";
 
 export async function POST(request: NextRequest) {
     try {
@@ -23,23 +20,13 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Invalid token" }, { status: 401 });
         }
 
-        const { banned } = await checkUserBanned(uid);
-        if (banned) {
-            return NextResponse.json({ error: "Access suspended" }, { status: 403 });
-        }
-
         // 2. Extract Device Identifiers (IP / Fingerprint)
-        const ip = getClientIp(request);
-        
-        function hashData(data: string): string {
-            return crypto.createHash("sha256").update(data).digest("hex");
-        }
-        
-        const ipHash = hashData(ip);
+        const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+        const ipHash = crypto.createHash("sha256").update(ip).digest("hex");
         
         const body = await request.json().catch(() => ({}));
         const fingerprintArg = body.fingerprint || request.headers.get("x-device-fingerprint") || undefined;
-        const fingerprintHash = fingerprintArg ? hashData(fingerprintArg) : undefined;
+        const fingerprintHash = fingerprintArg ? crypto.createHash("sha256").update(fingerprintArg).digest("hex") : undefined;
 
         const batch = adminDb.batch();
         let migratedCount = 0;
@@ -102,9 +89,6 @@ export async function POST(request: NextRequest) {
                 migratedCount = 1;
             }
         }
-
-        // ALWAYS ensure guest_entity exists and is linked
-        await ensureUserGuestEntity(uid, ipHash, fingerprintHash);
 
         return NextResponse.json({ success: true, migratedCount });
     } catch (e) {

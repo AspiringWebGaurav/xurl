@@ -12,8 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase/admin";
 import { createLink, getUserLinks, deleteLink } from "@/services/links";
-import { checkGuestLimit, checkGuestBanned } from "@/services/guest";
-import { checkUserBanned } from "@/lib/admin-access";
+import { checkGuestLimit } from "@/services/guest";
 import { PLAN_CONFIGS, GUEST_CONFIG, resolvePlanType } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
 import { logger } from "@/lib/utils/logger";
@@ -25,7 +24,6 @@ import crypto from "crypto";
 
 import { evaluateRequest } from "@/lib/redis/protection";
 import { getRedisClient, safeRedis } from "@/lib/redis/client";
-import { getClientIp } from "@/lib/utils/ip-resolver";
 
 // ─── Auth Helper ────────────────────────────────────────────────────────────
 
@@ -50,7 +48,7 @@ async function verifyAuth(request: NextRequest): Promise<string | null> {
 export async function POST(request: NextRequest) {
     try {
         // Security Gateway (Redis)
-        const ip = getClientIp(request);
+        const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
         // Determine authenticated user
         let verifiedUid = await verifyAuth(request);
@@ -59,16 +57,6 @@ export async function POST(request: NextRequest) {
         if (process.env.NODE_ENV !== "production") {
             const testHeader = request.headers.get("x-test-user-id");
             if (testHeader) verifiedUid = testHeader;
-        }
-
-        if (verifiedUid) {
-            const { banned } = await checkUserBanned(verifiedUid);
-            if (banned) {
-                return NextResponse.json(
-                    { code: "ACCESS_SUSPENDED", message: "Access suspended." },
-                    { status: 403 }
-                );
-            }
         }
 
         const isGuest = !verifiedUid;
@@ -134,14 +122,6 @@ export async function POST(request: NextRequest) {
 
         // ── Server-side link-limit enforcement ──
         if (isGuest) {
-            const { banned: guestBanned } = await checkGuestBanned(ip, fingerprint);
-            if (guestBanned) {
-                return NextResponse.json(
-                    { code: "ACCESS_SUSPENDED", message: "Access suspended." },
-                    { status: 403 }
-                );
-            }
-
             // Block custom alias for guests
             if (customSlug) {
                 return NextResponse.json(
@@ -217,7 +197,7 @@ export async function POST(request: NextRequest) {
             code = "PLAN_LIMIT";
         }
 
-        logger.error("create_link_error", message, { status, code, errorName });
+        console.error(`[CREATE LINK ERROR] ${status} - ${message}`);
         return NextResponse.json({ code, message }, { status });
     }
 }
@@ -232,14 +212,6 @@ export async function GET(request: NextRequest) {
             return NextResponse.json(
                 { code: "UNAUTHORIZED", message: "Authentication required." },
                 { status: 401 }
-            );
-        }
-
-        const { banned } = await checkUserBanned(verifiedUid);
-        if (banned) {
-            return NextResponse.json(
-                { code: "ACCESS_SUSPENDED", message: "Access suspended." },
-                { status: 403 }
             );
         }
 
@@ -346,15 +318,6 @@ export async function DELETE(request: NextRequest) {
                 { status: 401 }
             );
         }
-
-        const { banned } = await checkUserBanned(verifiedUid);
-        if (banned) {
-            return NextResponse.json(
-                { code: "ACCESS_SUSPENDED", message: "Access suspended." },
-                { status: 403 }
-            );
-        }
-
         const body = await request.json();
         const { slug } = body;
 

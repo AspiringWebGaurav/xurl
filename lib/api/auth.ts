@@ -2,7 +2,6 @@ import { adminDb } from "@/lib/firebase/admin";
 import { createApiRequestId } from "@/lib/api/logging";
 import { hashApiKey } from "@/lib/api/crypto";
 import { PLAN_CONFIGS, resolvePlanType } from "@/lib/plans";
-import { isSubjectBanned } from "@/lib/admin-access";
 import type { UserDocument } from "@/types";
 
 export interface ApiAuthSuccess {
@@ -79,15 +78,6 @@ export async function authenticateApiRequest(authorizationHeader: string | null)
                 ok: false,
                 status: 401,
                 error: "Invalid API key",
-                requestId,
-            } satisfies ApiAuthFailure;
-        }
-
-        if (isSubjectBanned(user.access)) {
-            return {
-                ok: false,
-                status: 403,
-                error: "Access suspended",
                 requestId,
             } satisfies ApiAuthFailure;
         }

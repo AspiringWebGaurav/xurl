@@ -78,18 +78,6 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // ─── Guest Entities (admin-only) ──────────────────────────────────
-    match /guest_entities/{guestId} {
-      allow read, list: if isAdmin();
-      allow write: if false; // All writes via admin SDK
-    }
-
-    // ─── Public Guest Access (unauthenticated single-doc read) ──────
-    match /public_guest_access/{accessKey} {
-      allow get: if true;
-      allow list, write: if false;
-    }
-
     // ─── Analytics ────────────────────────────────────────────────────
     // Read access requires authentication. Write access is admin SDK only.
     // Note: Server-side API routes use admin SDK which bypasses these rules.

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import dns from "node:dns/promises";
 import net from "node:net";
-import { logger } from "@/lib/utils/logger";
 
 // ─── SSRF Protection (DNS-resolution based) ─────────────────────────────────
 
@@ -193,9 +192,7 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({ title, favicon });
     } catch (e) {
-        logger.error("preview_fetch_error", "Failed to fetch URL preview", {
-            error: e instanceof Error ? e.message : String(e),
-        });
+        console.error("Preview api fetch error:", e);
         return NextResponse.json({ title: null, favicon: null });
     }
 }

@@ -1,13 +1,7 @@
 import { adminDb } from "@/lib/firebase/admin";
 import crypto from "crypto";
-import { DEFAULT_ACCESS, type GuestEntity, type PublicGuestAccess, type SubjectAccess } from "@/types";
-import { writeActivityEvent } from "@/lib/admin/activity-events-writer";
-import { isSubjectBanned } from "@/lib/admin-access";
-import { acquireGuestCreationLock, releaseGuestCreationLock } from "@/lib/redis/guest-lock";
 
 const GUEST_USAGE_COLLECTION = "guest_usage";
-const GUEST_ENTITIES_COLLECTION = "guest_entities";
-const PUBLIC_GUEST_ACCESS_COLLECTION = "public_guest_access";
 
 export interface GuestUsageRecord {
     ipHash: string;
@@ -18,10 +12,18 @@ export interface GuestUsageRecord {
     createdAt: number;
 }
 
+/**
+ * Creates a SHA-256 hash for privacy-preserving tracking
+ */
 function hashData(data: string, salt: string = ""): string {
     return crypto.createHash("sha256").update(`${data}${salt}`).digest("hex");
 }
 
+/**
+ * Checks if a guest (identified by IP or fingerprint) has an active link.
+ * Returns an object with `allowed` = true if no active link exists.
+ * Returns `allowed` = false and `expiresIn` (in seconds) if an active link exists.
+ */
 export async function checkGuestLimit(
     ip: string,
     fingerprint: string | undefined
@@ -30,13 +32,16 @@ export async function checkGuestLimit(
     const fingerprintHash = fingerprint ? hashData(fingerprint) : null;
     const now = Date.now();
 
-    const ipSnap = await adminDb
+    // Query 1: Check by IP
+    const ipQuery = adminDb
         .collection(GUEST_USAGE_COLLECTION)
         .where("ipHash", "==", ipHash)
         .where("expiresAt", ">", now)
-        .limit(1)
-        .get();
+        .limit(1);
 
+    const ipSnap = await ipQuery.get();
+
+    // Check if IP query found an active link
     if (!ipSnap.empty) {
         const data = ipSnap.docs[0].data() as GuestUsageRecord;
         return {
@@ -44,18 +49,19 @@ export async function checkGuestLimit(
             expiresIn: Math.ceil((data.expiresAt - now) / 1000),
             slug: data.slug,
             originalUrl: data.originalUrl,
-            createdAt: data.createdAt,
+            createdAt: data.createdAt
         };
     }
 
+    // Query 2: Check by Fingerprint (if provided)
     if (fingerprintHash) {
-        const fpSnap = await adminDb
+        const fpQuery = adminDb
             .collection(GUEST_USAGE_COLLECTION)
             .where("fingerprintHash", "==", fingerprintHash)
             .where("expiresAt", ">", now)
-            .limit(1)
-            .get();
+            .limit(1);
 
+        const fpSnap = await fpQuery.get();
         if (!fpSnap.empty) {
             const data = fpSnap.docs[0].data() as GuestUsageRecord;
             return {
@@ -63,7 +69,7 @@ export async function checkGuestLimit(
                 expiresIn: Math.ceil((data.expiresAt - now) / 1000),
                 slug: data.slug,
                 originalUrl: data.originalUrl,
-                createdAt: data.createdAt,
+                createdAt: data.createdAt
             };
         }
     }
@@ -71,477 +77,3 @@ export async function checkGuestLimit(
     return { allowed: true };
 }
 
-function generatePublicAccessKey(guestId: string): string {
-    return crypto
-        .createHash("sha256")
-        .update(`guest_access_v1_${guestId}`)
-        .digest("hex")
-        .substring(0, 48);
-}
-
-export function resolveGuestId(ipHash: string, fingerprintHash: string | null): string {
-    // CRITICAL FIX: Always use ipHash as document ID to prevent duplicates
-    // when fingerprint becomes available after initial creation.
-    // Fingerprint is stored as metadata for identity strength tracking.
-    return ipHash;
-}
-
-export async function resolveGuestEntity(
-    ip: string,
-    fingerprint: string | undefined,
-    userAgent?: string | null
-): Promise<{ entity: GuestEntity; banned: boolean }> {
-    const ipHash = hashData(ip);
-    const fingerprintHash = fingerprint ? hashData(fingerprint) : null;
-    const userAgentHash = userAgent ? hashData(userAgent) : null;
-    const guestId = resolveGuestId(ipHash, fingerprintHash);
-    const now = Date.now();
-
-    const ref = adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(guestId);
-
-    // Acquire distributed lock for creation
-    const lockAcquired = await acquireGuestCreationLock(guestId, 10);
-
-    try {
-        // Fetch existing entity by computed guestId first
-        const snap = await ref.get();
-
-        if (!snap.exists && fingerprintHash) {
-            // If fingerprint exists but guestId was IP-based, try fingerprint guestId as well
-            const fpRef = adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(fingerprintHash);
-            const fpSnap = await fpRef.get();
-            if (fpSnap.exists) {
-                const existing = fpSnap.data() as GuestEntity;
-                const updates: Record<string, unknown> = {
-                    lastSeenAt: now,
-                    lastInteractionAt: now,
-                };
-                if (userAgentHash) updates.lastUserAgentHash = userAgentHash;
-                if (!existing.fingerprintHash) updates.fingerprintHash = fingerprintHash;
-                if (!existing.ipHash) updates.ipHash = ipHash;
-                await fpRef.update(updates);
-                const merged = { ...existing, ...updates } as GuestEntity;
-                return { entity: merged, banned: isSubjectBanned(merged.access) };
-            }
-        }
-
-        if (snap.exists) {
-            const existing = snap.data() as GuestEntity;
-
-            const updates: Record<string, unknown> = {
-                lastSeenAt: now,
-                lastInteractionAt: now,
-            };
-
-            if (userAgentHash) {
-                updates.lastUserAgentHash = userAgentHash;
-            }
-
-            if (fingerprintHash && !existing.fingerprintHash) {
-                updates.fingerprintHash = fingerprintHash;
-                updates.canonicalIdentityStrength = "fingerprint";
-            }
-
-            if (ipHash && !existing.ipHash) {
-                updates.ipHash = ipHash;
-            }
-
-            if (fingerprintHash && existing.guestId !== fingerprintHash && existing.canonicalIdentityStrength === "ip") {
-                const aliasSet = new Set(existing.aliasGuestIds || []);
-                aliasSet.add(existing.guestId);
-                updates.aliasGuestIds = Array.from(aliasSet);
-            }
-
-            await ref.update(updates);
-
-            const merged = { ...existing, ...updates } as GuestEntity;
-            return { entity: merged, banned: isSubjectBanned(merged.access) };
-        }
-
-        // Entity does NOT exist - create atomically with transaction
-        if (!lockAcquired) {
-            // Another instance is creating this entity, wait and retry read
-            await new Promise(resolve => setTimeout(resolve, 100));
-            const retrySnap = await ref.get();
-            if (retrySnap.exists) {
-                const entity = retrySnap.data() as GuestEntity;
-                return { entity, banned: isSubjectBanned(entity.access) };
-            }
-            // Still doesn't exist - Redis failed, rely on Firestore transaction only
-        }
-
-        const publicAccessKey = generatePublicAccessKey(guestId);
-        const newEntity: GuestEntity = {
-            guestId,
-            fingerprintHash,
-            ipHash,
-            firstSeenAt: now,
-            lastSeenAt: now,
-            lastInteractionAt: now,
-            lastUserAgentHash: userAgentHash,
-            activeSlug: null,
-            activeLinkExpiresAt: null,
-            aliasGuestIds: [],
-            access: { ...DEFAULT_ACCESS, updatedAt: now },
-            publicAccessKey,
-            canonicalIdentityStrength: fingerprintHash ? "fingerprint" : "ip",
-        };
-
-        // Use Firestore transaction for atomic multi-collection write
-        const finalEntity = await adminDb.runTransaction(async (tx) => {
-            const txSnap = await tx.get(ref);
-            if (txSnap.exists) {
-                // Entity was created by another request, return it
-                return txSnap.data() as GuestEntity;
-            }
-
-            tx.set(ref, newEntity);
-
-            const projection: PublicGuestAccess = {
-                status: newEntity.access.status,
-                reason: newEntity.access.reason,
-                expiresAt: newEntity.access.expiresAt,
-                version: newEntity.access.version,
-                updatedAt: newEntity.access.updatedAt,
-            };
-            tx.set(
-                adminDb.collection(PUBLIC_GUEST_ACCESS_COLLECTION).doc(publicAccessKey),
-                projection
-            );
-
-            return newEntity;
-        });
-
-        return { entity: finalEntity, banned: false };
-    } finally {
-        // Always release lock
-        if (lockAcquired) {
-            await releaseGuestCreationLock(guestId);
-        }
-    }
-}
-
-/**
- * Cross-checks a banned entity against its public projection.
- * If the projection says "active" but the entity says "banned", a previous
- * unban write reached public_guest_access but didn't fully commit to
- * guest_entities. This repairs the entity and unblocks the guest.
- * Returns the repaired access if a repair was made, null otherwise.
- */
-async function repairEntityFromProjection(
-    guestId: string,
-    currentAccess: SubjectAccess,
-    publicAccessKey: string
-): Promise<SubjectAccess | null> {
-    try {
-        const projSnap = await adminDb
-            .collection(PUBLIC_GUEST_ACCESS_COLLECTION)
-            .doc(publicAccessKey)
-            .get();
-
-        if (!projSnap.exists || projSnap.data()?.status !== "active") {
-            return null; // projection also says banned — no repair
-        }
-
-        const repairedAccess: SubjectAccess = {
-            ...currentAccess,
-            status: "active",
-            mode: null,
-            expiresAt: null,
-            updatedAt: Date.now(),
-            updatedBy: "system_repair_sync",
-        };
-
-        await adminDb
-            .collection(GUEST_ENTITIES_COLLECTION)
-            .doc(guestId)
-            .update({ access: repairedAccess });
-
-        console.warn(`[guest] repaired stale banned entity for guestId=${guestId}`);
-        return repairedAccess;
-    } catch (err) {
-        console.error("[guest] repairEntityFromProjection failed:", err);
-        return null; // fail-safe: don't unblock if repair errors
-    }
-}
-
-export async function checkGuestBanned(
-    ip: string,
-    fingerprint: string | undefined
-): Promise<{ banned: boolean; access: SubjectAccess | null; publicAccessKey: string | null }> {
-    try {
-        const ipHash = hashData(ip);
-        const fingerprintHash = fingerprint ? hashData(fingerprint) : null;
-        const guestId = resolveGuestId(ipHash, fingerprintHash);
-
-        const snap = await adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(guestId).get();
-
-        // CRITICAL FIX: Missing entity = NOT banned (allow through)
-        // Entity creation happens lazily on first link creation, not on access check
-        if (!snap.exists) {
-            return { banned: false, access: null, publicAccessKey: null };
-        }
-
-        const data = snap.data() as GuestEntity;
-        const access = data.access ?? null;
-
-        // Auto-expire temporary bans inline
-        if (access?.status === "banned" && access.mode === "temporary" && access.expiresAt && access.expiresAt <= Date.now()) {
-            const next = await autoExpireGuestAccess(data.guestId, access, data.publicAccessKey);
-            return { banned: false, access: next, publicAccessKey: data.publicAccessKey };
-        }
-
-        // Defensive: if entity still shows banned, cross-check the projection
-        // to catch any entity/projection divergence from a prior unban
-        if (isSubjectBanned(access) && data.publicAccessKey) {
-            const repaired = await repairEntityFromProjection(data.guestId, access, data.publicAccessKey);
-            if (repaired) {
-                return { banned: false, access: repaired, publicAccessKey: data.publicAccessKey };
-            }
-        }
-
-        return {
-            banned: isSubjectBanned(access),
-            access,
-            publicAccessKey: data.publicAccessKey,
-        };
-    } catch (err) {
-        console.error("[guest] checkGuestBanned error:", err);
-        return { banned: true, access: null, publicAccessKey: null };
-    }
-}
-
-export async function checkGuestBannedByHash(
-    ipHash: string | null,
-    fingerprintHash: string | null
-): Promise<{ banned: boolean; access: SubjectAccess | null }> {
-    try {
-        const guestId = resolveGuestId(ipHash || "", fingerprintHash);
-        const snap = await adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(guestId).get();
-        if (!snap.exists) return { banned: true, access: null };
-
-        const data = snap.data() as GuestEntity;
-        const access = data.access ?? null;
-
-        if (access?.status === "banned" && access.mode === "temporary" && access.expiresAt && access.expiresAt <= Date.now()) {
-            const next = await autoExpireGuestAccess(data.guestId, access, data.publicAccessKey);
-            return { banned: false, access: next };
-        }
-
-        if (isSubjectBanned(access) && data.publicAccessKey) {
-            const repaired = await repairEntityFromProjection(data.guestId, access, data.publicAccessKey);
-            if (repaired) {
-                return { banned: false, access: repaired };
-            }
-        }
-
-        return { banned: isSubjectBanned(access), access };
-    } catch (err) {
-        console.error("[guest] checkGuestBannedByHash error:", err);
-        return { banned: true, access: null };
-    }
-}
-
-export async function writePublicGuestAccess(publicAccessKey: string, access: SubjectAccess): Promise<void> {
-    const projection: PublicGuestAccess = {
-        status: access.status,
-        reason: access.reason,
-        expiresAt: access.expiresAt,
-        version: access.version,
-        updatedAt: access.updatedAt,
-    };
-    await adminDb.collection(PUBLIC_GUEST_ACCESS_COLLECTION).doc(publicAccessKey).set(projection);
-}
-
-async function autoExpireGuestAccess(guestId: string, current: SubjectAccess, publicAccessKey?: string) {
-    const now = Date.now();
-    const nextVersion = (current.version ?? 0) + 1;
-    const nextAccess: SubjectAccess = {
-        status: "active",
-        mode: null,
-        reason: null,
-        expiresAt: null,
-        updatedAt: now,
-        updatedBy: "system_auto_expiry",
-        version: nextVersion,
-        banId: null,
-    };
-
-    await adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(guestId).update({ access: nextAccess });
-    if (publicAccessKey) {
-        await writePublicGuestAccess(publicAccessKey, nextAccess);
-    }
-    await writeActivityEvent({
-        type: "ACCESS_EXPIRE_AUTO",
-        actor: "system_auto_expiry",
-        sourceCollection: GUEST_ENTITIES_COLLECTION,
-        severity: "INFO",
-        metadata: {
-            subjectType: "guest",
-            subjectId: guestId,
-            action: "expire_auto_unban",
-            prevVersion: current.version ?? 0,
-            nextVersion,
-            prevStatus: current.status,
-        },
-    });
-    return nextAccess;
-}
-
-/**
- * Ensures a user has exactly one guest_entity linked to their account.
- * Creates a new guest_entity if none exists, or returns the existing one.
- * Implements bidirectional linking: user.guestId ↔ guest_entity.userId
- * 
- * @param userId - Firebase Auth UID
- * @param ipHash - Optional IP hash for metadata only
- * @param fingerprintHash - Optional fingerprint hash for metadata only
- * @returns Object containing guestId and entity
- */
-export async function ensureUserGuestEntity(
-    userId: string,
-    ipHash?: string,
-    fingerprintHash?: string
-): Promise<{ guestId: string; entity: GuestEntity }> {
-    const now = Date.now();
-
-    // Step 1: Query for existing guest_entity by userId (primary resolution)
-    const existingSnap = await adminDb
-        .collection(GUEST_ENTITIES_COLLECTION)
-        .where("userId", "==", userId)
-        .limit(1)
-        .get();
-
-    if (!existingSnap.empty) {
-        const doc = existingSnap.docs[0];
-        const entity = doc.data() as GuestEntity;
-        const guestId = doc.id;
-
-        // Verify bidirectional link exists
-        const userRef = adminDb.collection("users").doc(userId);
-        const userSnap = await userRef.get();
-        
-        if (userSnap.exists && !userSnap.data()?.guestId) {
-            // Repair missing user.guestId
-            await userRef.update({ guestId, updatedAt: now });
-            console.log(`[ensureUserGuestEntity] Repaired missing user.guestId for ${userId}`);
-        }
-
-        return { guestId, entity };
-    }
-
-    // Step 2: Check if IP/fingerprint already has an entity (even if banned)
-    // This prevents ban bypass when a banned guest signs up
-    if (ipHash || fingerprintHash) {
-        const guestId = resolveGuestId(ipHash ?? "", fingerprintHash ?? null);
-        const existingByHashSnap = await adminDb
-            .collection(GUEST_ENTITIES_COLLECTION)
-            .doc(guestId)
-            .get();
-        
-        if (existingByHashSnap.exists) {
-            const existingEntity = existingByHashSnap.data() as GuestEntity;
-            
-            // Link this user to the existing entity (preserves ban status)
-            try {
-                await adminDb.runTransaction(async (tx) => {
-                    const freshSnap = await tx.get(existingByHashSnap.ref);
-                    if (!freshSnap.exists) {
-                        throw new Error("Entity disappeared during transaction");
-                    }
-                    
-                    // Update entity with userId
-                    tx.update(existingByHashSnap.ref, {
-                        userId,
-                        updatedAt: now
-                    });
-                    
-                    // Update user with guestId
-                    const userRefTx = adminDb.collection("users").doc(userId);
-                    tx.set(userRefTx, { guestId: existingEntity.guestId, updatedAt: now }, { merge: true });
-                });
-                
-                console.log(`[ensureUserGuestEntity] Linked user ${userId} to existing entity ${existingEntity.guestId} (preserving access state)`);
-                
-                return { 
-                    guestId: existingEntity.guestId, 
-                    entity: { ...existingEntity, userId } 
-                };
-            } catch (err) {
-                console.error(`[ensureUserGuestEntity] Failed to link user ${userId} to existing entity:`, err);
-                // Fall through to create new entity if linking fails
-            }
-        }
-    }
-
-    // Step 3: No existing guest_entity found - create new one
-    // Use transaction to prevent duplicates from concurrent requests
-    const result = await adminDb.runTransaction(async (tx) => {
-        // Double-check within transaction by userId
-        const userRefCheck = adminDb.collection("users").doc(userId);
-        const txUserSnap = await tx.get(userRefCheck);
-        
-        // If user already has a guestId, try to use that entity
-        if (txUserSnap.exists && txUserSnap.data()?.guestId) {
-            const existingGuestId = txUserSnap.data()!.guestId;
-            const existingGuestRef = adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(existingGuestId);
-            const existingGuestSnap = await tx.get(existingGuestRef);
-            
-            if (existingGuestSnap.exists) {
-                return { guestId: existingGuestId, entity: existingGuestSnap.data() as GuestEntity };
-            }
-        }
-
-        // Generate unique guestId (not based on IP/fingerprint)
-        const guestId = crypto.randomUUID();
-        const publicAccessKey = crypto
-            .createHash("sha256")
-            .update(`guest_access_v1_${guestId}`)
-            .digest("hex")
-            .substring(0, 48);
-
-        // Create new guest_entity
-        const newEntity: GuestEntity = {
-            guestId,
-            fingerprintHash: fingerprintHash || null,
-            ipHash: ipHash || null,
-            userId,
-            firstSeenAt: now,
-            lastSeenAt: now,
-            lastInteractionAt: now,
-            lastUserAgentHash: null,
-            activeSlug: null,
-            activeLinkExpiresAt: null,
-            aliasGuestIds: [],
-            access: { ...DEFAULT_ACCESS, updatedAt: now },
-            publicAccessKey,
-            canonicalIdentityStrength: "fingerprint",
-        };
-
-        const guestRef = adminDb.collection(GUEST_ENTITIES_COLLECTION).doc(guestId);
-        tx.set(guestRef, newEntity);
-
-        // Create public projection
-        const projection: PublicGuestAccess = {
-            status: newEntity.access.status,
-            reason: newEntity.access.reason,
-            expiresAt: newEntity.access.expiresAt,
-            version: newEntity.access.version,
-            updatedAt: newEntity.access.updatedAt,
-        };
-        tx.set(
-            adminDb.collection(PUBLIC_GUEST_ACCESS_COLLECTION).doc(publicAccessKey),
-            projection
-        );
-
-        // Update user.guestId (bidirectional link)
-        const userRefCreate = adminDb.collection("users").doc(userId);
-        tx.set(userRefCreate, { guestId, updatedAt: now }, { merge: true });
-
-        console.log(`[ensureUserGuestEntity] Created new guest_entity ${guestId} for user ${userId}`);
-
-        return { guestId, entity: newEntity };
-    });
-
-    return result;
-}

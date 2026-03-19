@@ -104,6 +104,8 @@
   --sidebar-ring: #111827;
 }
 
+/* Optional dark mode definitions (if user toggles it later), 
+   but forced off for now via layout.tsx to maintain standard SaaS look */
 .dark {
   --background: #111827;
   --foreground: #F9FAFB;
@@ -144,21 +146,22 @@
     @apply border-border outline-ring/50;
   }
   html, body {
-    @apply min-h-screen overflow-x-hidden m-0 p-0 bg-background; /* ← only change */
+    @apply min-h-screen overflow-x-hidden m-0 p-0;
   }
   body {
     @apply bg-background text-foreground;
   }
-
+  
+  /* Hide scrollbar on homepage, pricing page, and login page when footer is collapsed */
   #home-root,
   #pricing-root,
   #login-root {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
   }
   #home-root::-webkit-scrollbar,
   #pricing-root::-webkit-scrollbar,
   #login-root::-webkit-scrollbar {
-    display: none;
+    display: none; /* Chrome/Safari/Opera */
   }
 }

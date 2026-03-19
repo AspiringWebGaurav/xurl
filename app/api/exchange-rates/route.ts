@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { logger } from "@/lib/utils/logger";
 
 export const revalidate = 86400; // Cache for 24 hours (86400 seconds)
 
@@ -21,9 +20,7 @@ export async function GET() {
             }
         });
     } catch (error) {
-        logger.error("exchange_rates_fetch_error", "Failed to fetch exchange rates", {
-            error: error instanceof Error ? error.message : String(error),
-        });
+        console.error("Error fetching exchange rates:", error);
         // Fallback to default rates if API fails
         return NextResponse.json({
             rates: {

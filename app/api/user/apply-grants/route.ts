@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { checkUserBanned } from "@/lib/admin-access";
 import { applyPendingGrantsForEmail } from "@/services/grants";
 
 export async function POST(request: NextRequest) {
@@ -15,11 +14,6 @@ export async function POST(request: NextRequest) {
         decoded = await adminAuth.verifyIdToken(token);
     } catch {
         return NextResponse.json({ code: "UNAUTHORIZED", message: "Invalid token" }, { status: 401 });
-    }
-
-    const { banned } = await checkUserBanned(decoded.uid);
-    if (banned) {
-        return NextResponse.json({ code: "ACCESS_SUSPENDED", message: "Access suspended." }, { status: 403 });
     }
 
     const applied = await applyPendingGrantsForEmail(decoded.email, decoded.uid);

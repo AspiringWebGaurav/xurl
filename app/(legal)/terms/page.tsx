@@ -39,7 +39,7 @@ export default function TermsPage() {
                     <p>When you create an account via Google sign-in, you must provide accurate information. Paid plans are one-time purchases processed securely via Razorpay. Each purchase adds link creation credits to your cumulative quota permanently. Quotas do not expire and are not reset.</p>
 
                     <h3>6. Account Termination</h3>
-                    <p>We reserve the right to suspend or terminate your account, without prior notice or refund, if you violate these Terms or engage in abusive behavior. Upon termination, your shortened links may be deactivated and any unused quota will be forfeited. For details on enforcement actions and the appeal process, see our <a href="/ban-policy" target="_blank" rel="noopener noreferrer">Ban Policy</a>.</p>
+                    <p>We reserve the right to suspend or terminate your account, without prior notice or refund, if you violate these Terms or engage in abusive behavior. Upon termination, your shortened links may be deactivated and any unused quota will be forfeited.</p>
 
                     <h3>7. Intellectual Property</h3>
                     <p>The Service, including its design and technology, is owned by XURL. You retain ownership of the URLs you submit. By using the Service, you grant XURL a non-exclusive license to store, process, and redirect through your submitted URLs as necessary to operate the Service.</p>

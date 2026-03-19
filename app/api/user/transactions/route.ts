@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { checkUserBanned } from "@/lib/admin-access";
 import { logger } from "@/lib/utils/logger";
 
 export async function GET(request: NextRequest) {
@@ -16,11 +15,6 @@ export async function GET(request: NextRequest) {
             decoded = await adminAuth.verifyIdToken(token);
         } catch {
             return NextResponse.json({ code: "UNAUTHORIZED", message: "Invalid token" }, { status: 401 });
-        }
-
-        const { banned } = await checkUserBanned(decoded.uid);
-        if (banned) {
-            return NextResponse.json({ code: "ACCESS_SUSPENDED", message: "Access suspended." }, { status: 403 });
         }
 
         const { searchParams } = new URL(request.url);

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { checkUserBanned } from "@/lib/admin-access";
 import { logger } from "@/lib/utils/logger";
-import { DEFAULT_ACCESS } from "@/types";
-import { ensureUserGuestEntity } from "@/services/guest";
 
 export async function GET(request: NextRequest) {
     try {
@@ -35,21 +32,9 @@ export async function GET(request: NextRequest) {
                     plan: "free",
                     createdAt: now,
                     updatedAt: now,
-                    access: { ...DEFAULT_ACCESS, updatedAt: now },
                 },
                 { merge: true }
             );
-
-            // Ensure guest_entity exists and is linked
-            try {
-                await ensureUserGuestEntity(decoded.uid);
-            } catch (err) {
-                logger.error("profile_guest_entity_creation", "Failed to ensure guest entity", {
-                    userId: decoded.uid,
-                    error: err instanceof Error ? err.message : String(err),
-                });
-                // Don't fail profile creation - this is best-effort
-            }
 
             return NextResponse.json({
                 displayName: fallbackDisplayName,
@@ -57,13 +42,8 @@ export async function GET(request: NextRequest) {
         }
 
         const userData = userSnap.data()!;
-
-        const { banned } = await checkUserBanned(decoded.uid);
-        if (banned) {
-            return NextResponse.json({ code: "ACCESS_SUSPENDED", message: "Access suspended." }, { status: 403 });
-        }
-
-        return NextResponse.json({
+        
+        return NextResponse.json({ 
             displayName: userData.displayName || fallbackDisplayName,
         });
     } catch {
@@ -84,11 +64,6 @@ export async function PATCH(request: NextRequest) {
             decoded = await adminAuth.verifyIdToken(token);
         } catch {
             return NextResponse.json({ code: "UNAUTHORIZED", message: "Invalid token" }, { status: 401 });
-        }
-
-        const { banned } = await checkUserBanned(decoded.uid);
-        if (banned) {
-            return NextResponse.json({ code: "ACCESS_SUSPENDED", message: "Access suspended." }, { status: 403 });
         }
 
         const body = await request.json();

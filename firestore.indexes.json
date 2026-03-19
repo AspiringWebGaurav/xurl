@@ -83,24 +83,6 @@
                     "order": "DESCENDING"
                 }
             ]
-        },
-        {
-            "collectionGroup": "users",
-            "queryScope": "COLLECTION",
-            "fields": [
-                { "fieldPath": "access.status", "order": "ASCENDING" },
-                { "fieldPath": "access.mode", "order": "ASCENDING" },
-                { "fieldPath": "access.expiresAt", "order": "ASCENDING" }
-            ]
-        },
-        {
-            "collectionGroup": "guest_entities",
-            "queryScope": "COLLECTION",
-            "fields": [
-                { "fieldPath": "access.status", "order": "ASCENDING" },
-                { "fieldPath": "access.mode", "order": "ASCENDING" },
-                { "fieldPath": "access.expiresAt", "order": "ASCENDING" }
-            ]
         }
     ],
     "fieldOverrides": [

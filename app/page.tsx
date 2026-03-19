@@ -263,7 +263,7 @@ export default function HomePage() {
         }
     }, [focusTriggered]);
 
-    // ── Guest state sync (now handled by GuestManager in AccessGate) ──
+    // ── Server-synced guest state (source of truth is Firestore, NOT localStorage) ──
     useEffect(() => {
         if (user) {
             setGuestLoading(false);
@@ -275,13 +275,16 @@ export default function HomePage() {
 
         const syncGuestState = async () => {
             try {
-                const { guestManager } = await import("@/lib/guest-manager");
-                const data = await guestManager.initialize();
+                const fp = await getDeviceFingerprint();
+                const res = await fetch("/api/guest-status", {
+                    headers: { "x-device-fingerprint": fp },
+                });
                 if (cancelled) return;
+                const data = await res.json();
 
                 if (data.active && data.slug) {
                     setGuestUsed(true);
-                    const expiresAt = Date.now() + (data.expiresIn! * 1000);
+                    const expiresAt = Date.now() + (data.expiresIn * 1000);
                     setGuestExpiresAt(expiresAt);
                     localStorage.setItem("xurl_guest_link_history", JSON.stringify({ slug: data.slug, expiresAt }));
 
@@ -979,9 +982,9 @@ export default function HomePage() {
                                                 asChild
                                                 className="w-full max-w-[240px] h-11 bg-emerald-600 text-white hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all rounded-lg font-medium tracking-wide"
                                             >
-                                                <Link href="/contact" className="flex items-center justify-center">
+                                                <a href="mailto:support@xurl.eu.cc" className="flex items-center justify-center">
                                                     Contact Support <ExternalLink className="w-4 h-4 ml-2" />
-                                                </Link>
+                                                </a>
                                             </Button>
                                         ) : (
                                             <Button
