@@ -570,12 +570,28 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                 setGuestExpiresAt(newGuestExpiresAt);
                 localStorage.setItem("xurl_guest_link_history", JSON.stringify({ slug: data.slug, expiresAt: newGuestExpiresAt }));
             } else {
-                // Refresh quota automatically
+                // Refresh quota automatically with ALL fields including free plan counters
                 user.getIdToken().then(token => {
                     fetch("/api/links?pageSize=1", { headers: { "Authorization": `Bearer ${token}` } })
                         .then(r => r.json())
                         .then(d => {
-                            if (d.limit) setQuota({ freeLinksCreated: d.freeLinksCreated, paidLinksCreated: d.paidLinksCreated, limit: d.limit, plan: d.plan || "free", planRenewals: d.planRenewals, planTtlHours: d.planTtlHours, expiredLinksCount: d.expiredLinksCount, totalLinksEver: d.totalLinksEver });
+                            if (d.limit) {
+                                setQuota({
+                                    freeLinksCreated: d.freeLinksCreated,
+                                    paidLinksCreated: d.paidLinksCreated,
+                                    limit: d.limit,
+                                    plan: d.plan || "free",
+                                    planRenewals: d.planRenewals,
+                                    planTtlHours: d.planTtlHours,
+                                    expiredLinksCount: d.expiredLinksCount,
+                                    totalLinksEver: d.totalLinksEver,
+                                    // CRITICAL: Free plan specific fields for real-time quota enforcement
+                                    freeUsageCount: d.freeUsageCount,
+                                    freeMaxUses: d.freeMaxUses,
+                                    cooldownRemainingMs: d.cooldownRemainingMs,
+                                    canCreateFreeLink: d.canCreateFreeLink
+                                });
+                            }
                         })
                         .catch(console.error);
                 });
