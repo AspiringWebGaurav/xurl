@@ -145,11 +145,11 @@
   * {
     @apply border-border outline-ring/50;
   }
-  html, body {
-    @apply min-h-screen overflow-x-hidden m-0 p-0;
+  html {
+    @apply min-h-screen m-0 p-0;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply min-h-screen overflow-x-hidden m-0 p-0 bg-background text-foreground;
   }
   
   /* Hide scrollbar on homepage, pricing page, and login page when footer is collapsed */

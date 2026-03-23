@@ -95,6 +95,7 @@ screenshot/
 
 # Local developer data (indexes, caches)
 .local/
+.local/docs-index.json
 
 #scripts
 .scripts/

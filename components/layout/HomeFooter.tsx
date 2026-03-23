@@ -32,6 +32,7 @@ const footerColumns = [
             { href: "/privacy", label: "Privacy Policy" },
             { href: "/acceptable-use", label: "Acceptable Use" },
             { href: "/refund", label: "Refund Policy" },
+            { href: "/open-source", label: "Open Source" },
         ],
     },
 ];
@@ -39,7 +40,6 @@ const footerColumns = [
 const minimalLegalLinks = [
     { href: "/terms", label: "Terms" },
     { href: "/privacy", label: "Privacy" },
-    { href: "/acceptable-use", label: "Acceptable Use" },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -146,6 +146,8 @@ export function HomeFooter() {
                             <Link
                                 key={link.href}
                                 href={link.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="rounded-md px-2 py-1 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground"
                             >
                                 {link.label}
@@ -209,6 +211,8 @@ export function HomeFooter() {
                                                 <Link
                                                     key={link.href}
                                                     href={link.href}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
                                                     className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium"
                                                 >
                                                     {link.label}
