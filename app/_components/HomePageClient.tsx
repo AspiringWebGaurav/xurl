@@ -72,7 +72,23 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
     const [loadingText, setLoadingText] = useState("");
     const [error, setError] = useState("");
     const [copied, setCopied] = useState(false);
-    const [guestUsed, setGuestUsed] = useState(!initialGuestStatus.allowed);
+    const [guestUsed, setGuestUsed] = useState(() => {
+        if (typeof window !== "undefined") {
+            // sessionStorage survives client-side navigation (stale RSC cache protection)
+            // localStorage survives across tabs/sessions (cross-tab + IP-change protection)
+            if (
+                sessionStorage.getItem("xurl_guest_locked") === "true" ||
+                localStorage.getItem("xurl_guest_locked") === "true"
+            ) {
+                return true;
+            }
+            // Secondary evidence: link history exists even if locked flags were cleared
+            if (localStorage.getItem("xurl_guest_link_history")) {
+                return true;
+            }
+        }
+        return !initialGuestStatus.allowed;
+    });
     const [guestLoading, setGuestLoading] = useState(false);
     const [showQR, setShowQR] = useState(false);
     const [preview, setPreview] = useState<{ title?: string, favicon?: string } | null>(null);
@@ -115,7 +131,15 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
 
     // CRITICAL: Strict loading gate - prevents any render until all data is ready
     useEffect(() => {
+        let quotaAbortController: AbortController | null = null;
+
         const unsubscribe = onAuthStateChanged(auth, (u) => {
+            // Abort any in-flight quota fetch from a previous auth state change
+            if (quotaAbortController) {
+                quotaAbortController.abort();
+                quotaAbortController = null;
+            }
+
             setUser(u);
             setAuthLoading(false);
             
@@ -138,13 +162,18 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                 setGuestExpiresAt(null);
                 setViewingPastLink(false);
                 setCountdown("");
+
+                quotaAbortController = new AbortController();
+                const { signal } = quotaAbortController;
                 
                 u.getIdToken()
                     .then(token => fetch("/api/links?pageSize=1", { 
-                        headers: { "Authorization": `Bearer ${token}` } 
+                        headers: { "Authorization": `Bearer ${token}` },
+                        signal
                     }))
                     .then(r => r.json())
                     .then(d => {
+                        if (signal.aborted) return;
                         if (d.limit) {
                             setQuota({
                                 freeLinksCreated: d.freeLinksCreated,
@@ -165,22 +194,63 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                         setQuotaFetched(true);
                     })
                     .catch(err => {
+                        if (err?.name === "AbortError") return;
                         console.error("Quota fetch failed", err);
                         setQuotaFetched(true); // Still unblock, but with no quota
                     })
                     .finally(() => {
-                        setQuotaLoading(false);
+                        if (!signal.aborted) setQuotaLoading(false);
                     });
             } else {
                 // Guest - no quota needed
                 setQuota(null);
                 setQuotaFetched(true);
                 setQuotaLoading(false);
+
+                // Restore guest locked state on logout (or initial load with stale cache)
+                const isLockedInStorage = typeof window !== "undefined" && (
+                    sessionStorage.getItem("xurl_guest_locked") === "true" ||
+                    localStorage.getItem("xurl_guest_locked") === "true"
+                );
+
+                // Secondary evidence: link history exists even if locked flag was cleared
+                const hasLinkHistory = typeof window !== "undefined" && !!localStorage.getItem("xurl_guest_link_history");
+
+                if (isLockedInStorage || hasLinkHistory) {
+                    setGuestUsed(true);
+                    setViewingPastLink(false);
+                    // Re-persist locked flag if only link history was found (self-healing)
+                    if (!isLockedInStorage && hasLinkHistory) {
+                        sessionStorage.setItem("xurl_guest_locked", "true");
+                        localStorage.setItem("xurl_guest_locked", "true");
+                    }
+                    try {
+                        const raw = localStorage.getItem("xurl_guest_link_history");
+                        if (raw) {
+                            const { slug, expiresAt } = JSON.parse(raw);
+                            if (slug && expiresAt && expiresAt > Date.now()) {
+                                setShortUrl(buildShortUrl(slug));
+                                setGuestExpiresAt(expiresAt);
+                            }
+                        }
+                    } catch { /* ignore corrupt localStorage */ }
+                }
             }
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        return () => unsubscribe();
+        return () => {
+            if (quotaAbortController) quotaAbortController.abort();
+            unsubscribe();
+        };
     }, []);
+
+    // Persist guest locked flag for navigation/logout resilience
+    useEffect(() => {
+        if (typeof window !== "undefined" && guestUsed) {
+            sessionStorage.setItem("xurl_guest_locked", "true");
+            localStorage.setItem("xurl_guest_locked", "true");
+        }
+    }, [guestUsed]);
 
     useEffect(() => {
         if (!user || grantNotified || typeof window === "undefined") {
@@ -191,6 +261,9 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
         if (!raw) {
             return;
         }
+
+        let animFrameId: number | null = null;
+        let confettiCanvas: HTMLCanvasElement | null = null;
 
         try {
             const parsed = JSON.parse(raw) as {
@@ -223,6 +296,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
             }
 
             const canvas = document.createElement("canvas");
+            confettiCanvas = canvas;
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             canvas.style.position = "fixed";
@@ -260,15 +334,17 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                     });
 
                     if (time - startedAt < 1400) {
-                        requestAnimationFrame(draw);
+                        animFrameId = requestAnimationFrame(draw);
                     } else {
                         canvas.remove();
+                        confettiCanvas = null;
                     }
                 };
 
-                requestAnimationFrame(draw);
+                animFrameId = requestAnimationFrame(draw);
             } else {
                 canvas.remove();
+                confettiCanvas = null;
             }
 
             localStorage.removeItem("xurl_pending_grants_applied");
@@ -276,6 +352,11 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
         } catch {
             localStorage.removeItem("xurl_pending_grants_applied");
         }
+
+        return () => {
+            if (animFrameId !== null) cancelAnimationFrame(animFrameId);
+            if (confettiCanvas) confettiCanvas.remove();
+        };
     }, [user, grantNotified]);
 
     useEffect(() => {
@@ -358,7 +439,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
             const updateCountdown = () => {
                 const now = Date.now();
                 if (guestExpiresAt <= now) {
-                    setGuestUsed(false);
+                    // Link expired — keep guest LOCKED (lifetime limit enforced by server)
                     setGuestExpiresAt(null);
                     setShortUrl("");
                     setViewingPastLink(false);
