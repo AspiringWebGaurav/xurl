@@ -1,22 +1,16 @@
-fix: overhaul grant tracking system and implement dynamic application branding
+fix: resolve build type errors in link tracking logic
 
 Problem Statement:
-1. The global `gift_usage_count` tracking was not granular enough for multiple grant allocations, causing usage mismatch bugs.
-2. The default Vercel favicon persisted in production due to hardcoded layout metadata and aggressive edge middleware intercepting Next.js dynamic image routes.
-3. Accessibility warnings were present for Radix DialogContent components in the console.
-4. UI for expiring links lacked precise countdowns and clear indicators for permanent links.
+1. The recent overhaul to granular per-grant tracking introduced a scope resolution issue in `services/links.ts` where `migratedGifts` was block-scoped but referenced in an outer block.
+2. The `giftBonus` variable name was mismatched after renaming to `remainingGiftLinks`.
+3. The TypeScript compiler strictly enforced the `GiftQuota` interface resulting in missing `used` property compilation errors in the build step, preventing Vercel deployments from succeeding.
 
 Fixes Implemented:
-1. Granular Grant Tracking:
-   - Shifted from a global counter to per-grant `used` tracking inside `services/links.ts`.
-   - Added lazy migration logic to seamlessly transition legacy production data.
-   - Updated the Admin Dashboard to show precise per-grant usage and added manual custom expiry inputs.
-2. Dynamic App Branding & SEO:
-   - Implemented dynamic Next.js image responses (`icon.tsx`, `apple-icon.tsx`, `opengraph-image.tsx`, `twitter-image.tsx`).
-   - Removed hardcoded static icon metadata from `app/layout.tsx`.
-   - Whitelisted special Next.js asset paths (`/icon`, `/manifest.webmanifest`, etc.) in `proxy.ts` to prevent the edge middleware from treating them as shortened link slugs.
-3. UI/UX & Accessibility:
-   - Replaced generic "Expiring" text with precise real-time countdowns ("Expires in Xd/Xh").
-   - Added infinity indicators for permanent links in the History drawer.
-   - Resolved DialogContent `aria-describedby` warnings across navigation and modal components.
-   - Improved UI state locking when users have active gifts.
+1. TypeScript Declarations: 
+   - Explicitly added the `used?: number` property to the global `GiftQuota` interface in `types/index.ts` to reflect the new dynamic grant consumption logic.
+   - Fixed inline interface definitions in `services/links.ts`, `services/grants.ts`, and `app/api/links/route.ts` to strictly type the new properties.
+2. Block Scope & Variable Naming:
+   - Elevated the scope of `migratedGifts` out of the localized block in `services/links.ts` to guarantee visibility during the write-back transaction.
+   - Standardized `remainingGiftLinks` in calculating the effective limit, matching the new precise grant arithmetic.
+3. Build Verification:
+   - Ensured a clean, robust build via a local `npm run build` mimicking the Vercel edge runtime environment.

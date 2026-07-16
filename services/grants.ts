@@ -64,7 +64,7 @@ async function applyLinkGift(
         const userSnap = await tx.get(userRef);
         const userData = userSnap.exists ? (userSnap.data() as any) : null;
         const currentPlan = resolvePlanType(userData?.plan || "free");
-        const existingGifts: { id: string; amount: number; expiresAt: number | null }[] = Array.isArray(userData?.giftQuotas)
+        const existingGifts: { id: string; amount: number; expiresAt: number | null; used?: number }[] = Array.isArray(userData?.giftQuotas)
             ? userData.giftQuotas
             : [];
 

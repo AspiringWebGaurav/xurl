@@ -237,8 +237,8 @@ export async function GET(request: NextRequest) {
         const config = PLAN_CONFIGS[plan];
         
         const giftQuotas = Array.isArray(userData?.giftQuotas) ? userData.giftQuotas : [];
-        const activeGiftQuotas = giftQuotas.filter((gift: { amount: number; expiresAt: number | null }) => !gift.expiresAt || gift.expiresAt > now);
-        const giftBonus = activeGiftQuotas.reduce((sum: number, gift: { amount: number }) => sum + (gift.amount || 0), 0);
+        const activeGiftQuotas = giftQuotas.filter((gift: { amount: number; expiresAt: number | null; used?: number }) => !gift.expiresAt || gift.expiresAt > now);
+        const giftBonus = activeGiftQuotas.reduce((sum: number, gift: { amount: number; used?: number }) => sum + Math.max(0, (gift.amount || 0) - (gift.used || 0)), 0);
 
         let effectiveLimit: number;
         if (plan === "free") {

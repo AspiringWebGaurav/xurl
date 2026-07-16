@@ -111,9 +111,10 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                 createdAt: now,
                 updatedAt: now,
             };
-            let activeGiftQuotas: { id: string; amount: number; expiresAt: number | null }[] = [];
+            let activeGiftQuotas: { id: string; amount: number; expiresAt: number | null; used?: number }[] = [];
             let originalGiftQuotaCount = 0;
             let consumedQuota: 'free' | 'gift' = 'free';
+            let migratedGifts = false;
 
             // If user is authenticated, handle limits and logic via user doc
             if (userId !== "anonymous") {
@@ -143,7 +144,6 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                 
                 // Lazy migration: Distribute legacy gift_usage_count to per-grant `used` fields
                 let legacyGiftUsage = userData.gift_usage_count || 0;
-                let migratedGifts = false;
                 
                 giftQuotas = giftQuotas.map(gift => {
                     if (typeof gift.used !== 'number') {
@@ -217,10 +217,10 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
 
                 let effectiveLimit: number;
                 if (currentPlan === "free") {
-                    effectiveLimit = config.limit + giftBonus;
+                    effectiveLimit = config.limit + remainingGiftLinks;
                 } else {
                     // Use permanent accumulated limit, fallback for legacy users
-                    effectiveLimit = (userData.cumulativeQuota || (config.limit * (userData.planRenewals || 1))) + giftBonus;
+                    effectiveLimit = (userData.cumulativeQuota || (config.limit * (userData.planRenewals || 1))) + remainingGiftLinks;
                 }
 
                 // Count ALL active links belonging to the user across ALL time (infinite accumulation)
