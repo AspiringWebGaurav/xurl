@@ -153,6 +153,55 @@ export async function POST(request: NextRequest) {
             });
         }
 
+        // ─── Free Fulfillment (100% Promo Code Bypass) ──────────────────────
+        if (finalAmountPaise === 0 && promoValidation?.valid) {
+            const syntheticOrderId = `free-${decoded.uid}-${now}`;
+            const orderDoc: OrderDocument = {
+                orderId: syntheticOrderId,
+                userId: decoded.uid,
+                planId,
+                amount: 0,
+                baseAmount: promoValidation.originalAmount,
+                discountAmount: promoValidation.discountAmount,
+                promoCodeId: promoValidation.promoId,
+                promoCode: promoValidation.code,
+                promoDiscountType: promoValidation.discountType,
+                promoDiscountValue: promoValidation.discountValue,
+                currency: "INR",
+                status: "paid",
+                source: "promo_free",
+                createdAt: now,
+                updatedAt: now,
+            };
+
+            await adminDb.collection("orders").doc(syntheticOrderId).set(orderDoc);
+
+            await applyPlanUpgrade(planId, decoded.uid, syntheticOrderId, `free-${now}`, undefined, {
+                source: "promo_free",
+                amountPaise: 0,
+            });
+
+            logger.info(
+                "payment_order_free_fulfillment",
+                `100% Promo Code applied for user ${decoded.uid} plan ${planId}`
+            );
+
+            return NextResponse.json({
+                success: true,
+                orderId: syntheticOrderId,
+                amount: 0,
+                currency: "INR",
+                pricing: {
+                    originalAmount: orderDoc.baseAmount,
+                    discountAmount: orderDoc.discountAmount,
+                    finalAmount: 0,
+                    promoCode: orderDoc.promoCode,
+                },
+                freeFulfillment: true,
+                planId: planId
+            });
+        }
+
         // ─── Normal Razorpay flow (production + non-dev users) ────────────────
         const order = await razorpayService.createOrder({
             userId: decoded.uid,

@@ -24,7 +24,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { HomeFooter } from "@/components/layout/HomeFooter";
 import { UpgradeNavbar } from "@/components/layout/UpgradeNavbar";
-import { Loader2, ArrowRight, Link2, Clock, Check, ShieldCheck, Zap, AlertCircle } from "lucide-react";
+import { Loader2, ArrowRight, Link2, Clock, Check, ShieldCheck, Zap, AlertCircle, PartyPopper, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Suspense } from "react";
 import Script from "next/script";
@@ -123,7 +123,7 @@ function LoginContent() {
     const [isUpgrading, setIsUpgrading] = useState(false);
     const [showLoginOverlay, setShowLoginOverlay] = useState(false);
     const [overlayMessage, setOverlayMessage] = useState<React.ReactNode>("Connecting to Google...");
-    const [paymentState, setPaymentState] = useState<"idle" | "upgrading" | "processing" | "success" | "failed" | "cancelled">("idle");
+    const [paymentState, setPaymentState] = useState<"idle" | "upgrading" | "processing" | "success" | "free_success" | "failed" | "cancelled">("idle");
     const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -321,6 +321,16 @@ function LoginContent() {
                         return;
                     }
 
+                    // Free Fulfillment bypass (100% Promo Code)
+                    if (data.freeFulfillment) {
+                        setPaymentState("free_success");
+                        setIsUpgrading(false);
+                        setTimeout(() => {
+                            user.getIdToken(true).then(() => router.push("/"));
+                        }, 5000);
+                        return;
+                    }
+
                     loadRazorpayOptions(data.orderId, data.amount, data.currency, planContext?.badgeName || "Paid Plan");
                 } else {
                     setPaymentState("failed");
@@ -390,7 +400,7 @@ function LoginContent() {
             
             {/* Global Payment Overlay for states like processing & success */}
             <AnimatePresence>
-                {(paymentState === "processing" || paymentState === "success" || paymentState === "failed" || paymentState === "cancelled") && (
+                {(paymentState === "processing" || paymentState === "success" || paymentState === "free_success" || paymentState === "failed" || paymentState === "cancelled") && (
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -401,7 +411,11 @@ function LoginContent() {
                             initial={{ scale: 0.9, y: 20 }}
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.9, opacity: 0 }}
-                            className="bg-card w-full max-w-sm rounded-2xl shadow-xl border border-border p-8 flex flex-col items-center text-center"
+                            className={`w-full max-w-sm rounded-2xl shadow-xl border p-8 flex flex-col items-center text-center ${
+                                paymentState === "free_success" 
+                                ? "bg-white dark:bg-slate-950 backdrop-blur-xl border-purple-200 dark:border-purple-900/50 ring-2 ring-purple-500/30 shadow-[0_0_40px_rgba(168,85,247,0.2)]" 
+                                : "bg-card border-border"
+                            }`}
                         >
                             {paymentState === "processing" ? (
                                 <>
@@ -412,6 +426,44 @@ function LoginContent() {
                                     <h3 className="text-xl font-bold text-foreground mb-2">Verifying Payment</h3>
                                     <p className="text-sm text-muted-foreground leading-relaxed">
                                         Please do not close this window. We are confirming your transaction with Razorpay...
+                                    </p>
+                                </>
+                            ) : paymentState === "free_success" ? (
+                                <>
+                                    <div className="w-16 h-16 rounded-full bg-purple-50 border border-purple-200 flex items-center justify-center mb-6 relative">
+                                        <motion.div
+                                            initial={{ scale: 0, rotate: -45 }}
+                                            animate={{ scale: 1, rotate: 0 }}
+                                            transition={{ type: "spring", stiffness: 200, damping: 10, delay: 0.1 }}
+                                        >
+                                            <PartyPopper className="w-8 h-8 text-purple-600" />
+                                        </motion.div>
+                                        <motion.div
+                                            animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+                                            transition={{ duration: 2, repeat: Infinity }}
+                                            className="absolute -top-1 -right-1"
+                                        >
+                                            <Sparkles className="w-4 h-4 text-amber-400" />
+                                        </motion.div>
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-foreground mb-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-indigo-600">
+                                        Congratulations!
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        Your 100% off promo code <strong className="text-foreground">{appliedPromo?.code}</strong> has been successfully applied and consumed!
+                                    </p>
+                                    <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-lg w-full flex flex-col gap-1 text-left">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-muted-foreground">Plan Unlocked</span>
+                                            <span className="text-sm font-semibold">{planContext?.badgeName}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-muted-foreground">Amount Charged</span>
+                                            <span className="text-sm font-semibold text-emerald-600">₹0.00</span>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-6 animate-pulse">
+                                        Redirecting to your dashboard...
                                     </p>
                                 </>
                             ) : paymentState === "success" ? (
