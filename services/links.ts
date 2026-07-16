@@ -28,6 +28,7 @@ import { safeRedis } from "@/lib/redis/client";
 export interface CreateLinkInput extends OriginalCreateLinkInput {
     ipHash?: string;
     fingerprintHash?: string;
+    quotaPreference?: 'free' | 'gift' | 'auto';
 }
 
 // Re-export for backward compatibility with existing imports
@@ -112,6 +113,7 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
             };
             let activeGiftQuotas: { id: string; amount: number; expiresAt: number | null }[] = [];
             let originalGiftQuotaCount = 0;
+            let consumedQuota: 'free' | 'gift' = 'free';
 
             // If user is authenticated, handle limits and logic via user doc
             if (userId !== "anonymous") {
@@ -137,31 +139,77 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                     userData.planStatus = "past_due";
                 }
 
-                const giftQuotas = Array.isArray(userData.giftQuotas) ? userData.giftQuotas : [];
+                let giftQuotas = Array.isArray(userData.giftQuotas) ? userData.giftQuotas : [];
+                
+                // Lazy migration: Distribute legacy gift_usage_count to per-grant `used` fields
+                let legacyGiftUsage = userData.gift_usage_count || 0;
+                let migratedGifts = false;
+                
+                giftQuotas = giftQuotas.map(gift => {
+                    if (typeof gift.used !== 'number') {
+                        migratedGifts = true;
+                        const toAllocate = Math.min(legacyGiftUsage, gift.amount);
+                        legacyGiftUsage -= toAllocate;
+                        return { ...gift, used: toAllocate };
+                    }
+                    return gift;
+                });
+
+                if (migratedGifts && userId !== "anonymous") {
+                    userData.giftQuotas = giftQuotas;
+                    // Note: We'll write this back at the end of the transaction
+                }
+
                 originalGiftQuotaCount = giftQuotas.length;
                 activeGiftQuotas = giftQuotas.filter((gift) => !gift.expiresAt || gift.expiresAt > now);
-                const giftBonus = activeGiftQuotas.reduce((sum, gift) => sum + (gift.amount || 0), 0);
+                const remainingGiftLinks = activeGiftQuotas.reduce((sum, gift) => sum + Math.max(0, (gift.amount || 0) - (gift.used || 0)), 0);
 
                 // ── Free Plan Cooldown & Usage Enforcement ──
                 if (currentPlan === "free") {
                     const freeConfig = PLAN_CONFIGS.free;
                     const usageCount = userData.free_usage_count || 0;
                     const lastUsed = userData.free_last_used_at || 0;
+                    const giftUsageCount = userData.gift_usage_count || 0;
+                    
+                    const effectiveMaxUses = (freeConfig.maxUses || 3);
+                    const pref = input.quotaPreference || 'auto';
 
-                    // Check lifetime max uses
-                    if (freeConfig.maxUses && usageCount >= freeConfig.maxUses) {
-                        const e = new Error(`You have used all ${freeConfig.maxUses} free link creations. Upgrade to continue.`);
-                        e.name = "FreeLimitExhausted";
-                        throw e;
+                    let usingGift = false;
+                    
+                    if (pref === 'gift') {
+                        usingGift = true;
+                    } else if (pref === 'free') {
+                        usingGift = false;
+                    } else {
+                        // Auto: Use gift if free is exhausted or on cooldown
+                        const freeExhausted = usageCount >= effectiveMaxUses;
+                        const freeOnCooldown = freeConfig.cooldownMs && lastUsed && (now - lastUsed) < freeConfig.cooldownMs;
+                        if ((freeExhausted || freeOnCooldown) && remainingGiftLinks > 0) {
+                            usingGift = true;
+                        }
                     }
 
-                    // Check 24-hour cooldown
-                    if (freeConfig.cooldownMs && lastUsed && (now - lastUsed) < freeConfig.cooldownMs) {
-                        const remainingMs = freeConfig.cooldownMs - (now - lastUsed);
-                        const remainingHours = Math.ceil(remainingMs / (60 * 60 * 1000));
-                        const e = new Error(`Free plan cooldown active. You can create another link in ${remainingHours} hour${remainingHours > 1 ? 's' : ''}. Upgrade for instant access.`);
-                        e.name = "FreeCooldownActive";
-                        throw e;
+                    if (usingGift) {
+                        if (remainingGiftLinks <= 0) {
+                            const e = new Error(`You have no remaining gift links. Upgrade to continue.`);
+                            e.name = "FreeLimitExhausted";
+                            throw e;
+                        }
+                        consumedQuota = 'gift';
+                    } else {
+                        if (freeConfig.maxUses && usageCount >= effectiveMaxUses) {
+                            const e = new Error(`You have used all ${effectiveMaxUses} free links. Upgrade to continue.`);
+                            e.name = "FreeLimitExhausted";
+                            throw e;
+                        }
+                        if (freeConfig.cooldownMs && lastUsed && (now - lastUsed) < freeConfig.cooldownMs) {
+                            const remainingMs = freeConfig.cooldownMs - (now - lastUsed);
+                            const remainingHours = Math.ceil(remainingMs / (60 * 60 * 1000));
+                            const e = new Error(`Free plan cooldown active. You can create another link in ${remainingHours} hour${remainingHours > 1 ? 's' : ''}. Upgrade for instant access.`);
+                            e.name = "FreeCooldownActive";
+                            throw e;
+                        }
+                        consumedQuota = 'free';
                     }
                 }
 
@@ -211,7 +259,11 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                 }
 
                 // Compute TTL for authenticated plan
-                finalExpiresAt = now + config.ttlMs;
+                if (consumedQuota === 'gift') {
+                    finalExpiresAt = null; // Gift links are permanent
+                } else {
+                    finalExpiresAt = now + config.ttlMs;
+                }
             } else {
                 // Determine Guest TTL
                 finalExpiresAt = input.expiresAt ?? null;
@@ -317,19 +369,33 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                 if (userData.planStatus) {
                     userUpdates.planStatus = userData.planStatus;
                 }
-                if (originalGiftQuotaCount !== activeGiftQuotas.length || activeGiftQuotas.length > 0) {
+                if (migratedGifts || originalGiftQuotaCount !== activeGiftQuotas.length || activeGiftQuotas.length > 0) {
                     userUpdates.giftQuotas = activeGiftQuotas;
                 }
                 // Free plan: increment usage counter and record timestamp
                 if (resolvedPlan === "free") {
-                    userUpdates.free_usage_count = FieldValue.increment(1);
-                    userUpdates.free_last_used_at = now;
+                    if (consumedQuota === 'gift') {
+                        userUpdates.gift_usage_count = FieldValue.increment(1);
+                        
+                        // Increment used count on the specific gift quota
+                        for (const gift of activeGiftQuotas) {
+                            const used = gift.used || 0;
+                            if (used < gift.amount) {
+                                gift.used = used + 1;
+                                break;
+                            }
+                        }
+                    } else {
+                        userUpdates.free_usage_count = FieldValue.increment(1);
+                        userUpdates.free_last_used_at = now;
+                    }
                 }
                 transaction.set(adminDb.collection("users").doc(userId), userUpdates, { merge: true });
             }
 
             return {
-                resolvedPlan: userId !== "anonymous" ? resolvePlanType(userData.plan || "free") : "guest"
+                resolvedPlan: userId !== "anonymous" ? resolvePlanType(userData.plan || "free") : "guest",
+                consumedQuota
             };
         }, { maxAttempts: 5 });
     } catch (e: unknown) {

@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { originalUrl, customSlug, title } = body;
+        const { originalUrl, customSlug, title, quotaPreference } = body;
         const idempotencyKey = request.headers.get("x-idempotency-key") || request.headers.get("idempotency-key") || undefined;
 
         if (!originalUrl) {
@@ -166,7 +166,8 @@ export async function POST(request: NextRequest) {
             expiresAt,
             idempotencyKey,
             ipHash: isGuest ? ipHash : undefined,
-            fingerprintHash: isGuest ? fingerprintHash : undefined
+            fingerprintHash: isGuest ? fingerprintHash : undefined,
+            quotaPreference
         });
 
         // Record guest usage natively inside createLink transaction closing TOCTOU
@@ -290,12 +291,14 @@ export async function GET(request: NextRequest) {
         let freeMaxUses: number | undefined;
         let cooldownRemainingMs: number | undefined;
         let canCreateFreeLink: boolean | undefined;
+        let giftUsageCount: number | undefined;
 
         if (plan === "free") {
             const freeConfig = PLAN_CONFIGS.free;
             freeUsageCount = userData?.free_usage_count || 0;
             const freeLastUsedAt = userData?.free_last_used_at || null;
             freeMaxUses = freeConfig.maxUses || 3;
+            giftUsageCount = userData?.gift_usage_count || 0;
             const freeCooldownMs = freeConfig.cooldownMs || 0;
 
             if (freeLastUsedAt && freeCooldownMs) {
@@ -304,7 +307,7 @@ export async function GET(request: NextRequest) {
                 cooldownRemainingMs = 0;
             }
 
-            canCreateFreeLink = (freeUsageCount || 0) < freeMaxUses && cooldownRemainingMs === 0;
+            canCreateFreeLink = (freeUsageCount || 0) < (freeMaxUses || 3) && cooldownRemainingMs === 0;
         }
 
         return NextResponse.json({
@@ -316,6 +319,7 @@ export async function GET(request: NextRequest) {
             activeLinks: activeLinksFromDoc,
             expiredLinksCount,
             giftedLinksAvailable: giftBonus,
+            activeGiftQuotas,
             limit: effectiveLimit,
             plan,
             planRenewals,
@@ -323,6 +327,7 @@ export async function GET(request: NextRequest) {
             // Free plan specific fields
             freeUsageCount,
             freeMaxUses,
+            giftUsageCount,
             cooldownRemainingMs,
             canCreateFreeLink
         });

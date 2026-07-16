@@ -14,7 +14,7 @@ interface RateLimitModalProps {
 export function RateLimitModal({ isOpen, onClose, retryAfterSeconds = 60 }: RateLimitModalProps) {
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-md p-0 overflow-hidden bg-background border-border shadow-xl rounded-xl">
+            <DialogContent aria-describedby={undefined} className="sm:max-w-md p-0 overflow-hidden bg-background border-border shadow-xl rounded-xl">
                 <AnimatePresence>
                     {isOpen && (
                         <motion.div

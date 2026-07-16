@@ -1,0 +1,22 @@
+fix: overhaul grant tracking system and implement dynamic application branding
+
+Problem Statement:
+1. The global `gift_usage_count` tracking was not granular enough for multiple grant allocations, causing usage mismatch bugs.
+2. The default Vercel favicon persisted in production due to hardcoded layout metadata and aggressive edge middleware intercepting Next.js dynamic image routes.
+3. Accessibility warnings were present for Radix DialogContent components in the console.
+4. UI for expiring links lacked precise countdowns and clear indicators for permanent links.
+
+Fixes Implemented:
+1. Granular Grant Tracking:
+   - Shifted from a global counter to per-grant `used` tracking inside `services/links.ts`.
+   - Added lazy migration logic to seamlessly transition legacy production data.
+   - Updated the Admin Dashboard to show precise per-grant usage and added manual custom expiry inputs.
+2. Dynamic App Branding & SEO:
+   - Implemented dynamic Next.js image responses (`icon.tsx`, `apple-icon.tsx`, `opengraph-image.tsx`, `twitter-image.tsx`).
+   - Removed hardcoded static icon metadata from `app/layout.tsx`.
+   - Whitelisted special Next.js asset paths (`/icon`, `/manifest.webmanifest`, etc.) in `proxy.ts` to prevent the edge middleware from treating them as shortened link slugs.
+3. UI/UX & Accessibility:
+   - Replaced generic "Expiring" text with precise real-time countdowns ("Expires in Xd/Xh").
+   - Added infinity indicators for permanent links in the History drawer.
+   - Resolved DialogContent `aria-describedby` warnings across navigation and modal components.
+   - Improved UI state locking when users have active gifts.

@@ -53,7 +53,7 @@ export function ApiDocsMobileNav({
                             Sections
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-h-[85dvh] gap-0 p-0 sm:max-w-md">
+                    <DialogContent aria-describedby={undefined} className="max-h-[85dvh] gap-0 p-0 sm:max-w-md">
                         <DialogHeader className="border-b border-border px-4 py-3">
                             <DialogTitle>API Navigation</DialogTitle>
                         </DialogHeader>

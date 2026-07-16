@@ -11,7 +11,7 @@ import { HomeFooter } from "@/components/layout/HomeFooter";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Check, Link2, Loader2, Lock, QrCode, Clock, ExternalLink, ArrowRight } from "lucide-react";
+import { Copy, Check, Link2, Loader2, Lock, QrCode, Clock, ExternalLink, ArrowRight, Gift } from "lucide-react";
 import QRCode from "react-qr-code";
 import Link from "next/link";
 import { getDeviceFingerprint } from "@/lib/utils/fingerprint";
@@ -107,8 +107,10 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
         totalLinksEver?: number;
         freeUsageCount?: number;
         freeMaxUses?: number;
+        giftUsageCount?: number;
         cooldownRemainingMs?: number;
         canCreateFreeLink?: boolean;
+        activeGiftQuotas?: { id: string, amount: number, expiresAt: number | null }[];
     } | null>(null);
     const [guestExpiresAt, setGuestExpiresAt] = useState<number | null>(initialGuestStatus.expiresIn && initialGuestStatus.expiresIn > 0 ? Date.now() + (initialGuestStatus.expiresIn * 1000) : null);
     const [countdown, setCountdown] = useState<string>("");
@@ -117,7 +119,15 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
     const [isRateLimited, setIsRateLimited] = useState(false);
     const [showDelayedModuleSkeleton, setShowDelayedModuleSkeleton] = useState(false);
     const [grantNotified, setGrantNotified] = useState(false);
+    const [selectedQuota, setSelectedQuotaState] = useState<'free' | 'gift' | null>(null);
     const router = useRouter();
+
+    const setSelectedQuota = (q: 'free' | 'gift') => {
+        setSelectedQuotaState(q);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('xurl_quota_pref', q);
+        }
+    };
 
     // Google login hook with consistent error handling
     const { login: handleGoogleLogin, isLoggingIn } = useGoogleLogin({
@@ -188,8 +198,25 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                 freeUsageCount: d.freeUsageCount,
                                 freeMaxUses: d.freeMaxUses,
                                 cooldownRemainingMs: d.cooldownRemainingMs,
-                                canCreateFreeLink: d.canCreateFreeLink
+                                canCreateFreeLink: d.canCreateFreeLink,
+                                activeGiftQuotas: d.activeGiftQuotas,
+                                giftUsageCount: d.giftUsageCount
                             });
+                            
+                            // Initialize selectedQuota (prioritize gift, fallback to free)
+                            const totalGiftBonus = d.activeGiftQuotas?.reduce((sum: number, g: any) => sum + (g.amount || 0), 0) || 0;
+                            const hasGiftsAvailable = totalGiftBonus > (d.giftUsageCount || 0);
+                            const savedPref = typeof window !== 'undefined' ? localStorage.getItem('xurl_quota_pref') : null;
+                            
+                            if (hasGiftsAvailable && savedPref !== 'free') {
+                                setSelectedQuotaState('gift');
+                            } else if (d.canCreateFreeLink || savedPref === 'free') {
+                                setSelectedQuotaState('free');
+                            } else if (hasGiftsAvailable) {
+                                setSelectedQuotaState('gift');
+                            } else {
+                                setSelectedQuotaState('free');
+                            }
                         }
                         setQuotaFetched(true);
                     })
@@ -600,7 +627,8 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                 headers,
                 body: JSON.stringify({
                     originalUrl: url.trim(),
-                    customSlug: alias.trim() || undefined
+                    customSlug: alias.trim() || undefined,
+                    quotaPreference: selectedQuota || undefined
                 }),
             });
 
@@ -670,8 +698,24 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                     freeUsageCount: d.freeUsageCount,
                                     freeMaxUses: d.freeMaxUses,
                                     cooldownRemainingMs: d.cooldownRemainingMs,
-                                    canCreateFreeLink: d.canCreateFreeLink
+                                    canCreateFreeLink: d.canCreateFreeLink,
+                                    activeGiftQuotas: d.activeGiftQuotas,
+                                    giftUsageCount: d.giftUsageCount
                                 });
+                                // Initialize selectedQuota (prioritize gift, fallback to free)
+                                const totalGiftBonus = d.activeGiftQuotas?.reduce((sum: number, g: any) => sum + (g.amount || 0), 0) || 0;
+                                const hasGiftsAvailable = totalGiftBonus > (d.giftUsageCount || 0);
+                                const savedPref = typeof window !== 'undefined' ? localStorage.getItem('xurl_quota_pref') : null;
+                                
+                                if (hasGiftsAvailable && savedPref !== 'free') {
+                                    setSelectedQuotaState('gift');
+                                } else if (d.canCreateFreeLink || savedPref === 'free') {
+                                    setSelectedQuotaState('free');
+                                } else if (hasGiftsAvailable) {
+                                    setSelectedQuotaState('gift');
+                                } else {
+                                    setSelectedQuotaState('free');
+                                }
                             }
                         })
                         .catch(console.error);
@@ -726,8 +770,12 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
 
     // Determine if the user has reached their quota limit or is in cooldown
     const isFreeLimitReached = !!(user && quota?.plan === "free" && (
-        (quota.freeUsageCount !== undefined && quota.freeMaxUses !== undefined && quota.freeUsageCount >= quota.freeMaxUses) ||
-        (quota.cooldownRemainingMs !== undefined && quota.cooldownRemainingMs > 0)
+        selectedQuota === 'free' 
+            ? ((quota.freeUsageCount !== undefined && quota.freeMaxUses !== undefined && quota.freeUsageCount >= quota.freeMaxUses) ||
+               (quota.cooldownRemainingMs !== undefined && quota.cooldownRemainingMs > 0))
+            : (selectedQuota === 'gift'
+                ? ((quota.activeGiftQuotas?.reduce((sum: number, g: any) => sum + (g.amount || 0), 0) || 0) <= (quota.giftUsageCount || 0))
+                : true) // default disable if nothing selected
     ));
     const isPaidOverQuota = !!(user && quota && quota.plan !== "free" && quota.paidLinksCreated >= quota.limit);
     const isGuestBlocked = !user && guestUsed && !viewingPastLink;
@@ -776,17 +824,83 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                             <>
                                                 {/* Free Plan Status - Show usage count and cooldown */}
                                                 {quota.plan === "free" && (
-                                                    <div className={`${statusPillBase} bg-indigo-50/90 border-indigo-200/80 text-indigo-700`}>
-                                                        <Link2 className="w-3.5 h-3.5 text-indigo-500" />
-                                                        {quota.freeUsageCount || 0} / {quota.freeMaxUses || 3} free links used
-                                                        {quota.cooldownRemainingMs && quota.cooldownRemainingMs > 0 && (
-                                                            <>
-                                                                <span className="text-indigo-300 mx-0.5">|</span>
-                                                                <Clock className="w-3.5 h-3.5 text-indigo-500" />
-                                                                Next in {formatCooldown(quota.cooldownRemainingMs)}
-                                                            </>
-                                                        )}
-                                                    </div>
+                                                    <>
+                                                        <button 
+                                                            onClick={() => !viewingPastLink && setSelectedQuota('free')}
+                                                            disabled={viewingPastLink}
+                                                            title={selectedQuota === 'free' ? 'Currently selected' : 'Click to use Free Quota'}
+                                                            className={`${statusPillBase} transition-all duration-200 ${viewingPastLink ? 'cursor-default' : 'cursor-pointer'} ${
+                                                                selectedQuota === 'free' 
+                                                                    ? 'bg-indigo-100 border-indigo-400 text-indigo-800 ring-2 ring-indigo-400 ring-offset-2 ring-offset-background shadow-md scale-105' 
+                                                                    : 'bg-indigo-50/90 border-indigo-200/80 text-indigo-700 hover:bg-indigo-100/80 hover:border-indigo-300'
+                                                            } ${viewingPastLink && selectedQuota !== 'free' ? 'opacity-50 hover:bg-indigo-50/90 hover:border-indigo-200/80' : ''}`}
+                                                        >
+                                                            <Link2 className={`w-3.5 h-3.5 ${selectedQuota === 'free' ? 'text-indigo-600' : 'text-indigo-500'}`} />
+                                                            {Math.min(quota.freeUsageCount || 0, quota.freeMaxUses || 3)} / {quota.freeMaxUses || 3} free links
+                                                            {quota.cooldownRemainingMs && quota.cooldownRemainingMs > 0 ? (
+                                                                <>
+                                                                    <span className="text-indigo-300 mx-0.5">|</span>
+                                                                    <Clock className={`w-3.5 h-3.5 ${selectedQuota === 'free' ? 'text-indigo-600' : 'text-indigo-500'}`} />
+                                                                    Next in {formatCooldown(quota.cooldownRemainingMs)}
+                                                                </>
+                                                            ) : null}
+                                                        </button>
+                                                        {/* Render Aggregate Gift Badge */
+                                                         (() => {
+                                                            const totalGiftBonus = quota.activeGiftQuotas?.reduce((sum: number, g: any) => sum + (g.amount || 0), 0) || 0;
+                                                            if (totalGiftBonus === 0) return null;
+                                                            const remainingGiftLinks = Math.max(0, totalGiftBonus - (quota.giftUsageCount || 0));
+                                                            if (remainingGiftLinks === 0) return null;
+
+                                                            const isPermanent = quota.activeGiftQuotas!.some((g: any) => !g.expiresAt);
+                                                            
+                                                            let expiryText = "Expiring";
+                                                            if (!isPermanent && quota.activeGiftQuotas!.length > 0) {
+                                                                const earliestExpiry = Math.min(...quota.activeGiftQuotas!.map((g: any) => g.expiresAt));
+                                                                const hoursLeft = Math.max(0, (earliestExpiry - Date.now()) / (1000 * 60 * 60));
+                                                                if (hoursLeft > 48) {
+                                                                    expiryText = `Expires in ${Math.ceil(hoursLeft / 24)}d`;
+                                                                } else if (hoursLeft > 0) {
+                                                                    expiryText = `Expires in ${Math.ceil(hoursLeft)}h`;
+                                                                }
+                                                            }
+                                                            
+                                                            const hasGiftsAvailable = remainingGiftLinks > 0;
+                                                            
+                                                            const isSelected = selectedQuota === 'gift';
+                                                            const baseColors = isPermanent 
+                                                                ? 'bg-fuchsia-50/90 border-fuchsia-300/80 text-fuchsia-700 shadow-[0_0_12px_rgba(232,121,249,0.3)]' 
+                                                                : 'bg-pink-50/90 border-pink-200/80 text-pink-700';
+                                                            const hoverColors = isPermanent
+                                                                ? 'hover:bg-fuchsia-100 hover:border-fuchsia-400'
+                                                                : 'hover:bg-pink-100 hover:border-pink-300';
+                                                            const selectedColors = isPermanent
+                                                                ? 'bg-fuchsia-100 border-fuchsia-500 text-fuchsia-900 ring-2 ring-fuchsia-500 ring-offset-2 ring-offset-background shadow-lg scale-105'
+                                                                : 'bg-pink-100 border-pink-400 text-pink-800 ring-2 ring-pink-400 ring-offset-2 ring-offset-background shadow-md scale-105';
+                                                                
+                                                            return (
+                                                                <button 
+                                                                    key="aggregate-gift" 
+                                                                    onClick={() => !viewingPastLink && hasGiftsAvailable && setSelectedQuota('gift')}
+                                                                    disabled={!hasGiftsAvailable || viewingPastLink}
+                                                                    title={isSelected ? 'Currently selected' : (hasGiftsAvailable ? 'Click to use Gift Quota' : 'No gift quota available')}
+                                                                    className={`${statusPillBase} transition-all duration-200 ${hasGiftsAvailable && !viewingPastLink ? 'cursor-pointer' : (viewingPastLink ? 'cursor-default' : 'opacity-50 cursor-not-allowed')} ${
+                                                                        isSelected ? selectedColors : `${baseColors} ${hoverColors}`
+                                                                    } ${viewingPastLink && !isSelected ? 'opacity-50' : ''} ${viewingPastLink && !isSelected && isPermanent ? 'hover:bg-fuchsia-50/90 hover:border-fuchsia-300/80' : ''} ${viewingPastLink && !isSelected && !isPermanent ? 'hover:bg-pink-50/90 hover:border-pink-200/80' : ''}`}
+                                                                >
+                                                                    <Gift className={`w-3.5 h-3.5 ${isPermanent ? (isSelected ? 'text-fuchsia-600' : 'text-fuchsia-500') : (isSelected ? 'text-pink-600' : 'text-pink-500')}`} />
+                                                                    {remainingGiftLinks} Gift Links
+                                                                    <span className={isPermanent ? 'text-fuchsia-300 mx-0.5' : 'text-pink-300 mx-0.5'}>|</span>
+                                                                    <Clock className={`w-3.5 h-3.5 ${isPermanent ? (isSelected ? 'text-fuchsia-600' : 'text-fuchsia-500') : (isSelected ? 'text-pink-600' : 'text-pink-500')}`} />
+                                                                    {isPermanent ? (
+                                                                        <span className="font-bold">Permanent</span>
+                                                                    ) : (
+                                                                        <span>{expiryText}</span>
+                                                                    )}
+                                                                </button>
+                                                            );
+                                                        })()}
+                                                    </>
                                                 )}
 
                                                 {/* Paid Plan Status (if any) */}
@@ -803,10 +917,14 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
 
                                                 {/* Expired Links Warning */}
                                                 {quota.expiredLinksCount !== undefined && quota.expiredLinksCount > 0 && (
-                                                    <div className={`${statusPillBase} bg-amber-50/90 border-amber-200/80 text-amber-700`} title={`${quota.expiredLinksCount} links have expired`}>
+                                                    <button 
+                                                        onClick={() => window.dispatchEvent(new Event("openHistory"))}
+                                                        className={`${statusPillBase} transition-all duration-200 cursor-pointer bg-amber-50/90 border-amber-200/80 text-amber-700 hover:bg-amber-100 hover:border-amber-300 hover:shadow-sm`} 
+                                                        title={`${quota.expiredLinksCount} links have expired (click to view)`}
+                                                    >
                                                         <Clock className="w-3.5 h-3.5 text-amber-500" />
                                                         {quota.expiredLinksCount} expired history
-                                                    </div>
+                                                    </button>
                                                 )}
                                             </>
                                         ) : (

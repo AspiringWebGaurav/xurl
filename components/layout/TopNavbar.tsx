@@ -161,12 +161,16 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
             intervalId = setInterval(syncGuestHistoryState, 1000);
         }
 
+        const handleOpenHistory = () => setIsHistoryOpen(true);
+
         window.addEventListener("linkGenerated", handleLinkGenerated);
+        window.addEventListener("openHistory", handleOpenHistory);
         return () => {
             if (intervalId) {
                 clearInterval(intervalId);
             }
             window.removeEventListener("linkGenerated", handleLinkGenerated);
+            window.removeEventListener("openHistory", handleOpenHistory);
         };
     }, [syncGuestHistoryState, syncUserHistoryState, user]);
 
@@ -766,7 +770,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                                 </DropdownMenu>
 
                                 <Dialog open={notificationModalOpen} onOpenChange={setNotificationModalOpen}>
-                                    <DialogContent className="max-w-[640px] gap-0 rounded-2xl border border-slate-200 bg-white p-0 shadow-xl" showCloseButton={false}>
+                                    <DialogContent aria-describedby={undefined} className="max-w-[640px] gap-0 rounded-2xl border border-slate-200 bg-white p-0 shadow-xl" showCloseButton={false}>
                                         <DialogHeader className="flex-row items-center justify-between border-b border-slate-100 px-6 py-4">
                                             <DialogTitle className="text-base font-semibold text-slate-900">Notifications</DialogTitle>
                                             <DialogClose className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">

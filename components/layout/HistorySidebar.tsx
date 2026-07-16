@@ -228,7 +228,7 @@ export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: Histo
                                                     {isExpired ? (
                                                         <span className="text-red-500 font-medium">Expired</span>
                                                     ) : (
-                                                        <span>{link.expiresAt ? `Expires ${new Date(link.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Never expires'}</span>
+                                                        <span>{link.expiresAt ? `Expires ${new Date(link.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : <span className="flex items-center gap-1 text-fuchsia-600 font-semibold">Never expires <span className="text-lg leading-none">∞</span></span>}</span>
                                                     )}
                                                 </div>
                                             </div>

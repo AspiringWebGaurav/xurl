@@ -33,6 +33,8 @@ export interface UserDocument {
     apiKeyLastRotatedAt?: number | null;
     /** Free plan: total link creations used (max 3 lifetime) */
     free_usage_count?: number;
+    /** Gift quotas consumed (bypasses cooldown) */
+    gift_usage_count?: number;
     /** Free plan: timestamp of last link creation (for 24h cooldown) */
     free_last_used_at?: number | null;
     settings: UserSettings;

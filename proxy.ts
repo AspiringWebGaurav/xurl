@@ -50,6 +50,12 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
         pathname.startsWith('/api') ||
         pathname.startsWith('/_redirect-fallback') ||
         pathname === '/favicon.ico' ||
+        pathname === '/icon' ||
+        pathname === '/apple-icon' ||
+        pathname === '/manifest.webmanifest' ||
+        pathname === '/manifest.json' ||
+        pathname === '/opengraph-image' ||
+        pathname === '/twitter-image' ||
         pathname === '/' ||
         pathname === '/login' ||
         pathname === '/pricing' ||

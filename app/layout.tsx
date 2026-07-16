@@ -55,11 +55,6 @@ export const metadata: Metadata = {
         description: seo.twitter.description,
         images: [seo.ogImage],
     },
-    icons: {
-        icon: "/favicon.ico",
-        apple: "/images/apple-touch-icon.png",
-    },
-    manifest: "/manifest.json",
 };
 
 export default function RootLayout({

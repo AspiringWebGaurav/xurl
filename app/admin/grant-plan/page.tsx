@@ -8,7 +8,8 @@ import { isAdminEmail } from "@/lib/admin-config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronDown, Loader2, ShieldCheck } from "lucide-react";
+import { ChevronDown, Loader2, ShieldCheck, Gift } from "lucide-react";
+import { ManageGiftsModal } from "./ManageGiftsModal";
 
 const PLAN_OPTIONS = ["starter", "pro", "business", "enterprise", "bigenterprise"] as const;
 const DURATION_PRESETS = [
@@ -98,6 +99,7 @@ export default function AdminGrantPlanPage() {
     const [form, setForm] = useState<GrantFormState>(initialForm);
     const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
     const [searchLoading, setSearchLoading] = useState(false);
+    const [giftsModalOpen, setGiftsModalOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const [selectedUser, setSelectedUser] = useState<SearchUser | null>(null);
@@ -587,6 +589,14 @@ export default function AdminGrantPlanPage() {
                                         This account has administrative access.
                                     </div>
                                 )}
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="ml-auto"
+                                    onClick={() => setGiftsModalOpen(true)}
+                                >
+                                    <Gift className="w-4 h-4 mr-2 text-indigo-500" /> Manage Gifts
+                                </Button>
                             </div>
                             <div className="mt-3 grid gap-2 md:grid-cols-2">
                                 {panelRows.map((row) => (
@@ -964,6 +974,13 @@ export default function AdminGrantPlanPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <ManageGiftsModal
+                open={giftsModalOpen}
+                onOpenChange={setGiftsModalOpen}
+                userId={selectedUser?.id || ""}
+                userEmail={selectedUser?.email || ""}
+                adminUser={user}
+            />
         </div>
     );
 }
