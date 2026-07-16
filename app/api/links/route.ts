@@ -322,6 +322,7 @@ export async function GET(request: NextRequest) {
             activeGiftQuotas,
             limit: effectiveLimit,
             plan,
+            planExpiry: userData?.planExpiry || null,
             planRenewals,
             planTtlHours,
             // Free plan specific fields

@@ -5,19 +5,11 @@ import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
 import { ensureUserDocument } from "@/lib/firebase/user-profile";
 
-function getDynamicExpiryMessage(planKey?: string | null) {
+function getExpiryDisplay(planKey: string | null, isRenewal: boolean, currentExpiry: number | null) {
     if (!planKey) return "";
-    const now = new Date();
-    switch (planKey) {
-        case 'free': now.setMinutes(now.getMinutes() + 10); break;
-        case 'starter': now.setHours(now.getHours() + 2); break;
-        case 'pro': now.setHours(now.getHours() + 6); break;
-        case 'business': now.setHours(now.getHours() + 12); break;
-        case 'enterprise': now.setHours(now.getHours() + 24); break;
-        case 'bigenterprise': now.setHours(now.getHours() + 24); break;
-        default: return "";
-    }
-    return `Expires ${now.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}`;
+    if (planKey === "free") return "Permanent (Free Plan)";
+    if (isRenewal && currentExpiry === null) return "Permanent (Admin Granted)";
+    return "Valid for 30 Days";
 }
 import { useGoogleLogin } from "@/lib/hooks/useGoogleLogin";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -142,6 +134,7 @@ function LoginContent() {
         newTotal: number;
         totalLinksEver: number;
         expiredLinksCount: number;
+        planExpiry: number | null;
     } | null>(null);
 
     useEffect(() => {
@@ -176,6 +169,7 @@ function LoginContent() {
                                 newTotal: (data.limit || 0) + newAddition,
                                 totalLinksEver: data.totalLinksEver || 0,
                                 expiredLinksCount: data.expiredLinksCount || 0,
+                                planExpiry: data.planExpiry || null,
                             });
                         } else {
                             setRenewalData(null);
@@ -667,8 +661,8 @@ function LoginContent() {
                                             <Clock className={`h-4 w-4 ${planContext.clockIconColor}`} />
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-semibold text-slate-900">Expiry window</p>
-                                            <p className="text-sm text-slate-500">{getDynamicExpiryMessage(planKey)}</p>
+                                            <p className="text-sm font-semibold text-slate-900">Plan validity</p>
+                                            <p className="text-sm text-slate-500">{getExpiryDisplay(planKey, renewalData.isRenewal, renewalData.planExpiry)}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -694,8 +688,8 @@ function LoginContent() {
                                             <Clock className={`h-4 w-4 ${planContext.clockIconColor}`} />
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-semibold text-slate-900">Expiry window</p>
-                                            <p className="text-sm text-slate-500">{user || planKey === 'free' ? getDynamicExpiryMessage(planKey) : planContext.expiryTime}</p>
+                                            <p className="text-sm font-semibold text-slate-900">Plan validity</p>
+                                            <p className="text-sm text-slate-500">{getExpiryDisplay(planKey, false, null)}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -733,7 +727,7 @@ function LoginContent() {
                             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Selected plan</p>
                             <div className="mt-2.5 flex items-center justify-between gap-4">
                                 <span className="text-sm font-semibold text-slate-900">{renewalData?.isRenewal ? `Renew ${planContext.badgeName}` : planContext.badgeName}</span>
-                                <span className="text-xs text-slate-500">{user || planKey === 'free' ? getDynamicExpiryMessage(planKey) : planContext.expiryTime}</span>
+                                <span className="text-xs text-slate-500">{getExpiryDisplay(planKey, renewalData?.isRenewal ?? false, renewalData?.planExpiry ?? null)}</span>
                             </div>
                         </div>
                     )}

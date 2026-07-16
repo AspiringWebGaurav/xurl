@@ -161,10 +161,20 @@ export async function applyPlanUpgrade(
             apiKeyLastRotatedAt = now;
         }
 
-        const defaultExpiry =
-            planId === "free"
-                ? null
-                : now + 30 * 24 * 60 * 60 * 1000; // +30 days
+        let baseExpiryTime = now;
+        if (isRenewal && existingUser?.planExpiry) {
+            baseExpiryTime = Math.max(now, existingUser.planExpiry);
+        }
+
+        let defaultExpiry: number | null = null;
+        if (planId !== "free") {
+            if (isRenewal && existingUser?.planExpiry === null) {
+                // Keep permanent plan permanent on renewal/promo
+                defaultExpiry = null;
+            } else {
+                defaultExpiry = baseExpiryTime + 30 * 24 * 60 * 60 * 1000; // +30 days
+            }
+        }
 
         const effectiveExpiry =
             planId === "free"
@@ -173,7 +183,7 @@ export async function applyPlanUpgrade(
                     ? defaultExpiry
                     : options.overrideExpiryMs === null
                         ? null
-                        : now + options.overrideExpiryMs;
+                        : baseExpiryTime + options.overrideExpiryMs;
 
         const result: PlanUpgradeResult = {
             plan: planId,
