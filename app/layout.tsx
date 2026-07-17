@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { DesktopOnlyOverlay } from "@/components/layout/DesktopOnlyOverlay";
+import { BanGuard } from "@/components/layout/BanGuard";
 import { Toaster } from "@/components/ui/sonner";
 import { seo } from "@/lib/seo";
 import { StructuredData } from "@/components/seo/StructuredData";
@@ -66,9 +67,11 @@ export default function RootLayout({
         <html lang="en">
             <body className={`${inter.className} bg-background text-foreground`}>
                 <StructuredData />
-                <DesktopOnlyOverlay>
-                    {children}
-                </DesktopOnlyOverlay>
+                <BanGuard>
+                    <DesktopOnlyOverlay>
+                        {children}
+                    </DesktopOnlyOverlay>
+                </BanGuard>
                 <Toaster />
             </body>
         </html>

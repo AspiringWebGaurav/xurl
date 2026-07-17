@@ -12,9 +12,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase/admin";
 import { createLink, getUserLinks, deleteLink } from "@/services/links";
+
+export const dynamic = "force-dynamic";
 import { checkGuestLimit } from "@/services/guest";
 import { PLAN_CONFIGS, GUEST_CONFIG, resolvePlanType } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
+import { isAdminEmail } from "@/lib/admin-config";
 import { logger } from "@/lib/utils/logger";
 import crypto from "crypto";
 
@@ -24,6 +27,7 @@ import crypto from "crypto";
 
 import { evaluateRequest } from "@/lib/redis/protection";
 import { getRedisClient, safeRedis } from "@/lib/redis/client";
+import { isUserBanned } from "@/lib/auth/ban-check";
 
 // ─── Auth Helper ────────────────────────────────────────────────────────────
 
@@ -52,11 +56,20 @@ export async function POST(request: NextRequest) {
 
         // Determine authenticated user
         let verifiedUid = await verifyAuth(request);
+        const guestSessionId = request.headers.get("x-guest-session-id") || undefined;
 
         // --- TEST BYPASS ---
         if (process.env.NODE_ENV !== "production") {
             const testHeader = request.headers.get("x-test-user-id");
             if (testHeader) verifiedUid = testHeader;
+        }
+
+        // --- BAN CHECK ---
+        if (verifiedUid) {
+            const banned = await isUserBanned(verifiedUid);
+            if (banned) {
+                return NextResponse.json({ error: "Your account is currently suspended." }, { status: 403 });
+            }
         }
 
         const isGuest = !verifiedUid;
@@ -167,6 +180,7 @@ export async function POST(request: NextRequest) {
             idempotencyKey,
             ipHash: isGuest ? ipHash : undefined,
             fingerprintHash: isGuest ? fingerprintHash : undefined,
+            guestSessionId: isGuest ? guestSessionId : undefined,
             quotaPreference
         });
 
@@ -228,10 +242,21 @@ export async function GET(request: NextRequest) {
         const userData = userDoc.exists ? userDoc.data() : {};
         let plan: PlanType = resolvePlanType(userData?.plan);
         
-        // Live downgrade detection: if paid plan has expired, show as free
+        // Admin override: Always force enterprise plan for admin
+        let isAdmin = false;
+        try {
+            const authUser = await adminAuth.getUser(verifiedUid);
+            isAdmin = isAdminEmail(authUser.email);
+        } catch (e) {}
+
         const now = Date.now();
-        if (plan !== "free" && userData?.planExpiry && userData.planExpiry < now) {
-            plan = "free";
+        if (isAdmin) {
+            plan = "enterprise";
+        } else {
+            // Live downgrade detection: if paid plan has expired, show as free
+            if (plan !== "free" && userData?.planExpiry && userData.planExpiry < now) {
+                plan = "free";
+            }
         }
         
         const config = PLAN_CONFIGS[plan];

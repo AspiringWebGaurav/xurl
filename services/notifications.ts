@@ -8,7 +8,7 @@ export type NotificationAction = {
 
 export type NotificationPayload = {
     userId: string;
-    type: "ADMIN_GRANT" | "PROMO";
+    type: "ADMIN_GRANT" | "PROMO" | "SYSTEM";
     title: string;
     message: string;
     data?: Record<string, unknown>;

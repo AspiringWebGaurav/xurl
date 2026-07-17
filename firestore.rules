@@ -4,7 +4,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return request.auth != null
-        && request.auth.token.email in ["gauravpatil9262@gmail.com"];
+        && request.auth.token.email != null
+        && hashing.md5(request.auth.token.email.utf8()).toHexString() == "dbefee58aa49fc1abe242c151883d4fb";
     }
 
     // ─── Links ────────────────────────────────────────────────────────
@@ -13,6 +14,12 @@ service cloud.firestore {
     match /links/{slug} {
       allow read: if true;  // Needed for redirect lookups
       allow list: if isAdmin();
+      allow write: if false; // All writes via admin SDK
+    }
+
+    // ─── Guest Sessions ───────────────────────────────────────────────
+    match /guest_sessions/{sessionId} {
+      allow read: if true;
       allow write: if false; // All writes via admin SDK
     }
 

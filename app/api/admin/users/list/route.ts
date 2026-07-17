@@ -35,6 +35,9 @@ export async function GET(request: NextRequest) {
             activeLinks: data.activeLinks ?? null,
             linksCreated: data.linksCreated ?? null,
             cumulativeQuota: data.cumulativeQuota ?? null,
+            banStatus: data.banStatus ?? "none",
+            banScheduledAt: data.banScheduledAt ?? null,
+            unbanScheduledAt: data.unbanScheduledAt ?? null,
         };
     });
 
@@ -53,6 +56,9 @@ export async function GET(request: NextRequest) {
                     activeLinks: data.activeLinks ?? null,
                     linksCreated: data.linksCreated ?? null,
                     cumulativeQuota: data.cumulativeQuota ?? null,
+                    banStatus: data.banStatus ?? "none",
+                    banScheduledAt: data.banScheduledAt ?? null,
+                    unbanScheduledAt: data.unbanScheduledAt ?? null,
                 });
             } else {
                 items.unshift({
@@ -61,9 +67,12 @@ export async function GET(request: NextRequest) {
                     plan: "free",
                     planExpiry: null,
                     createdAt: null,
-                    activeLinks: null,
-                    linksCreated: null,
-                    cumulativeQuota: null,
+                    activeLinks: 0,
+                    linksCreated: 0,
+                    cumulativeQuota: 0,
+                    banStatus: "none",
+                    banScheduledAt: null,
+                    unbanScheduledAt: null,
                 });
             }
 

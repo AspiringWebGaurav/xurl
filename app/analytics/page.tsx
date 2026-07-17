@@ -607,6 +607,13 @@ function FullDashboard({
                     <BreakdownList data={data.countries} />
                 </motion.div>
             </motion.div>
+
+            {/* Legal Notice */}
+            <div className="mt-8 text-center">
+                <p className="text-[11px] text-slate-500">
+                    Analytics data is collected in accordance with our <a href="/privacy#analytics" className="hover:text-emerald-500 hover:underline underline-offset-2 transition-colors">Privacy Policy</a>.
+                </p>
+            </div>
         </>
     );
 }

@@ -14,6 +14,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/Logo";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getDeviceFingerprint, getOrCreateGuestSessionId } from "@/lib/utils/fingerprint";
 import { cn } from "@/lib/utils";
 import { History, LogOut, Loader2, ArrowLeft, BarChart3 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -56,6 +57,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
     const [hasNewHistory, setHasNewHistory] = useState(false);
     const [hasGuestHistory, setHasGuestHistory] = useState(false);
     const [linkCount, setLinkCount] = useState<number | null>(null);
+    const [forceSync, setForceSync] = useState(0);
     const [pulseBadge, setPulseBadge] = useState(false);
     const [notificationCount, setNotificationCount] = useState(0);
     const [notificationOpen, setNotificationOpen] = useState(false);
@@ -83,47 +85,17 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
     const router = useRouter();
     const pricingLabels = ["Pricing", "Plans"] as const;
     const isDevEnv = process.env.NODE_ENV === "development";
-    const isDeveloper =
-        !!user?.email && user.email.toLowerCase() === "gauravpatil9262@gmail.com";
-
-    const syncGuestHistoryState = useCallback(() => {
-        const h = localStorage.getItem("xurl_guest_link_history");
-        if (!h) {
-            setHasGuestHistory(false);
-            setLinkCount(0);
-            return;
-        }
-
-        try {
-            const parsed = JSON.parse(h);
-            if (parsed.expiresAt > Date.now()) {
-                setHasGuestHistory(true);
-                setLinkCount(1);
-            } else {
-                setHasGuestHistory(false);
-                setLinkCount(0);
-            }
-        } catch {
-            setHasGuestHistory(false);
-            setLinkCount(0);
-        }
-    }, []);
+    const isDeveloper = isAdminEmail(user?.email);
 
     const syncUserHistoryState = useCallback(async (currentUser: User) => {
-        setHasGuestHistory(false);
-        setLinkCount(0);
-
         try {
             const token = await currentUser.getIdToken();
-            const res = await fetch("/api/links?pageSize=25", { headers: { "Authorization": `Bearer ${token}` } });
+            const res = await fetch("/api/links?pageSize=1", { headers: { "Authorization": `Bearer ${token}` } });
             const data = await res.json();
-
-            const nextLinkCount = Array.isArray(data.links) ? data.links.length : 0;
-            const currentActive = (data.freeLinksCreated || 0) + (data.paidLinksCreated || 0);
-
-            setLinkCount(nextLinkCount);
+            
             setPlan(data.plan || "free");
-
+            
+            const currentActive = (data.freeLinksCreated || 0) + (data.paidLinksCreated || 0);
             if (typeof data.limit === "number") {
                 setQuota({
                     limit: data.limit,
@@ -135,44 +107,86 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
             }
         } catch (error) {
             console.error(error);
-            setLinkCount(0);
             setPlan("free");
             setQuota(null);
         }
     }, []);
 
     useEffect(() => {
+        let unsub = () => {};
+
+        const setupLiveSync = async () => {
+            try {
+                const currentUser = auth.currentUser;
+                const { collection, query, where, onSnapshot, getFirestore } = await import("firebase/firestore");
+                const db = getFirestore();
+
+                if (currentUser) {
+                    const q = query(collection(db, "links"), where("userId", "==", currentUser.uid));
+                    unsub = onSnapshot(q, (snapshot) => {
+                        let activeCount = 0;
+                        snapshot.forEach(doc => {
+                            const data = doc.data();
+                            if (!data.expiresAt || data.expiresAt > Date.now()) {
+                                activeCount++;
+                            }
+                        });
+                        setLinkCount(snapshot.size);
+                        setHasGuestHistory(false);
+                        setQuota(prev => prev ? { ...prev, currentActive: activeCount } : null);
+                    });
+                    
+                    void syncUserHistoryState(currentUser);
+                } else {
+                    const sessionId = await getOrCreateGuestSessionId();
+                    if (sessionId) {
+                        const q = query(collection(db, "links"), where("guestSessionId", "==", sessionId));
+                        unsub = onSnapshot(q, (snapshot) => {
+                            let activeCount = 0;
+                            snapshot.forEach(doc => {
+                                const data = doc.data();
+                                if (!data.expiresAt || data.expiresAt > Date.now()) {
+                                    activeCount++;
+                                }
+                            });
+                            setLinkCount(activeCount);
+                            setHasGuestHistory(activeCount > 0);
+                        });
+                    } else {
+                        setLinkCount(0);
+                        setHasGuestHistory(false);
+                    }
+                }
+            } catch (e) {
+                console.error("TopNavbar sync error", e);
+            }
+        };
+
+        // Initialize sync
+        void setupLiveSync();
+
+        return () => unsub();
+    }, [user, syncUserHistoryState, forceSync]);
+
+    useEffect(() => {
         const handleLinkGenerated = () => {
             setHasNewHistory(true);
             setPulseBadge(true);
             setTimeout(() => setPulseBadge(false), 200);
-
-            const currentUser = auth.currentUser;
-            if (currentUser) {
-                void syncUserHistoryState(currentUser);
-                return;
+            if (!auth.currentUser) {
+                setForceSync(f => f + 1);
             }
-
-            syncGuestHistoryState();
         };
-
-        let intervalId: ReturnType<typeof setInterval> | null = null;
-        if (!user) {
-            intervalId = setInterval(syncGuestHistoryState, 1000);
-        }
 
         const handleOpenHistory = () => setIsHistoryOpen(true);
 
         window.addEventListener("linkGenerated", handleLinkGenerated);
         window.addEventListener("openHistory", handleOpenHistory);
         return () => {
-            if (intervalId) {
-                clearInterval(intervalId);
-            }
             window.removeEventListener("linkGenerated", handleLinkGenerated);
             window.removeEventListener("openHistory", handleOpenHistory);
         };
-    }, [syncGuestHistoryState, syncUserHistoryState, user]);
+    }, []);
 
     // Unified Google login hook with instant cancel detection
     const { login: handleGoogleLogin, isLoggingIn } = useGoogleLogin({
@@ -216,6 +230,8 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
     });
 
     useEffect(() => {
+        let snapshotUnsub: (() => void) | null = null;
+        
         const unsubscribe = onAuthStateChanged(auth, (u) => {
             setUser(u);
             setLoading(false);
@@ -238,17 +254,39 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                 liveOpenTimerRef.current = null;
             }
             pendingDeltaRef.current = 0;
+            
+            if (snapshotUnsub) {
+                snapshotUnsub();
+                snapshotUnsub = null;
+            }
+
             if (u) {
                 void ensureUserDocument(u);
                 void syncUserHistoryState(u);
+                
+                // Realtime Sync Listener
+                let initialSnapshot = true;
+                snapshotUnsub = onSnapshot(doc(db, "users", u.uid), (docSnap) => {
+                    if (initialSnapshot) {
+                        initialSnapshot = false;
+                        return;
+                    }
+                    if (docSnap.exists()) {
+                        // Whenever the user document changes (e.g. updatedAt pinged by admin), refresh data
+                        window.dispatchEvent(new Event("linkGenerated"));
+                    }
+                });
             } else {
-                syncGuestHistoryState();
+                setForceSync(f => f + 1);
                 setPlan("free");
                 setQuota(null);
             }
         });
-        return () => unsubscribe();
-    }, [syncGuestHistoryState, syncUserHistoryState]);
+        return () => {
+            unsubscribe();
+            if (snapshotUnsub) snapshotUnsub();
+        };
+    }, [syncUserHistoryState]);
 
     const triggerBellShake = useCallback(() => {
         if (shakeTimerRef.current) {

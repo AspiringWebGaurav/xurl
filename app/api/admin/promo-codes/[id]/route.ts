@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminRequest } from "@/lib/admin-access";
 import { deletePromoCode, updatePromoCode } from "@/services/promo-codes";
+import { logAdminAction } from "@/services/admin-logs";
 
 export async function PATCH(
     request: NextRequest,
@@ -36,6 +37,9 @@ export async function PATCH(
             admin.email
         );
 
+
+        await logAdminAction(admin.email || admin.uid || "Unknown", "OTHER", `Updated promo code: ${id}`);
+
         return NextResponse.json({ success: true, item: updated });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to update promo code.";
@@ -54,5 +58,8 @@ export async function DELETE(
 
     const { id } = await params;
     await deletePromoCode(id, admin.uid, admin.email);
+
+    await logAdminAction(admin.email || admin.uid || "Unknown", "DELETE_PROMO", `Deleted promo code: ${id}`);
+
     return NextResponse.json({ success: true });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminRequest } from "@/lib/admin-access";
 import { createPromoCode, listPromoCodes } from "@/services/promo-codes";
+import { logAdminAction } from "@/services/admin-logs";
 
 export async function GET(request: NextRequest) {
     const admin = await verifyAdminRequest(request);
@@ -39,6 +40,9 @@ export async function POST(request: NextRequest) {
             admin.uid,
             admin.email
         );
+
+
+        await logAdminAction(admin.email || admin.uid || "Unknown", "CREATE_PROMO", `Created promo code: ${body.code}`);
 
         return NextResponse.json({ success: true, item: { id: created.id, ...created.data } });
     } catch (error) {

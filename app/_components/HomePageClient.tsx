@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { auth } from "@/lib/firebase/config";
+import { auth, db } from "@/lib/firebase/config";
+import { doc, onSnapshot } from "firebase/firestore";
 import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { env } from "@/lib/env";
 import { buildShortUrl } from "@/lib/utils/url-builder";
@@ -11,10 +12,10 @@ import { HomeFooter } from "@/components/layout/HomeFooter";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Check, Link2, Loader2, Lock, QrCode, Clock, ExternalLink, ArrowRight, Gift } from "lucide-react";
+import { Copy, Check, Link2, Loader2, Lock, Unlock, QrCode, Clock, ExternalLink, ArrowRight, Gift } from "lucide-react";
 import QRCode from "react-qr-code";
 import Link from "next/link";
-import { getDeviceFingerprint } from "@/lib/utils/fingerprint";
+import { getDeviceFingerprint, getOrCreateGuestSessionId } from "@/lib/utils/fingerprint";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { RateLimitModal } from "@/components/ui/rate-limit-modal";
@@ -72,23 +73,11 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
     const [loadingText, setLoadingText] = useState("");
     const [error, setError] = useState("");
     const [copied, setCopied] = useState(false);
-    const [guestUsed, setGuestUsed] = useState(() => {
-        if (typeof window !== "undefined") {
-            // sessionStorage survives client-side navigation (stale RSC cache protection)
-            // localStorage survives across tabs/sessions (cross-tab + IP-change protection)
-            if (
-                sessionStorage.getItem("xurl_guest_locked") === "true" ||
-                localStorage.getItem("xurl_guest_locked") === "true"
-            ) {
-                return true;
-            }
-            // Secondary evidence: link history exists even if locked flags were cleared
-            if (localStorage.getItem("xurl_guest_link_history")) {
-                return true;
-            }
-        }
-        return !initialGuestStatus.allowed;
-    });
+    const [guestUsed, setGuestUsed] = useState(!initialGuestStatus.allowed);
+    const [showUnlockAnimation, setShowUnlockAnimation] = useState(false);
+    const previousGuestUsedRef = useRef(!initialGuestStatus.allowed);
+    const [guestSessionId, setGuestSessionId] = useState("");
+    const unsubGuestRef = useRef<(() => void) | null>(null);
     const [guestLoading, setGuestLoading] = useState(false);
     const [showQR, setShowQR] = useState(false);
     const [preview, setPreview] = useState<{ title?: string, favicon?: string } | null>(null);
@@ -234,50 +223,76 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                 setQuotaFetched(true);
                 setQuotaLoading(false);
 
-                // Restore guest locked state on logout (or initial load with stale cache)
-                const isLockedInStorage = typeof window !== "undefined" && (
-                    sessionStorage.getItem("xurl_guest_locked") === "true" ||
-                    localStorage.getItem("xurl_guest_locked") === "true"
-                );
+                // Setup live guest session (UUID)
+                let sessionId: string | null = null;
+                const setupSession = async () => {
+                    sessionId = await getOrCreateGuestSessionId();
+                };
+                void setupSession().then(() => {
+                    if (sessionId) {
+                        setGuestSessionId(sessionId);
 
-                // Secondary evidence: link history exists even if locked flag was cleared
-                const hasLinkHistory = typeof window !== "undefined" && !!localStorage.getItem("xurl_guest_link_history");
+                        if (unsubGuestRef.current) unsubGuestRef.current();
 
-                if (isLockedInStorage || hasLinkHistory) {
-                    setGuestUsed(true);
-                    setViewingPastLink(false);
-                    // Re-persist locked flag if only link history was found (self-healing)
-                    if (!isLockedInStorage && hasLinkHistory) {
-                        sessionStorage.setItem("xurl_guest_locked", "true");
-                        localStorage.setItem("xurl_guest_locked", "true");
-                    }
-                    try {
-                        const raw = localStorage.getItem("xurl_guest_link_history");
-                        if (raw) {
-                            const { slug, expiresAt } = JSON.parse(raw);
-                            if (slug && expiresAt && expiresAt > Date.now()) {
-                                setShortUrl(buildShortUrl(slug));
-                                setGuestExpiresAt(expiresAt);
+                        unsubGuestRef.current = onSnapshot(doc(db, "guest_sessions", sessionId), (docSnap) => {
+                            if (docSnap.exists()) {
+                                const data = docSnap.data();
+                                if (data.locked) {
+                                    setGuestUsed(true);
+                                    previousGuestUsedRef.current = true;
+                                    setViewingPastLink(false);
+                                    if (data.slug && data.expiresAt && data.expiresAt > Date.now()) {
+                                        setShortUrl(buildShortUrl(data.slug));
+                                        setGuestExpiresAt(data.expiresAt);
+                                    } else {
+                                        setShortUrl("");
+                                        setGuestExpiresAt(null);
+                                    }
+                                } else {
+                                    if (previousGuestUsedRef.current) {
+                                        setShowUnlockAnimation(true);
+                                        toast.success("Admin has lifted your sign-up lock!", { icon: '🔓', duration: 5000 });
+                                        setTimeout(() => setShowUnlockAnimation(false), 3000);
+                                        // Keep showing the old link so it doesn't vanish immediately
+                                        setViewingPastLink(true);
+                                    }
+                                    previousGuestUsedRef.current = false;
+                                    setGuestUsed(false);
+                                }
+                            } else {
+                                if (previousGuestUsedRef.current) {
+                                    setShowUnlockAnimation(true);
+                                    toast.success("Admin has lifted your sign-up lock!", { icon: '🔓', duration: 5000 });
+                                    setTimeout(() => setShowUnlockAnimation(false), 3000);
+                                    // Keep showing the old link so it doesn't vanish immediately
+                                    setViewingPastLink(true);
+                                }
+                                previousGuestUsedRef.current = false;
+                                setGuestUsed(false);
                             }
-                        }
-                    } catch { /* ignore corrupt localStorage */ }
-                }
+                        }, (err) => {
+                            console.error("Guest session sync error:", err);
+                        });
+                    }
+                });
             }
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
         return () => {
             if (quotaAbortController) quotaAbortController.abort();
+            if (unsubGuestRef.current) unsubGuestRef.current();
             unsubscribe();
         };
     }, []);
 
-    // Persist guest locked flag for navigation/logout resilience
+    // Cleanup old legacy localStorage usage
     useEffect(() => {
-        if (typeof window !== "undefined" && guestUsed) {
-            sessionStorage.setItem("xurl_guest_locked", "true");
-            localStorage.setItem("xurl_guest_locked", "true");
+        if (typeof window !== "undefined") {
+            localStorage.removeItem("xurl_guest_locked");
+            localStorage.removeItem("xurl_guest_link_history");
+            sessionStorage.removeItem("xurl_guest_locked");
         }
-    }, [guestUsed]);
+    }, []);
 
     useEffect(() => {
         if (!user || grantNotified || typeof window === "undefined") {
@@ -618,6 +633,9 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                 "Content-Type": "application/json",
                 "x-device-fingerprint": await getDeviceFingerprint(),
             };
+            if (!user && guestSessionId) {
+                headers["x-guest-session-id"] = guestSessionId;
+            }
             if (user) {
                 headers["Authorization"] = `Bearer ${await user.getIdToken()}`;
             }
@@ -648,9 +666,6 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                     setGuestUsed(true);
                     const expiresAt = Date.now() + (data.expiresIn * 1000);
                     setGuestExpiresAt(expiresAt);
-                    if (data.slug) {
-                        localStorage.setItem("xurl_guest_link_history", JSON.stringify({ slug: data.slug, expiresAt }));
-                    }
 
                     if (data.slug && data.originalUrl) {
                         const generated = buildShortUrl(data.slug);
@@ -677,7 +692,6 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                 const newGuestExpiresAt = Date.now() + (5 * 60 * 1000);
                 setGuestUsed(true);
                 setGuestExpiresAt(newGuestExpiresAt);
-                localStorage.setItem("xurl_guest_link_history", JSON.stringify({ slug: data.slug, expiresAt: newGuestExpiresAt }));
             } else {
                 // Refresh quota automatically with ALL fields including free plan counters
                 user.getIdToken().then(token => {
@@ -798,6 +812,27 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                 <SearchParamsHandler onFocus={() => setFocusTriggered(true)} />
             </Suspense>
             <TopNavbar isCreateDisabled={isDisabled} />
+
+            <AnimatePresence>
+                {showUnlockAnimation && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.9, y: 50 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 1.1, y: -50 }}
+                        transition={{ type: "spring", bounce: 0.5 }}
+                        className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-background/40 backdrop-blur-sm"
+                    >
+                        <div className="flex flex-col items-center justify-center p-8 bg-card border shadow-2xl rounded-3xl text-center">
+                            <div className="bg-emerald-100 p-4 rounded-full mb-4">
+                                <Unlock className="w-12 h-12 text-emerald-600 animate-bounce" />
+                            </div>
+                            <h2 className="text-2xl font-bold mb-2">Lock Lifted!</h2>
+                            <p className="text-muted-foreground">The admin has successfully unlocked your account.</p>
+                            <p className="text-sm font-semibold text-emerald-600 mt-4">You can now create a new link!</p>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             <main
                 className={`flex-1 flex flex-col w-full px-6 md:px-8 overflow-x-hidden ${isGuestLocked ? "overflow-y-hidden justify-center items-center" : "overflow-y-auto"}`}
@@ -1230,12 +1265,14 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                                 </Button>
                                                 {shortUrl && (
                                                     <Button
-                                                        onClick={() => setViewingPastLink(true)}
+                                                        onClick={() => {
+                                                            window.dispatchEvent(new Event("openHistory"));
+                                                        }}
                                                         variant="outline"
                                                         className="mt-2 w-full max-w-[240px] border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 bg-emerald-50/50 rounded-lg"
                                                     >
                                                         <Link2 className="w-4 h-4 mr-2" />
-                                                        See your created link
+                                                        View link history
                                                     </Button>
                                                 )}
                                             </>
@@ -1322,6 +1359,9 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                         )}
                                     </Button>
                                 )}
+                                <div className="mt-3 text-center text-[11px] text-muted-foreground/60 leading-relaxed px-4">
+                                    By shortening a URL, you agree to our <a href="/terms#link-shortening" className="hover:text-emerald-500 hover:underline underline-offset-2 transition-colors">Terms of Service</a>, <a href="/acceptable-use" className="hover:text-emerald-500 hover:underline underline-offset-2 transition-colors">Acceptable Use Policy</a>, and <a href="/code-of-conduct" className="hover:text-emerald-500 hover:underline underline-offset-2 transition-colors">Code of Conduct</a>.
+                                </div>
                             </motion.div>
                         )}
                     </AnimatePresence>

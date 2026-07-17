@@ -164,4 +164,44 @@
   #login-root::-webkit-scrollbar {
     display: none; /* Chrome/Safari/Opera */
   }
+
+  /* Custom Scrollbar for Admin Panel */
+  #admin-root, #admin-root *,
+  .admin-scrollbar, .admin-scrollbar * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+  }
+  
+  #admin-root::-webkit-scrollbar,
+  #admin-root *::-webkit-scrollbar,
+  .admin-scrollbar::-webkit-scrollbar,
+  .admin-scrollbar *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  #admin-root::-webkit-scrollbar-track,
+  #admin-root *::-webkit-scrollbar-track,
+  .admin-scrollbar::-webkit-scrollbar-track,
+  .admin-scrollbar *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  #admin-root::-webkit-scrollbar-thumb,
+  #admin-root *::-webkit-scrollbar-thumb,
+  .admin-scrollbar::-webkit-scrollbar-thumb,
+  .admin-scrollbar *::-webkit-scrollbar-thumb {
+    background-color: rgba(148, 163, 184, 0.4);
+    border-radius: 20px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: background-color 0.2s ease-in-out;
+  }
+
+  #admin-root::-webkit-scrollbar-thumb:hover,
+  #admin-root *::-webkit-scrollbar-thumb:hover,
+  .admin-scrollbar::-webkit-scrollbar-thumb:hover,
+  .admin-scrollbar *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(100, 116, 139, 0.7);
+  }
 }

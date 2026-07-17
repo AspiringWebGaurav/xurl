@@ -1,18 +1,14 @@
 import { adminDb } from "@/lib/firebase/admin";
-import { ADMIN_EMAILS } from "@/lib/admin-config";
+import { isAdminEmail } from "@/lib/admin-config";
 import { writeActivityEvent } from "@/lib/admin/activity-events-writer";
 import { logger } from "@/lib/utils/logger";
-
-const DEV_EMAIL = "gauravpatil9262@gmail.com";
 
 export function isDevEnvironment(): boolean {
     return process.env.NODE_ENV === "development";
 }
 
 export function isDeveloperEmail(email: string | null | undefined): boolean {
-    if (!email) return false;
-    const normalized = email.toLowerCase();
-    return normalized === DEV_EMAIL || ADMIN_EMAILS.includes(normalized as (typeof ADMIN_EMAILS)[number]);
+    return isAdminEmail(email);
 }
 
 export async function getDevModeForUser(userId: string): Promise<boolean> {

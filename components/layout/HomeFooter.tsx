@@ -31,6 +31,8 @@ const footerColumns = [
             { href: "/terms", label: "Terms of Service" },
             { href: "/privacy", label: "Privacy Policy" },
             { href: "/acceptable-use", label: "Acceptable Use" },
+            { href: "/code-of-conduct", label: "Code of Conduct" },
+            { href: "/guest-policy", label: "Guest Policy" },
             { href: "/refund", label: "Refund Policy" },
             { href: "/open-source", label: "Open Source" },
         ],

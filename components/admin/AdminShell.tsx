@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { Sparkles, Percent, Gift, ClipboardList, ListChecks, Loader2, ShieldCheck } from "lucide-react";
+import { Sparkles, Percent, Gift, ClipboardList, ListChecks, Loader2, ShieldCheck, Link as LinkIcon } from "lucide-react";
 import { auth } from "@/lib/firebase/config";
 import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -15,6 +15,8 @@ const NAV_ITEMS = [
     { href: "/admin", label: "Dashboard", icon: Sparkles },
     { href: "/admin/promo-codes", label: "Promo Codes", icon: Percent },
     { href: "/admin/grant-plan", label: "Grant Plan", icon: Gift },
+    { href: "/admin/bans", label: "Bans & Appeals", icon: ShieldCheck },
+    { href: "/admin/links", label: "Link Management", icon: LinkIcon },
     { href: "/admin/purchase-history", label: "Purchase History", icon: ClipboardList },
     { href: "/admin/logs", label: "Admin Logs", icon: ListChecks },
 ] as const;
@@ -84,7 +86,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div className="min-h-screen bg-[#f5f7fb] text-slate-900">
+        <div id="admin-root" className="min-h-screen bg-[#f5f7fb] text-slate-900">
             <div className="fixed inset-x-0 top-0 z-50">
                 <TopNavbar />
             </div>

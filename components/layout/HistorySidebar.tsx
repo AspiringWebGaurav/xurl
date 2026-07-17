@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, ExternalLink, Copy, Calendar, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/firebase/config";
-import { getDeviceFingerprint } from "@/lib/utils/fingerprint";
+import { getDeviceFingerprint, getOrCreateGuestSessionId } from "@/lib/utils/fingerprint";
 import { buildShortUrl } from "@/lib/utils/url-builder";
 
 interface HistorySidebarProps {
@@ -29,93 +29,107 @@ export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: Histo
     const [hasMore, setHasMore] = useState(false);
     const [copied, setCopied] = useState<string | null>(null);
     const [userPlan, setUserPlan] = useState<string | null>(null);
+    const [forceSync, setForceSync] = useState(0);
     const linksRef = useRef<LinkItem[]>([]);
 
     useEffect(() => {
         linksRef.current = links;
     }, [links]);
 
-    const fetchLinks = useCallback(async (isLoadMore = false) => {
-        if (isLoadMore) {
-            setLoadingMore(true);
-        } else {
-            setLoading(true);
-        }
-
-        try {
-            const currentUser = auth.currentUser;
-            let fetchedLinks: LinkItem[] = [];
-            let fetchedHasMore = false;
-            const existingLinks = linksRef.current;
-            const cursorParam =
-                isLoadMore && existingLinks.length > 0
-                    ? `&cursor=${existingLinks[existingLinks.length - 1].createdAt}`
-                    : "";
-
-            if (currentUser) {
-                const token = await currentUser.getIdToken();
-                const res = await fetch(`/api/links?pageSize=25${cursorParam}`, {
-                    headers: { "Authorization": `Bearer ${token}` },
-                });
-                const data = await res.json();
-                if (data.links) {
-                    fetchedLinks = data.links;
-                }
-                if (data.hasMore !== undefined) {
-                    fetchedHasMore = data.hasMore;
-                }
-                if (data.plan) {
-                    setUserPlan(data.plan);
-                } else {
-                    setUserPlan("free");
-                }
-            } else if (!isLoadMore) {
-                // Fetch live server state for unauthenticated guest
-                setUserPlan("guest");
-                const fp = await getDeviceFingerprint();
-                const res = await fetch("/api/guest-status", {
-                    headers: { "x-device-fingerprint": fp },
-                });
-                const data = await res.json();
-
-                if (data.active && data.slug) {
-                    fetchedLinks.push({
-                        slug: data.slug,
-                        originalUrl: data.originalUrl || "Original URL hidden for guests",
-                        createdAt: data.createdAt || Date.now(),
-                        expiresAt: Date.now() + (data.expiresIn * 1000),
-                    });
-                }
-            }
-
-            const nextLinks = isLoadMore ? [...existingLinks, ...fetchedLinks] : fetchedLinks;
-            linksRef.current = nextLinks;
-            setLinks(nextLinks);
-            onLinksChange?.(nextLinks.length);
-            setHasMore(fetchedHasMore);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
-            setLoadingMore(false);
-        }
-    }, [onLinksChange]);
-
     useEffect(() => {
+        let unsub = () => {};
+        
+        const setupSync = async () => {
+            setLoading(true);
+            try {
+                const currentUser = auth.currentUser;
+                const { collection, query, where, orderBy, limit, onSnapshot, getFirestore } = await import("firebase/firestore");
+                const db = getFirestore();
+                
+                if (currentUser) {
+                    const token = await currentUser.getIdToken();
+                    const res = await fetch(`/api/user/profile`, {
+                        headers: { "Authorization": `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+                    setUserPlan(data.plan || "free");
+                    
+                    const q = query(
+                        collection(db, "links"),
+                        where("userId", "==", currentUser.uid),
+                        orderBy("createdAt", "desc"),
+                        limit(50)
+                    );
+                    
+                    unsub = onSnapshot(q, (snapshot) => {
+                        const newLinks = snapshot.docs.map(doc => ({
+                            slug: doc.id,
+                            originalUrl: doc.data().originalUrl,
+                            createdAt: doc.data().createdAt,
+                            expiresAt: doc.data().expiresAt
+                        }));
+                        setLinks(newLinks);
+                        onLinksChange?.(newLinks.length);
+                        setLoading(false);
+                    }, (err) => {
+                        console.error("History sync error:", err);
+                        setLoading(false);
+                    });
+                } else {
+                    setUserPlan("guest");
+                    const sessionId = await getOrCreateGuestSessionId();
+                    if (sessionId) {
+                        const q = query(
+                            collection(db, "links"),
+                            where("guestSessionId", "==", sessionId)
+                        );
+                        
+                        unsub = onSnapshot(q, (snapshot) => {
+                            const newLinks = snapshot.docs.map(doc => ({
+                                slug: doc.id,
+                                originalUrl: doc.data().originalUrl,
+                                createdAt: doc.data().createdAt,
+                                expiresAt: doc.data().expiresAt
+                            }));
+                            // Sort locally since we don't have a composite index for guestSessionId + createdAt
+                            newLinks.sort((a, b) => b.createdAt - a.createdAt);
+                            setLinks(newLinks);
+                            onLinksChange?.(newLinks.length);
+                            setLoading(false);
+                        }, (err) => {
+                            console.error("Guest history sync error:", err);
+                            setLoading(false);
+                        });
+                    } else {
+                        setLinks([]);
+                        onLinksChange?.(0);
+                        setLoading(false);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to setup history sync:", e);
+                setLoading(false);
+            }
+        };
+
         if (isOpen) {
-            void fetchLinks();
+            void setupSync();
         }
-    }, [fetchLinks, isOpen, userId]);
+
+        return () => unsub();
+    }, [isOpen, userId, onLinksChange, forceSync]);
 
     // Listen for new links generated in the background
     useEffect(() => {
         const handleLinkGenerated = () => {
-            void fetchLinks(false);
+            if (!auth.currentUser) {
+                setForceSync(f => f + 1);
+            }
         };
 
         window.addEventListener("linkGenerated", handleLinkGenerated);
         return () => window.removeEventListener("linkGenerated", handleLinkGenerated);
-    }, [fetchLinks, userId]);
+    }, []);
 
     const handleCopy = async (slug: string) => {
         const url = `${window.location.origin}/${slug}`;
@@ -234,21 +248,15 @@ export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: Histo
                                             </div>
                                         );
                                     })}
-                                    
-                                    {hasMore && (
-                                        <div className="pt-2 pb-6 flex justify-center">
-                                            <Button 
-                                                variant="outline" 
-                                                className="w-full bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 font-medium disabled:opacity-50"
-                                                onClick={() => fetchLinks(true)}
-                                                disabled={loadingMore}
-                                            >
-                                                {loadingMore ? (
-                                                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading...</>
-                                                ) : "Load More"}
-                                            </Button>
-                                        </div>
-                                    )}
+
+                                </div>
+                            )}
+                            
+                            {userPlan === "guest" && (
+                                <div className="mt-4 pt-4 border-t border-border/50 text-center">
+                                    <p className="text-[11px] text-muted-foreground">
+                                        Review our <a href="/guest-policy" className="hover:text-emerald-500 hover:underline underline-offset-2 transition-colors">Guest Policy</a>
+                                    </p>
                                 </div>
                             )}
                         </div>

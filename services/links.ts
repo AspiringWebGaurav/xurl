@@ -10,11 +10,12 @@
  * Uses firebase-admin SDK — runs server-side only.
  */
 
-import { adminDb } from "@/lib/firebase/admin";
+import { adminDb, adminAuth } from "@/lib/firebase/admin";
+import { isAdminEmail } from "@/lib/admin-config";
 import { FieldValue } from "firebase-admin/firestore";
 import { encodeBase62 } from "@/lib/utils/base62";
 import { validateUrl } from "@/lib/utils/url-validator";
-import { cacheInvalidate, setRedirectCache, negCacheInvalidate } from "@/lib/redis/redirect-cache";
+import { cacheInvalidate, setRedirectCache, negCacheInvalidate, setNegCacheRedis } from "@/lib/redis/redirect-cache";
 import { recordSuccessfulGuestLink } from "@/lib/redis/protection";
 import { rateLimitLinkCreation } from "@/lib/utils/rate-limiter";
 import { logger } from "@/lib/utils/logger";
@@ -28,6 +29,7 @@ import { safeRedis } from "@/lib/redis/client";
 export interface CreateLinkInput extends OriginalCreateLinkInput {
     ipHash?: string;
     fingerprintHash?: string;
+    guestSessionId?: string;
     quotaPreference?: 'free' | 'gift' | 'auto';
 }
 
@@ -115,9 +117,17 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
             let originalGiftQuotaCount = 0;
             let consumedQuota: 'free' | 'gift' = 'free';
             let migratedGifts = false;
+            let isAdminUser = false;
 
             // If user is authenticated, handle limits and logic via user doc
             if (userId !== "anonymous") {
+                let userEmail = "";
+                try {
+                    const authUser = await adminAuth.getUser(userId);
+                    userEmail = authUser.email || "";
+                    isAdminUser = isAdminEmail(userEmail);
+                } catch (e) {}
+
                 const userRef = adminDb.collection("users").doc(userId);
                 const userSnap = await transaction.get(userRef);
 
@@ -133,11 +143,17 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                 // Resolve legacy plan names (e.g. "freebie" → "free")
                 let currentPlan: PlanType = resolvePlanType(userData.plan);
 
-                // Downgrade if subscription expired
-                if (currentPlan !== "free" && userData.planExpiry && userData.planExpiry < now) {
-                    currentPlan = "free";
-                    userData.plan = "free";
-                    userData.planStatus = "past_due";
+                // Admin override: always treat admins as enterprise users
+                if (isAdminUser) {
+                    currentPlan = "enterprise";
+                    userData.plan = "enterprise";
+                } else {
+                    // Downgrade if subscription expired
+                    if (currentPlan !== "free" && userData.planExpiry && userData.planExpiry < now) {
+                        currentPlan = "free";
+                        userData.plan = "free";
+                        userData.planStatus = "past_due";
+                    }
                 }
 
                 let giftQuotas = Array.isArray(userData.giftQuotas) ? userData.giftQuotas : [];
@@ -333,7 +349,8 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                 createdUnderPlan: userId === "anonymous" ? "guest" as PlanType : resolvePlanType(userData.plan) as PlanType,
                 planEraStart: userId !== "anonymous" ? (userData.planEraStart || userData.planStart || userData.createdAt || now) : null,
                 totalClicks: 0,
-                deleteAt: finalExpiresAt ? finalExpiresAt + (7 * 24 * 60 * 60 * 1000) : null
+                deleteAt: finalExpiresAt ? finalExpiresAt + (7 * 24 * 60 * 60 * 1000) : null,
+                guestSessionId: input.guestSessionId || null
             };
             transaction.set(adminDb.collection("links").doc(slug), linkDoc);
 
@@ -356,16 +373,26 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                         createdAt: now
                     });
                 }
+                if (input.guestSessionId) {
+                    transaction.set(adminDb.collection("guest_sessions").doc(input.guestSessionId), {
+                        slug,
+                        locked: true,
+                        expiresAt: finalExpiresAt,
+                        createdAt: now
+                    });
+                }
             }
 
             if (userId !== "anonymous") {
                 const resolvedPlan = resolvePlanType(userData.plan);
                 const userUpdates: Record<string, unknown> = {
-                    plan: resolvedPlan,
                     activeLinks: FieldValue.increment(1),
                     linksCreated: FieldValue.increment(1),
                     updatedAt: now,
                 };
+                if (!isAdminUser) {
+                    userUpdates.plan = resolvedPlan;
+                }
                 if (userData.planStatus) {
                     userUpdates.planStatus = userData.planStatus;
                 }
@@ -572,8 +599,126 @@ export async function deleteLink(slug: string, userId: string): Promise<void> {
         logger.warn("link_delete", `Failed to update user counters for ${userId}`);
     }
 
-    // 5) Invalidate cache
+    // 5) Invalidate cache and instantly flag it as missing for edge servers
     cacheInvalidate(slug);
+    setNegCacheRedis(slug, 3600); // 1 hour negative cache so edge instantly blocks it without hitting DB
 
     logger.linkDeleted(slug, userId);
+}
+
+/**
+ * Admin: Universal update function for any link, bypassing ownership checks.
+ */
+export async function adminUpdateLink(slug: string, updates: Partial<LinkDocument>): Promise<void> {
+    const existing = await getLinkBySlug(slug);
+    if (!existing) throw new Error("Link not found.");
+
+    await adminDb.collection("links").doc(slug).update({
+        ...updates,
+        updatedAt: Date.now(),
+    });
+
+    // Touch user document to trigger real-time UI synchronization for the user
+    try {
+        await adminDb.collection("users").doc(existing.userId).set({
+            updatedAt: Date.now()
+        }, { merge: true });
+    } catch {
+        logger.warn("admin_link_update", `Failed to update user timestamp for ${existing.userId}`);
+    }
+
+    cacheInvalidate(slug);
+}
+
+/**
+ * Admin: Hard delete a link and ALL related data, bypassing ownership checks.
+ */
+export async function adminDeleteLink(slug: string): Promise<void> {
+    const existing = await getLinkBySlug(slug);
+    if (!existing) throw new Error("Link not found.");
+
+    // 1) Delete the link document
+    await adminDb.collection("links").doc(slug).update({ deletedByApi: true });
+    await adminDb.collection("links").doc(slug).delete();
+
+    // 2) Delete ALL related analytics documents
+    const MAX_BATCH = 500;
+    let deletedTotal = 0;
+    const SAFETY_CAP = 5000; 
+
+    while (deletedTotal < SAFETY_CAP) {
+        const analyticsSnap = await adminDb
+            .collection("analytics")
+            .where("slug", "==", slug)
+            .limit(MAX_BATCH)
+            .get();
+
+        if (analyticsSnap.empty) break;
+
+        const batch = adminDb.batch();
+        analyticsSnap.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+        deletedTotal += analyticsSnap.size;
+
+        if (analyticsSnap.size < MAX_BATCH) break;
+    }
+
+    // 3) Update user's link counters
+    try {
+        await adminDb.collection("users").doc(existing.userId).set(
+            {
+                activeLinks: FieldValue.increment(-1),
+                linksCreated: FieldValue.increment(-1),
+                updatedAt: Date.now(),
+            },
+            { merge: true }
+        );
+    } catch {
+        logger.warn("admin_link_delete", `Failed to update user counters for ${existing.userId}`);
+    }
+
+    // 4) Wipe guest_usage if it was a guest link
+    if (existing.userId === "anonymous") {
+        try {
+            const guestSnap = await adminDb.collection("guest_usage").where("slug", "==", slug).get();
+            if (!guestSnap.empty) {
+                const batch = adminDb.batch();
+                guestSnap.docs.forEach((d) => batch.delete(d.ref));
+                await batch.commit();
+            }
+        } catch {
+            logger.warn("admin_link_delete", `Failed to wipe guest_usage for ${slug}`);
+        }
+    }
+
+    // 5) Invalidate cache and instantly flag it as missing for edge servers
+    cacheInvalidate(slug);
+    setNegCacheRedis(slug, 3600); // 1 hour negative cache so edge instantly blocks it without hitting DB
+
+    logger.info("admin_link_deleted", `Admin deleted link ${slug} (owner: ${existing.userId})`);
+}
+
+/**
+ * Removes the guest usage tracking for a specific guest link, 
+ * effectively lifting the signup lock for that specific guest 
+ * without deleting the link itself.
+ */
+export async function adminLiftGuestLock(slug: string) {
+    try {
+        const guestSnap = await adminDb.collection("guest_usage").where("slug", "==", slug).get();
+        if (!guestSnap.empty) {
+            const batch = adminDb.batch();
+            guestSnap.docs.forEach((d) => batch.delete(d.ref));
+            
+            // Also delete from guest_sessions to instantly unlock the client's live listener
+            const sessionSnap = await adminDb.collection("guest_sessions").where("slug", "==", slug).get();
+            sessionSnap.docs.forEach((d) => batch.delete(d.ref));
+
+            await batch.commit();
+            logger.info("admin_lift_guest_lock", `Admin lifted guest lock for slug ${slug}`);
+        }
+    } catch (e) {
+        logger.error("admin_lift_guest_lock", `Failed to lift guest lock for ${slug}`, { error: e });
+        throw e;
+    }
 }

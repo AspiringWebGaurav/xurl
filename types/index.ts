@@ -38,6 +38,28 @@ export interface UserDocument {
     /** Free plan: timestamp of last link creation (for 24h cooldown) */
     free_last_used_at?: number | null;
     settings: UserSettings;
+    
+    // Ban system
+    banStatus?: "none" | "banned";
+    banScheduledAt?: number | null;
+    unbanScheduledAt?: number | null;
+    banReason?: string;
+}
+
+export interface BanAppeal {
+    id: string;
+    userId: string;
+    email: string;
+    message: string;
+    status: "pending" | "approved" | "rejected";
+    createdAt: number;
+    reviewedAt?: number;
+}
+
+export interface BannedEmail {
+    email: string;
+    reason: string;
+    bannedAt: number;
 }
 
 export interface UserSettings {
@@ -125,6 +147,7 @@ export interface LinkDocument {
     totalClicks: number;
     /** Native Firestore TTL deletion timestamp - set to 7 days after expiresAt */
     deleteAt?: number | null;
+    guestSessionId?: string | null;
 }
 
 /**

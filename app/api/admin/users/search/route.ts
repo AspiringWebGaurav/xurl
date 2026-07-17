@@ -34,6 +34,9 @@ export async function GET(request: NextRequest) {
             activeLinks: data.activeLinks ?? null,
             linksCreated: data.linksCreated ?? null,
             cumulativeQuota: data.cumulativeQuota ?? null,
+            banStatus: data.banStatus ?? "none",
+            banScheduledAt: data.banScheduledAt ?? null,
+            unbanScheduledAt: data.unbanScheduledAt ?? null,
         };
     });
 

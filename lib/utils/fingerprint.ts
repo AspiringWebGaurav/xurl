@@ -30,3 +30,21 @@ export async function getDeviceFingerprint(): Promise<string> {
         return "fallback-fingerprint";
     }
 }
+
+export async function getOrCreateGuestSessionId(): Promise<string> {
+    if (typeof window === "undefined") return "server-side";
+
+    let sessionId = localStorage.getItem("xurl_guest_session_id");
+    if (!sessionId) {
+        try {
+            sessionId = await getDeviceFingerprint();
+            if (sessionId === "fallback-fingerprint") {
+                sessionId = crypto.randomUUID();
+            }
+        } catch {
+            sessionId = crypto.randomUUID();
+        }
+        localStorage.setItem("xurl_guest_session_id", sessionId);
+    }
+    return sessionId;
+}

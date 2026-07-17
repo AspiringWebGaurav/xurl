@@ -21,8 +21,37 @@ export async function GET(request: NextRequest) {
         const userSnap = await userRef.get();
         const fallbackDisplayName = decoded.name || decoded.email?.split("@")[0] || "User";
 
+        let hasPendingAppeal = false;
+        try {
+            const appealsSnap = await adminDb.collection("ban_appeals")
+                .where("userId", "==", decoded.uid)
+                .where("status", "==", "pending")
+                .limit(1)
+                .get();
+            if (!appealsSnap.empty) {
+                hasPendingAppeal = true;
+            }
+        } catch (e) {
+            console.error("Failed to check pending appeals", e);
+        }
+
         if (!userSnap.exists) {
             const now = Date.now();
+            let banStatus: "none" | "banned" = "none";
+            let banReason: string | undefined = undefined;
+
+            if (decoded.email) {
+                try {
+                    const bannedEmailSnap = await adminDb.collection("banned_emails").doc(decoded.email.toLowerCase()).get();
+                    if (bannedEmailSnap.exists) {
+                        banStatus = "banned";
+                        banReason = bannedEmailSnap.data()?.reason || "Violated terms of service";
+                    }
+                } catch (error: any) {
+                    console.error("Failed to check banned_emails collection:", error);
+                }
+            }
+
             await userRef.set(
                 {
                     uid: decoded.uid,
@@ -32,12 +61,16 @@ export async function GET(request: NextRequest) {
                     plan: "free",
                     createdAt: now,
                     updatedAt: now,
+                    ...(banStatus === "banned" ? { banStatus, banReason } : {})
                 },
                 { merge: true }
             );
 
             return NextResponse.json({
                 displayName: fallbackDisplayName,
+                banStatus,
+                banReason,
+                hasPendingAppeal,
             });
         }
 
@@ -45,6 +78,11 @@ export async function GET(request: NextRequest) {
         
         return NextResponse.json({ 
             displayName: userData.displayName || fallbackDisplayName,
+            banStatus: userData.banStatus,
+            banScheduledAt: userData.banScheduledAt,
+            unbanScheduledAt: userData.unbanScheduledAt,
+            banReason: userData.banReason,
+            hasPendingAppeal,
         });
     } catch {
         return NextResponse.json({ code: "FETCH_FAILED", message: "Failed to fetch profile" }, { status: 500 });

@@ -3,6 +3,7 @@ import { verifyAdminRequest } from "@/lib/admin-access";
 import { PLAN_CONFIGS, resolvePlanType, type PlanType } from "@/lib/plans";
 import { adminDb } from "@/lib/firebase/admin";
 import { grantLinkGiftToUserOrPending, grantPlanToUserOrPending } from "@/services/grants";
+import { logAdminAction } from "@/services/admin-logs";
 
 function getOverrideMs(durationOption: string, customValue?: number, customUnit?: string): number | null {
     switch (durationOption) {
@@ -104,6 +105,8 @@ export async function POST(request: NextRequest) {
                 customUnit: body.customUnit,
             });
 
+            await logAdminAction(admin.email || admin.uid || "Unknown", "GRANT_PLAN", `Granted ${planId} plan to ${rawEmail}`);
+
             return NextResponse.json({ success: true, applied: result.applied, pendingId: result.pendingId });
         }
 
@@ -130,6 +133,8 @@ export async function POST(request: NextRequest) {
             customValue: Number(body.customValue),
             customUnit: body.customUnit,
         });
+
+        await logAdminAction(admin.email || admin.uid || "Unknown", "OTHER", `Granted ${quantity} link gifts to ${rawEmail}`);
 
         return NextResponse.json({ success: true, applied: result.applied, pendingId: result.pendingId });
     } catch (error) {
