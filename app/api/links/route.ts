@@ -17,7 +17,6 @@ export const dynamic = "force-dynamic";
 import { checkGuestLimit } from "@/services/guest";
 import { PLAN_CONFIGS, GUEST_CONFIG, resolvePlanType } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
-import { isAdminEmail } from "@/lib/admin-config";
 import { logger } from "@/lib/utils/logger";
 import crypto from "crypto";
 
@@ -242,21 +241,10 @@ export async function GET(request: NextRequest) {
         const userData = userDoc.exists ? userDoc.data() : {};
         let plan: PlanType = resolvePlanType(userData?.plan);
         
-        // Admin override: Always force enterprise plan for admin
-        let isAdmin = false;
-        try {
-            const authUser = await adminAuth.getUser(verifiedUid);
-            isAdmin = isAdminEmail(authUser.email);
-        } catch (e) {}
-
         const now = Date.now();
-        if (isAdmin) {
-            plan = "enterprise";
-        } else {
-            // Live downgrade detection: if paid plan has expired, show as free
-            if (plan !== "free" && userData?.planExpiry && userData.planExpiry < now) {
-                plan = "free";
-            }
+        // Live downgrade detection: if paid plan has expired, show as free
+        if (plan !== "free" && userData?.planExpiry && userData.planExpiry < now) {
+            plan = "free";
         }
         
         const config = PLAN_CONFIGS[plan];

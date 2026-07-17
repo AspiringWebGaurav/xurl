@@ -10,8 +10,7 @@
  * Uses firebase-admin SDK — runs server-side only.
  */
 
-import { adminDb, adminAuth } from "@/lib/firebase/admin";
-import { isAdminEmail } from "@/lib/admin-config";
+import { adminDb } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { encodeBase62 } from "@/lib/utils/base62";
 import { validateUrl } from "@/lib/utils/url-validator";
@@ -117,17 +116,9 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
             let originalGiftQuotaCount = 0;
             let consumedQuota: 'free' | 'gift' = 'free';
             let migratedGifts = false;
-            let isAdminUser = false;
 
             // If user is authenticated, handle limits and logic via user doc
             if (userId !== "anonymous") {
-                let userEmail = "";
-                try {
-                    const authUser = await adminAuth.getUser(userId);
-                    userEmail = authUser.email || "";
-                    isAdminUser = isAdminEmail(userEmail);
-                } catch (e) {}
-
                 const userRef = adminDb.collection("users").doc(userId);
                 const userSnap = await transaction.get(userRef);
 
@@ -143,17 +134,11 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                 // Resolve legacy plan names (e.g. "freebie" → "free")
                 let currentPlan: PlanType = resolvePlanType(userData.plan);
 
-                // Admin override: always treat admins as enterprise users
-                if (isAdminUser) {
-                    currentPlan = "enterprise";
-                    userData.plan = "enterprise";
-                } else {
-                    // Downgrade if subscription expired
-                    if (currentPlan !== "free" && userData.planExpiry && userData.planExpiry < now) {
-                        currentPlan = "free";
-                        userData.plan = "free";
-                        userData.planStatus = "past_due";
-                    }
+                // Downgrade if subscription expired
+                if (currentPlan !== "free" && userData.planExpiry && userData.planExpiry < now) {
+                    currentPlan = "free";
+                    userData.plan = "free";
+                    userData.planStatus = "past_due";
                 }
 
                 let giftQuotas = Array.isArray(userData.giftQuotas) ? userData.giftQuotas : [];
@@ -386,13 +371,11 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
             if (userId !== "anonymous") {
                 const resolvedPlan = resolvePlanType(userData.plan);
                 const userUpdates: Record<string, unknown> = {
+                    plan: resolvedPlan,
                     activeLinks: FieldValue.increment(1),
                     linksCreated: FieldValue.increment(1),
                     updatedAt: now,
                 };
-                if (!isAdminUser) {
-                    userUpdates.plan = resolvedPlan;
-                }
                 if (userData.planStatus) {
                     userUpdates.planStatus = userData.planStatus;
                 }
