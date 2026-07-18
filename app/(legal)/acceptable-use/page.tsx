@@ -85,7 +85,7 @@ export default async function AcceptableUsePage() {
     const isMobileDevice = headersList.get("x-is-mobile-device") === "true";
     return (
         <LegalPageShell isMobileDevice={isMobileDevice} title="Acceptable Use Policy"
-            lastUpdated="Last Updated: July 17, 2026 (Originally Published: July 16, 2026)"
+            lastUpdated="Last Updated: July 18, 2026 (Originally Published: July 16, 2026)"
             sections={sections}
         />
     );

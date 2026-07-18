@@ -25,7 +25,7 @@ const sections = [
     {
         title: "Description of Service",
         content: (
-            <p>XURL provides URL shortening, dynamic link management, QR code generation, and advanced real-time click analytics services. The Service supports three distinct access tiers: guest access (no account required, hardware-fingerprint tracked), free accounts (Google OAuth sign-in), and premium paid plans with enhanced features. The Service is provided strictly &ldquo;as is&rdquo; and &ldquo;as available.&rdquo; We reserve the right to modify or entirely discontinue any part of the Service at any time.</p>
+            <p>XURL provides URL shortening, dynamic link management, QR code generation, and advanced real-time click analytics services seamlessly across both desktop and mobile platforms. The Service supports three distinct access tiers: guest access (no account required, hardware-fingerprint tracked), free accounts (Google OAuth sign-in), and premium paid plans with enhanced features. The Service features cross-platform synchronization, real-time dynamic maintenance overlays, and physical haptic feedback (on mobile devices). The Service is provided strictly &ldquo;as is&rdquo; and &ldquo;as available.&rdquo; We reserve the right to modify or entirely discontinue any part of the Service at any time.</p>
         ),
     },
     {
@@ -82,7 +82,7 @@ export default async function TermsPage() {
     const isMobileDevice = headersList.get("x-is-mobile-device") === "true";
     return (
         <LegalPageShell isMobileDevice={isMobileDevice} title="Terms of Service"
-            lastUpdated="Last Updated: July 17, 2026 (Originally Published: July 16, 2026)"
+            lastUpdated="Last Updated: July 18, 2026 (Originally Published: July 16, 2026)"
             sections={sections}
         />
     );
