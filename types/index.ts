@@ -148,6 +148,7 @@ export interface LinkDocument {
     /** Native Firestore TTL deletion timestamp - set to 7 days after expiresAt */
     deleteAt?: number | null;
     guestSessionId?: string | null;
+    deviceType?: "desktop" | "mobile" | "api";
 }
 
 /**
@@ -185,6 +186,7 @@ export interface CreateLinkInput {
     password?: string | null;
     tags?: string[];
     idempotencyKey?: string;
+    deviceType?: "desktop" | "mobile" | "api";
 }
 
 export interface CreateLinkResponse {

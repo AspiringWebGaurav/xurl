@@ -7,8 +7,10 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { ShieldAlert, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Logo } from "@/components/ui/Logo";
+import { getOrCreateGuestSessionId } from "@/lib/utils/fingerprint";
+import { MobileBanView } from "@/components/mobile/MobileBanView";
 
-export function BanGuard({ children }: { children: React.ReactNode }) {
+export function BanGuard({ children, isMobileDevice = false }: { children: React.ReactNode, isMobileDevice?: boolean }) {
     const [user, setUser] = useState<User | null>(null);
     const [isChecking, setIsChecking] = useState(true);
     const [isBanned, setIsBanned] = useState(false);
@@ -102,6 +104,27 @@ export function BanGuard({ children }: { children: React.ReactNode }) {
                 });
             } else {
                 setIsBanned(false);
+                
+                // Guest Ban Check
+                const checkGuestBan = async () => {
+                    try {
+                        const guestSessionId = await getOrCreateGuestSessionId();
+                        if (guestSessionId) {
+                            unsubscribeSnapshot = onSnapshot(doc(db, "banned_guests", guestSessionId), (docSnap) => {
+                                if (docSnap.exists()) {
+                                    setIsBanned(true);
+                                    setBanReason("Your device has been flagged for violating our terms of service.");
+                                } else {
+                                    setIsBanned(false);
+                                }
+                            });
+                        }
+                    } catch (e) {
+                        console.error("Guest ban check error");
+                    }
+                };
+                checkGuestBan();
+                
                 setIsChecking(false);
             }
         });
@@ -124,18 +147,29 @@ export function BanGuard({ children }: { children: React.ReactNode }) {
     }, []);
 
     const submitAppeal = async () => {
-        if (!user || appealText.trim().length < 10) return;
+        if (appealText.trim().length < 10) return;
         setAppealLoading(true);
         try {
-            const token = await user.getIdToken();
+            const headers: Record<string, string> = {
+                "Content-Type": "application/json",
+            };
+
+            if (user) {
+                const token = await user.getIdToken();
+                headers["Authorization"] = `Bearer ${token}`;
+            } else {
+                const guestSessionId = await getOrCreateGuestSessionId();
+                if (guestSessionId) {
+                    headers["x-guest-session-id"] = guestSessionId;
+                }
+            }
+
             const res = await fetch("/api/user/appeal", {
                 method: "POST",
-                headers: { 
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}` 
-                },
+                headers,
                 body: JSON.stringify({ message: appealText })
             });
+
             if (res.ok) {
                 setHasPendingAppeal(true);
                 toast.success("Appeal submitted successfully.");
@@ -160,6 +194,20 @@ export function BanGuard({ children }: { children: React.ReactNode }) {
     }
 
     if (isBanned) {
+        if (isMobileDevice) {
+            return (
+                <MobileBanView 
+                    banReason={banReason}
+                    user={user}
+                    appealText={appealText}
+                    setAppealText={setAppealText}
+                    appealLoading={appealLoading}
+                    hasPendingAppeal={hasPendingAppeal}
+                    submitAppeal={submitAppeal}
+                />
+            );
+        }
+
         return (
             <div className="fixed inset-0 z-[99999] flex flex-col lg:flex-row bg-rose-950 overflow-hidden">
                 {/* Left Column: Information */}

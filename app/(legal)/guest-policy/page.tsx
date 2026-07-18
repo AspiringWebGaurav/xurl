@@ -1,7 +1,10 @@
 import { Metadata } from "next";
+import { headers } from "next/headers";
 
 import { GuestPolicyContent } from "@/components/legal/GuestPolicyContent";
 import { TopNavbar } from "@/components/layout/TopNavbar";
+import { HomeFooter } from "@/components/layout/HomeFooter";
+import { MobileFooter } from "@/components/mobile/MobileFooter";
 import { seo } from "@/lib/seo";
 
 export const metadata: Metadata = {
@@ -74,11 +77,16 @@ const policySections = [
     },
 ] as const;
 
-export default function GuestPolicyPage() {
+export default async function GuestPolicyPage() {
+    const headersList = await headers();
+    const isMobileDevice = headersList.get("x-is-mobile-device") === "true";
     return (
-        <div className="flex h-[100dvh] flex-col overflow-hidden bg-background">
+        <div className="flex flex-col min-h-[100dvh] overflow-x-hidden bg-background">
             <TopNavbar isCreateDisabled={false} />
-            <GuestPolicyContent updatedAt={updatedAt} sections={policySections} />
+            <div className="flex-1 overflow-y-auto overflow-x-hidden w-full">
+                <GuestPolicyContent updatedAt={updatedAt} sections={policySections} />
+                {isMobileDevice ? <MobileFooter /> : <HomeFooter />}
+            </div>
         </div>
     );
 }

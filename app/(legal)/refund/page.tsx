@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { LegalPageShell } from "@/components/layout/LegalPageShell";
 import { seo } from "@/lib/seo";
 
@@ -69,10 +70,11 @@ const sections = [
     },
 ];
 
-export default function RefundPage() {
+export default async function RefundPage() {
+    const headersList = await headers();
+    const isMobileDevice = headersList.get("x-is-mobile-device") === "true";
     return (
-        <LegalPageShell
-            title="Refund Policy"
+        <LegalPageShell isMobileDevice={isMobileDevice} title="Refund Policy"
             lastUpdated={new Date().toLocaleDateString()}
             sections={sections}
         />

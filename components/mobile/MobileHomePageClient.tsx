@@ -1,23 +1,26 @@
 "use client";
 
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense, memo, useState, useEffect, useRef } from "react";
 import { useUrlShortener } from "@/lib/hooks/useUrlShortener";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "@/lib/firebase/config";
 import { HomeFooter } from "@/components/layout/HomeFooter";
-import { TopNavbar } from "@/components/layout/TopNavbar";
+import { HistorySidebar } from "@/components/layout/HistorySidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Copy, Check, Link2, Loader2, Lock, Unlock, QrCode, Clock, ExternalLink, ArrowRight, Gift } from "lucide-react";
 import QRCode from "react-qr-code";
 import Link from "next/link";
+import { MobileFooter } from "@/components/mobile/MobileFooter";
+import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { RateLimitModal } from "@/components/ui/rate-limit-modal";
-import { HomePageSkeleton } from "./HomePageSkeleton";
+import { HomePageSkeleton } from "@/app/_components/HomePageSkeleton";
 import type { GuestQuotaResult } from "@/lib/server/quota-check";
 import { formatCooldown } from "@/lib/utils/format-time";
+
 
 
 /** Reads ?focus=true from the URL — must be wrapped in <Suspense>. */
@@ -36,7 +39,7 @@ interface HomePageClientProps {
     initialGuestStatus: GuestQuotaResult;
 }
 
-export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
+export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps) {
     const {
         user, authLoading, quotaLoading, quotaFetched,
         url, setUrl, isValidUrl, setIsValidUrl, shortDomain, mounted,
@@ -52,6 +55,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
         isStrictlyLoading, heroCardBase, statusPillBase, premiumInputClass, premiumFieldShellBase, premiumPrimaryButtonClass
     } = useUrlShortener(initialGuestStatus);
 
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const resultRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -63,13 +67,16 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
     const isGuestLocked = !user && guestUsed && !showUnlockAnimation && !viewingPastLink;
     const isOverQuota = isGuestLocked || (quota ? (quota.used !== undefined ? quota.used : quota.freeLinksCreated) >= quota.limit : false);
 
-
     return (
-        <div className="flex flex-col h-[100dvh] overflow-hidden bg-background">
+        <div className="flex flex-col h-[100dvh] overflow-hidden bg-slate-50 dark:bg-slate-950 relative">
+            {/* Subtle background glow */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[30%] bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[30%] bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+            
             <Suspense fallback={null}>
                 <SearchParamsHandler onFocus={() => setFocusTriggered(true)} />
             </Suspense>
-            <TopNavbar isCreateDisabled={isDisabled} />
+            <TopNavbar isCreateDisabled={false} />
 
             <AnimatePresence>
                 {showUnlockAnimation && (
@@ -80,37 +87,36 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                         transition={{ type: "spring", bounce: 0.5 }}
                         className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-background/40 backdrop-blur-sm"
                     >
-                        <div className="flex flex-col items-center justify-center p-8 bg-card border shadow-2xl rounded-3xl text-center">
-                            <div className="bg-emerald-100 p-4 rounded-full mb-4">
-                                <Unlock className="w-12 h-12 text-emerald-600 animate-bounce" />
+                        <div className="flex flex-col items-center justify-center p-6 bg-card border shadow-2xl rounded-2xl text-center">
+                            <div className="bg-emerald-100 p-3 rounded-full mb-3">
+                                <Unlock className="w-8 h-8 text-emerald-600 animate-bounce" />
                             </div>
-                            <h2 className="text-2xl font-bold mb-2">Lock Lifted!</h2>
-                            <p className="text-muted-foreground">The admin has successfully unlocked your account.</p>
-                            <p className="text-sm font-semibold text-emerald-600 mt-4">You can now create a new link!</p>
+                            <h2 className="text-xl font-bold mb-2">Lock Lifted!</h2>
+                            <p className="text-sm text-muted-foreground">The admin has successfully unlocked your account.</p>
+                            <p className="text-xs font-semibold text-emerald-600 mt-2">You can now create a new link!</p>
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
             <main
-                className="flex-1 flex flex-col w-full px-6 md:px-8 overflow-x-hidden overflow-y-auto"
-                
+                className={`flex-1 flex flex-col w-full px-4 overflow-hidden justify-center items-center`}
             >
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, ease: "easeOut" }}
-                    className="w-full max-w-xl flex flex-col gap-6 m-auto"
+                    className={`w-full max-w-sm flex flex-col gap-4 mt-2`}
                 >
-                    <div className="text-center">
-                            <h1 className="text-[40px] font-semibold leading-[0.98] tracking-[-0.045em] text-foreground sm:text-[46px]">
+                    <div className="text-center mb-1">
+                            <h1 className="text-2xl font-bold tracking-tight text-foreground">
                                 Shorten your URL
                             </h1>
-                            <p className="mx-auto mt-3 max-w-[34rem] text-sm leading-6 text-muted-foreground/90 sm:text-[15px]">
-                                Turn long URLs into clean, shareable links with optional custom aliases in a few quick steps.
+                            <p className="mx-auto mt-1 text-xs text-muted-foreground/90">
+                                Clean, shareable links in a tap.
                             </p>
                             {!authLoading && (
-                                <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+                                <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                                     {user ? (
                                         quota ? (
                                             <>
@@ -394,7 +400,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -15, filter: "blur(4px)" }}
                                 transition={{ duration: 0.4, ease: "easeInOut" }}
-                                className={`${heroCardBase} flex flex-col gap-4 min-h-[290px] justify-center`}
+                                className={`${heroCardBase} flex flex-col gap-3 justify-center`}
                             >
                                 <div className={`flex flex-col gap-1.5 ${isOverQuota ? 'opacity-50 pointer-events-none' : ''}`}>
                                     <div className="flex justify-between items-center px-1">
@@ -542,7 +548,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                                     asChild
                                                     className="w-full max-w-[240px] h-11 bg-emerald-600 text-white hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all rounded-lg font-medium tracking-wide"
                                                 >
-                                                    <Link href="/pricing" className="flex items-center justify-center">
+                                                    <Link href="/mobile/plan" className="flex items-center justify-center">
                                                         Upgrade for Instant Access <ArrowRight className="w-4 h-4 ml-2" />
                                                     </Link>
                                                 </Button>
@@ -558,7 +564,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                                     asChild
                                                     className="w-full max-w-[240px] h-11 bg-emerald-600 text-white hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all rounded-lg font-medium tracking-wide"
                                                 >
-                                                    <Link href="/pricing" className="flex items-center justify-center">
+                                                    <Link href="/mobile/plan" className="flex items-center justify-center">
                                                         Upgrade to Continue <ArrowRight className="w-4 h-4 ml-2" />
                                                     </Link>
                                                 </Button>
@@ -584,7 +590,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                                         asChild
                                                         className="w-full max-w-[240px] h-11 bg-emerald-600 text-white hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all rounded-lg font-medium tracking-wide"
                                                     >
-                                                        <Link href="/pricing" className="flex items-center justify-center">
+                                                        <Link href="/mobile/plan" className="flex items-center justify-center">
                                                             Upgrade Workspace <ArrowRight className="w-4 h-4 ml-2" />
                                                         </Link>
                                                     </Button>
@@ -622,14 +628,25 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                         )}
                     </AnimatePresence>
                 </motion.div>
+                
+                <div className="pb-8" />
             </main>
+            
+            <div className="w-full z-10 shrink-0">
+                <MobileFooter />
+            </div>
 
             <RateLimitModal
                 isOpen={isRateLimited}
                 onClose={() => setIsRateLimited(false)}
             />
 
-            <HomeFooter />
+            <HistorySidebar
+                isOpen={isHistoryOpen}
+                onClose={() => setIsHistoryOpen(false)}
+                userId={user?.uid || ""}
+                onLinksChange={() => {}}
+            />
         </div>
     );
 }

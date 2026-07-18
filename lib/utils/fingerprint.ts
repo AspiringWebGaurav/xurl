@@ -31,6 +31,18 @@ export async function getDeviceFingerprint(): Promise<string> {
     }
 }
 
+function generateUUID() {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+    }
+    // Fallback for non-secure contexts (HTTP over LAN)
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
 export async function getOrCreateGuestSessionId(): Promise<string> {
     if (typeof window === "undefined") return "server-side";
 
@@ -39,10 +51,10 @@ export async function getOrCreateGuestSessionId(): Promise<string> {
         try {
             sessionId = await getDeviceFingerprint();
             if (sessionId === "fallback-fingerprint") {
-                sessionId = crypto.randomUUID();
+                sessionId = generateUUID();
             }
         } catch {
-            sessionId = crypto.randomUUID();
+            sessionId = generateUUID();
         }
         localStorage.setItem("xurl_guest_session_id", sessionId);
     }

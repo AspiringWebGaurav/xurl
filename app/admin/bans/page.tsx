@@ -7,7 +7,7 @@ import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { isAdminEmail } from "@/lib/admin-config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, ShieldAlert, CheckCircle, AlertTriangle, Search, RefreshCw, Mail, CalendarClock, UserX } from "lucide-react";
+import { Loader2, ShieldAlert, CheckCircle, AlertTriangle, Search, RefreshCw, Mail, CalendarClock, UserX, Ghost } from "lucide-react";
 import { toast } from "sonner";
 
 type SearchUser = {
@@ -21,11 +21,18 @@ type SearchUser = {
 
 type BanAppeal = {
     id: string;
-    userId: string;
+    userId?: string;
+    guestSessionId?: string;
     email: string;
     message: string;
     createdAt: number;
     status: "pending" | "approved" | "rejected";
+};
+
+type BannedGuest = {
+    guestSessionId: string;
+    bannedAt: number;
+    bannedBy: string;
 };
 
 export default function AdminBansPage() {
@@ -46,6 +53,10 @@ export default function AdminBansPage() {
     const [appeals, setAppeals] = useState<BanAppeal[]>([]);
     const [appealsLoading, setAppealsLoading] = useState(false);
 
+    // Banned Guests State
+    const [bannedGuests, setBannedGuests] = useState<BannedGuest[]>([]);
+    const [guestsLoading, setGuestsLoading] = useState(false);
+
     useEffect(() => {
         let mounted = true;
         const unsub = onAuthStateChanged(auth, async (u) => {
@@ -56,6 +67,7 @@ export default function AdminBansPage() {
             if (u && isAdminEmail(u.email)) {
                 loadLatestUsers(u);
                 loadAppeals(u);
+                loadBannedGuests(u);
             }
         });
         
@@ -63,6 +75,7 @@ export default function AdminBansPage() {
             if (auth.currentUser && isAdminEmail(auth.currentUser.email)) {
                 loadLatestUsers(auth.currentUser);
                 loadAppeals(auth.currentUser);
+                loadBannedGuests(auth.currentUser);
             }
         };
         
@@ -111,6 +124,23 @@ export default function AdminBansPage() {
             console.error(e);
         } finally {
             setAppealsLoading(false);
+        }
+    };
+
+    const loadBannedGuests = async (currentUser: User = user!) => {
+        if (!currentUser) return;
+        setGuestsLoading(true);
+        try {
+            const token = await currentUser.getIdToken();
+            const res = await fetch("/api/admin/bans/guest/list", {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (data.items) setBannedGuests(data.items);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setGuestsLoading(false);
         }
     };
 
@@ -168,7 +198,7 @@ export default function AdminBansPage() {
         }
     };
 
-    const resolveAppeal = async (appealId: string, action: "approve" | "reject", userId: string, email: string) => {
+    const resolveAppeal = async (appealId: string, action: "approve" | "reject", userId: string, email: string, guestSessionId?: string) => {
         if (!user) return;
         try {
             const token = await user.getIdToken();
@@ -178,17 +208,42 @@ export default function AdminBansPage() {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}` 
                 },
-                body: JSON.stringify({ appealId, action, userId, email })
+                body: JSON.stringify({ appealId, action, userId, email, guestSessionId })
             });
             if (res.ok) {
                 toast.success(`Appeal ${action}d successfully.`);
                 loadAppeals(user);
                 loadLatestUsers(user);
             } else {
-                toast.error("Failed to resolve appeal.");
+                toast.error("Failed to process appeal.");
             }
-        } catch (e) {
-            toast.error("Error resolving appeal.");
+        } catch (error) {
+            console.error(error);
+            toast.error("An unexpected error occurred.");
+        }
+    };
+
+    const handleUnbanGuest = async (guestSessionId: string) => {
+        if (!user) return;
+        try {
+            const token = await user.getIdToken();
+            const res = await fetch("/api/admin/bans/guest", {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}` 
+                },
+                body: JSON.stringify({ guestSessionId, action: "unban" })
+            });
+            if (res.ok) {
+                toast.success("Guest device has been unbanned.");
+                loadBannedGuests(user);
+            } else {
+                toast.error("Failed to unban guest.");
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error("An unexpected error occurred.");
         }
     };
 
@@ -360,6 +415,67 @@ export default function AdminBansPage() {
                             </table>
                         </div>
                     </div>
+
+                    {/* Banned Guest Devices */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="p-6 sm:p-8 border-b border-slate-200 bg-slate-50/30 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-lg font-semibold tracking-tight text-slate-900 flex items-center gap-2">
+                                    <Ghost className="h-5 w-5 text-slate-400" /> Banned Guest Devices
+                                </h2>
+                                <p className="text-sm text-slate-500 mt-1">Manage suspended anonymous fingerprints.</p>
+                            </div>
+                            <Button 
+                                variant="outline"
+                                size="icon"
+                                onClick={() => user && loadBannedGuests(user)}
+                                disabled={guestsLoading}
+                                title="Refresh Guests"
+                                className="h-8 w-8 rounded-lg border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:bg-slate-100 shadow-sm transition-all"
+                            >
+                                <RefreshCw className={`h-4 w-4 ${guestsLoading ? "animate-spin" : ""}`} />
+                            </Button>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm text-slate-600">
+                                <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-widest text-slate-500 border-b border-slate-200">
+                                    <tr>
+                                        <th scope="col" className="px-6 py-4">Guest Device / Fingerprint</th>
+                                        <th scope="col" className="px-6 py-4 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 bg-white">
+                                    {bannedGuests.map(g => (
+                                        <tr key={g.guestSessionId} className="hover:bg-slate-50/50 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="font-mono text-slate-900 bg-slate-100 px-2 py-1 rounded text-xs">
+                                                        {g.guestSessionId.substring(0, 16)}...
+                                                    </span>
+                                                    <span className="rounded-md bg-rose-100 px-2 py-1 text-[10px] font-bold text-rose-700 tracking-wide">BANNED</span>
+                                                </div>
+                                                <div className="mt-1 text-xs text-slate-400">
+                                                    Banned: {new Date(g.bannedAt).toLocaleString()}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <Button size="sm" variant="outline" className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 shadow-none font-medium h-8" onClick={() => handleUnbanGuest(g.guestSessionId)}>
+                                                    Unban Device
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {bannedGuests.length === 0 && !guestsLoading && (
+                                        <tr>
+                                            <td colSpan={2} className="px-6 py-8 text-center text-slate-500">
+                                                No banned guest devices found.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Right Column: Appeals Inbox */}
@@ -404,7 +520,7 @@ export default function AdminBansPage() {
                                             <span className="rounded bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700 uppercase tracking-widest">
                                                 Pending Review
                                             </span>
-                                            <span className="text-xs text-slate-400 font-mono">ID: {appeal.userId.substring(0,8)}...</span>
+                                            <span className="text-xs text-slate-400 font-mono">ID: {(appeal.userId || appeal.guestSessionId || "").substring(0,8)}...</span>
                                         </div>
                                         <p className="font-medium text-slate-900 mb-4">{appeal.email}</p>
                                         
@@ -416,10 +532,10 @@ export default function AdminBansPage() {
                                         </div>
                                         
                                         <div className="mt-5 grid grid-cols-2 gap-3 pt-4 border-t border-slate-100">
-                                            <Button size="sm" onClick={() => resolveAppeal(appeal.id, "approve", appeal.userId, appeal.email)} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-none font-medium">
+                                            <Button size="sm" onClick={() => resolveAppeal(appeal.id, "approve", appeal.userId || "", appeal.email, appeal.guestSessionId)} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-none font-medium">
                                                 Lift Ban
                                             </Button>
-                                            <Button size="sm" variant="outline" className="text-rose-600 border-rose-200 hover:bg-rose-50 shadow-none font-medium" onClick={() => resolveAppeal(appeal.id, "reject", appeal.userId, appeal.email)}>
+                                            <Button size="sm" variant="outline" className="text-rose-600 border-rose-200 hover:bg-rose-50 shadow-none font-medium" onClick={() => resolveAppeal(appeal.id, "reject", appeal.userId || "", appeal.email, appeal.guestSessionId)}>
                                                 Keep Ban
                                             </Button>
                                         </div>

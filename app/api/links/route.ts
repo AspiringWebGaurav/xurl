@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
         // Determine authenticated user
         let verifiedUid = await verifyAuth(request);
         const guestSessionId = request.headers.get("x-guest-session-id") || undefined;
+        const deviceType = (request.headers.get("x-device-type") || "api") as "desktop" | "mobile" | "api";
 
         // --- TEST BYPASS ---
         if (process.env.NODE_ENV !== "production") {
@@ -68,6 +69,11 @@ export async function POST(request: NextRequest) {
             const banned = await isUserBanned(verifiedUid);
             if (banned) {
                 return NextResponse.json({ error: "Your account is currently suspended." }, { status: 403 });
+            }
+        } else if (guestSessionId) {
+            const guestBanDoc = await adminDb.collection("banned_guests").doc(guestSessionId).get();
+            if (guestBanDoc.exists) {
+                return NextResponse.json({ error: "Your access is currently suspended." }, { status: 403 });
             }
         }
 
@@ -180,7 +186,8 @@ export async function POST(request: NextRequest) {
             ipHash: isGuest ? ipHash : undefined,
             fingerprintHash: isGuest ? fingerprintHash : undefined,
             guestSessionId: isGuest ? guestSessionId : undefined,
-            quotaPreference
+            quotaPreference,
+            deviceType
         });
 
         // Record guest usage natively inside createLink transaction closing TOCTOU

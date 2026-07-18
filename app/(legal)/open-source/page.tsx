@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { LegalPageShell } from "@/components/layout/LegalPageShell";
 import { seo } from "@/lib/seo";
 
@@ -88,10 +89,11 @@ const sections = [
     },
 ];
 
-export default function OpenSourcePage() {
+export default async function OpenSourcePage() {
+    const headersList = await headers();
+    const isMobileDevice = headersList.get("x-is-mobile-device") === "true";
     return (
-        <LegalPageShell
-            title="Open Source"
+        <LegalPageShell isMobileDevice={isMobileDevice} title="Open Source"
             sections={sections}
         />
     );

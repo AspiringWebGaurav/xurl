@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { LegalPageShell } from "@/components/layout/LegalPageShell";
 import { seo } from "@/lib/seo";
 
@@ -76,10 +77,11 @@ const sections = [
     },
 ];
 
-export default function TermsPage() {
+export default async function TermsPage() {
+    const headersList = await headers();
+    const isMobileDevice = headersList.get("x-is-mobile-device") === "true";
     return (
-        <LegalPageShell
-            title="Terms of Service"
+        <LegalPageShell isMobileDevice={isMobileDevice} title="Terms of Service"
             lastUpdated="Last Updated: July 17, 2026 (Originally Published: July 16, 2026)"
             sections={sections}
         />

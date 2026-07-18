@@ -86,17 +86,11 @@ temp/
 
 # Project Specific
 scripts/
-CLAUDE.md
-screenshot/
-
-# Local-only Claude experiments
-.claude/
-.local/
-.local/docs-index.json
-
-#scripts
 .scripts/
-.script/. l o c a l /  
+.local/
+CLAUDE.md
+.claude/
+screenshot/
 
 # database backups
 db-backup-pre-purge.json
@@ -106,3 +100,11 @@ db-backup-pre-purge.json
 test-results/
 playwright-report/
 blob-report/
+playwright/.cache/
+# Scratch scripts
+fix_*.js
+master_refactor*.js
+generate_hook.js
+rebuild_*.js
+inject_*.js
+

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { DesktopOnlyOverlay } from "@/components/layout/DesktopOnlyOverlay";
 import { BanGuard } from "@/components/layout/BanGuard";
 import { Toaster } from "@/components/ui/sonner";
 import { seo } from "@/lib/seo";
 import { StructuredData } from "@/components/seo/StructuredData";
+import { headers } from "next/headers";
+
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
@@ -58,19 +59,23 @@ export const metadata: Metadata = {
     },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
     children,
 }: Readonly<{
     children: React.ReactNode;
 }>) {
+    const headersList = await headers();
+    const isMobileDevice = headersList.get('x-is-mobile-device') === 'true';
+
     return (
-        <html lang="en">
-            <body className={`${inter.className} bg-background text-foreground`}>
+        <html lang="en" suppressHydrationWarning>
+            <head>
+                <script src="https://switchyy.eu.cc/switchy.js?key=pk_59ca8c1525d7dfebdaf4d2bc&project=rMvXJgJoFGuCTdxDB8jH" async />
+            </head>
+            <body className={`${inter.className} bg-background text-foreground`} suppressHydrationWarning>
                 <StructuredData />
-                <BanGuard>
-                    <DesktopOnlyOverlay>
-                        {children}
-                    </DesktopOnlyOverlay>
+                <BanGuard isMobileDevice={isMobileDevice}>
+                    {children}
                 </BanGuard>
                 <Toaster />
             </body>

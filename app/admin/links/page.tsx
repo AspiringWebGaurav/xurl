@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
 import { isAdminEmail } from "@/lib/admin-config";
-import { RefreshCw, Link as LinkIcon, Loader2, Search, MoreVertical, Globe, ShieldAlert, CalendarClock, Infinity, Trash2, X, Filter, Unlock } from "lucide-react";
+import { RefreshCw, Link as LinkIcon, Loader2, Search, MoreVertical, Globe, ShieldAlert, CalendarClock, Infinity, Trash2, X, Filter, Unlock, Smartphone, Monitor } from "lucide-react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ type UserLink = {
     isActive: boolean;
     totalClicks: number;
     guestSessionId?: string;
+    deviceType?: "desktop" | "mobile" | "api";
 };
 
 export default function AdminLinksPage() {
@@ -49,8 +50,13 @@ export default function AdminLinksPage() {
     const [selectedLinks, setSelectedLinks] = useState<Set<string>>(new Set());
     const [linkSearchQuery, setLinkSearchQuery] = useState("");
     const [linkFilter, setLinkFilter] = useState<"all" | "active" | "expired" | "revoked">("all");
+    const [deviceFilter, setDeviceFilter] = useState<"all" | "desktop" | "mobile">("all");
     const [guestStats, setGuestStats] = useState<{total: number, active: number} | null>(null);
     const [guestLinks, setGuestLinks] = useState<UserLink[]>([]);
+    
+    // Ban confirmation state
+    const [guestToBan, setGuestToBan] = useState<string | null>(null);
+    const [isBanning, setIsBanning] = useState(false);
 
     useEffect(() => {
         let mounted = true;
@@ -72,6 +78,7 @@ export default function AdminLinksPage() {
                         isActive: data.isActive,
                         totalClicks: data.totalClicks || 0,
                         guestSessionId: data.guestSessionId || undefined,
+                        deviceType: data.deviceType || "desktop",
                     });
                 });
                 newGuestLinks.sort((a, b) => b.createdAt - a.createdAt);
@@ -181,6 +188,36 @@ export default function AdminLinksPage() {
             toast.error("Error updating link");
         }
     };
+
+    const handleBanGuest = async (guestSessionId: string) => {
+        if (!user) return;
+        setIsBanning(true);
+        try {
+            const token = await user.getIdToken();
+            const res = await fetch("/api/admin/bans/guest", {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}` 
+                },
+                body: JSON.stringify({ guestSessionId, action: "ban" })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                toast.success("Guest device has been banned successfully.");
+                setGuestToBan(null);
+                if (selectedUser) loadUserLinks(selectedUser);
+            } else {
+                toast.error(data.error || "Failed to ban guest");
+            }
+        } catch (error) {
+            console.error("Ban guest error:", error);
+            toast.error("An unexpected error occurred");
+        } finally {
+            setIsBanning(false);
+        }
+    };
+
 
     const handleDeleteLink = async (slug: string) => {
         if (!user) return;
@@ -470,7 +507,7 @@ export default function AdminLinksPage() {
                         
                         {/* Filters & Search */}
                         <div className="flex items-center justify-between bg-slate-50/50 p-2 rounded-lg border border-slate-100">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 {(["all", "active", "expired", "revoked"] as const).map(f => (
                                     <Button 
                                         key={f}
@@ -482,6 +519,23 @@ export default function AdminLinksPage() {
                                         {f}
                                     </Button>
                                 ))}
+                                {selectedUser?.id === "anonymous" && (
+                                    <>
+                                        <div className="w-px h-6 bg-slate-200 mx-2"></div>
+                                        {(["all", "desktop", "mobile"] as const).map(f => (
+                                            <Button 
+                                                key={`dev-${f}`}
+                                                variant={deviceFilter === f ? "default" : "ghost"} 
+                                                size="sm" 
+                                                onClick={() => setDeviceFilter(f)}
+                                                className={`capitalize flex items-center gap-1.5 ${deviceFilter === f ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'text-slate-600 hover:text-indigo-600'}`}
+                                            >
+                                                {f === "desktop" ? <Monitor className="h-3.5 w-3.5" /> : f === "mobile" ? <Smartphone className="h-3.5 w-3.5" /> : <Filter className="h-3.5 w-3.5" />}
+                                                {f}
+                                            </Button>
+                                        ))}
+                                    </>
+                                )}
                             </div>
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -518,6 +572,11 @@ export default function AdminLinksPage() {
                                         if (linkFilter === "active" && (isExpired || isRevoked)) return false;
                                         if (linkFilter === "expired" && (!isExpired || isRevoked)) return false;
                                         if (linkFilter === "revoked" && !isRevoked) return false;
+                                        
+                                        // Device filter
+                                        if (selectedUser?.id === "anonymous" && deviceFilter !== "all") {
+                                            if (l.deviceType !== deviceFilter) return false;
+                                        }
                                         
                                         // Text search filter
                                         if (linkSearchQuery) {
@@ -598,8 +657,9 @@ export default function AdminLinksPage() {
                                                     {link.guestSessionId && (
                                                         <>
                                                             <span>•</span>
-                                                            <span className="font-mono text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100" title="Device/Session ID">
-                                                                Device: {link.guestSessionId.includes('-') ? link.guestSessionId.split('-')[0] : link.guestSessionId.substring(0, 8)}...
+                                                            <span className="font-mono text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 flex items-center gap-1" title="Guest Session ID">
+                                                                {link.deviceType === "mobile" ? <Smartphone className="h-3 w-3" /> : link.deviceType === "desktop" ? <Monitor className="h-3 w-3" /> : null}
+                                                                <span className="capitalize">{link.deviceType || "Unknown"}</span> Guest: {link.guestSessionId.includes('-') ? link.guestSessionId.split('-')[0] : link.guestSessionId.substring(0, 8)}...
                                                             </span>
                                                         </>
                                                     )}
@@ -633,10 +693,25 @@ export default function AdminLinksPage() {
                                                                 Make Permanent
                                                             </DropdownMenuItem>
                                                             {selectedUser?.id === "anonymous" && (
-                                                                <DropdownMenuItem onClick={() => handleLinkAction(link.slug, "lift_guest_lock")}>
-                                                                    <Unlock className="h-4 w-4 mr-2" />
-                                                                    Lift Signup Lock
-                                                                </DropdownMenuItem>
+                                                                <>
+                                                                    <DropdownMenuItem onClick={() => handleLinkAction(link.slug, "lift_guest_lock")}>
+                                                                        <Unlock className="h-4 w-4 mr-2" />
+                                                                        Lift Signup Lock
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem 
+                                                                        className="text-rose-600 focus:text-rose-600 focus:bg-rose-50"
+                                                                        onClick={() => {
+                                                                            if (!link.guestSessionId) {
+                                                                                toast.error("Cannot ban: Missing device ID");
+                                                                                return;
+                                                                            }
+                                                                            setGuestToBan(link.guestSessionId);
+                                                                        }}
+                                                                    >
+                                                                        <ShieldAlert className="h-4 w-4 mr-2" />
+                                                                        Ban Guest Device
+                                                                    </DropdownMenuItem>
+                                                                </>
                                                             )}
                                                             <DropdownMenuSeparator />
                                                             <DropdownMenuItem 
@@ -685,6 +760,41 @@ export default function AdminLinksPage() {
                         </Button>
                         <Button variant="destructive" onClick={() => confirmDelete?.type === 'single' ? handleDeleteLink(confirmDelete.target!) : executeBatchDelete()}>
                             Yes, Wipe Completely
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Guest Ban Modal */}
+            <Dialog open={!!guestToBan} onOpenChange={(open) => !open && !isBanning && setGuestToBan(null)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-rose-600">
+                            <ShieldAlert className="h-5 w-5" />
+                            Ban Guest Device
+                        </DialogTitle>
+                        <DialogDescription className="pt-2">
+                            Are you sure you want to ban this guest device?
+                            <br /><br />
+                            This will instantly revoke all their active links and prevent them from creating any new links using this device fingerprint.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex justify-end gap-3 mt-6">
+                        <Button 
+                            variant="outline" 
+                            onClick={() => setGuestToBan(null)}
+                            disabled={isBanning}
+                        >
+                            Cancel
+                        </Button>
+                        <Button 
+                            variant="destructive"
+                            onClick={() => guestToBan && handleBanGuest(guestToBan)}
+                            disabled={isBanning}
+                            className="gap-2"
+                        >
+                            {isBanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldAlert className="h-4 w-4" />}
+                            {isBanning ? "Banning..." : "Ban Device"}
                         </Button>
                     </div>
                 </DialogContent>

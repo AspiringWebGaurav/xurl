@@ -335,7 +335,8 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                 planEraStart: userId !== "anonymous" ? (userData.planEraStart || userData.planStart || userData.createdAt || now) : null,
                 totalClicks: 0,
                 deleteAt: finalExpiresAt ? finalExpiresAt + (7 * 24 * 60 * 60 * 1000) : null,
-                guestSessionId: input.guestSessionId || null
+                guestSessionId: input.guestSessionId || null,
+                deviceType: input.deviceType || "api"
             };
             transaction.set(adminDb.collection("links").doc(slug), linkDoc);
 

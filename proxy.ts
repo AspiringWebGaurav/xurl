@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, userAgent } from 'next/server';
 import type { NextFetchEvent } from 'next/server';
 
 // Edge in-memory cache
@@ -15,13 +15,13 @@ function dispatchAnalytics(
     const analyticsUrl = new URL('/api/analytics/click', request.url);
     const referrer = request.headers.get("referer") || "";
     const country = request.headers.get("x-vercel-ip-country") || "";
-    const userAgent = request.headers.get("user-agent") || "";
+    const agent = request.headers.get("user-agent") || "";
 
     event.waitUntil(
         fetch(analyticsUrl, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ slug, referrer, country, userAgent })
+            body: JSON.stringify({ slug, referrer, country, userAgent: agent })
         }).catch(err => console.error("Edge Analytics Dispatch Error", err))
     );
 }
@@ -45,7 +45,7 @@ function buildRedirectResponse(
 export async function proxy(request: NextRequest, event: NextFetchEvent) {
     const { pathname } = request.nextUrl;
 
-    if (
+    const isApiOrAsset = 
         pathname.startsWith('/_next') ||
         pathname.startsWith('/api') ||
         pathname.startsWith('/_redirect-fallback') ||
@@ -55,7 +55,9 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
         pathname === '/manifest.webmanifest' ||
         pathname === '/manifest.json' ||
         pathname === '/opengraph-image' ||
-        pathname === '/twitter-image' ||
+        pathname === '/twitter-image';
+
+    const isAppPage = 
         pathname === '/' ||
         pathname === '/login' ||
         pathname === '/pricing' ||
@@ -79,8 +81,33 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
         pathname === '/api-docs' ||
         pathname === '/refund' ||
         pathname === '/open-source' ||
-        request.nextUrl.searchParams.has('dest')
-    ) {
+        request.nextUrl.searchParams.has('dest');
+
+    if (isApiOrAsset) {
+        return NextResponse.next();
+    }
+
+    if (isAppPage) {
+        const { device } = userAgent(request);
+        if (device.type === 'mobile' || device.type === 'tablet') {
+            const requestHeaders = new Headers(request.headers);
+            requestHeaders.set('x-is-mobile-device', 'true');
+            
+            const hasMobileRoute = pathname === '/' || pathname === '/login' || pathname.startsWith('/dashboard') || pathname === '/pricing';
+            
+            if (hasMobileRoute) {
+                let mobilePathname = pathname === '/' ? '' : pathname;
+                if (pathname === '/pricing') mobilePathname = '/plan';
+                
+                return NextResponse.rewrite(new URL(`/mobile${mobilePathname}`, request.url), {
+                    request: { headers: requestHeaders }
+                });
+            } else {
+                return NextResponse.next({
+                    request: { headers: requestHeaders }
+                });
+            }
+        }
         return NextResponse.next();
     }
 
@@ -145,7 +172,7 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
 
 export const config = {
     matcher: [
-        '/((?!_next/static|_next/image|favicon.ico|api|login|pricing|expired|r|terms|privacy|acceptable-use|profile|purchase-history|dashboard|admin|placeholder|guest-policy|analytics|analytics-preview|features|about|blog|documentation|api-docs|refund|open-source|images).*)',
+        '/((?!_next/static|_next/image|favicon.ico|images).*)',
     ],
 };
 

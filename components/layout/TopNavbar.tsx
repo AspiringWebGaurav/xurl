@@ -140,7 +140,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                 } else {
                     const sessionId = await getOrCreateGuestSessionId();
                     if (sessionId) {
-                        const q = query(collection(db, "links"), where("guestSessionId", "==", sessionId));
+                        const q = query(collection(db, "links"), where("guestSessionId", "==", sessionId), where("userId", "==", "anonymous"));
                         unsub = onSnapshot(q, (snapshot) => {
                             let activeCount = 0;
                             snapshot.forEach(doc => {
@@ -624,45 +624,46 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                 )}
             </div>
 
-            <div className="flex flex-1 items-center justify-end gap-2 sm:gap-2.5">
+            <div className="flex flex-1 items-center justify-end gap-1.5 sm:gap-2.5">
+                {(pathname !== "/pricing" && pathname !== "/mobile/plan") ? (
+                    <Link
+                        href="/pricing"
+                        className={cn(
+                            navActionBase,
+                            secondaryAction
+                        )}
+                        onMouseEnter={() => setIsPricingHovered(true)}
+                        onMouseLeave={() => setIsPricingHovered(false)}
+                    >
+                        <span className="relative inline-flex h-5 w-[44px] items-center justify-center overflow-hidden">
+                            <AnimatePresence mode="wait" initial={false}>
+                                <motion.span
+                                    key={pricingLabels[pricingLabelIndex]}
+                                    initial={{ opacity: 0, y: 6 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -6 }}
+                                    transition={{ duration: 0.22, ease: "easeOut" }}
+                                    className="absolute inset-0 inline-flex items-center justify-center"
+                                >
+                                    {pricingLabels[pricingLabelIndex]}
+                                </motion.span>
+                            </AnimatePresence>
+                        </span>
+                    </Link>
+                ) : (
+                    <Link
+                        href="/"
+                        className={cn(
+                            navActionBase,
+                            "gap-1.5 border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900 whitespace-nowrap"
+                        )}
+                    >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Back to shortener</span>
+                        <span className="sm:hidden">Home</span>
+                    </Link>
+                )}
                 <div className="hidden sm:flex items-center gap-2">
-                    {pathname !== "/pricing" ? (
-                        <Link
-                            href="/pricing"
-                            className={cn(
-                                navActionBase,
-                                secondaryAction
-                            )}
-                            onMouseEnter={() => setIsPricingHovered(true)}
-                            onMouseLeave={() => setIsPricingHovered(false)}
-                        >
-                            <span className="relative inline-flex h-5 w-[44px] items-center justify-center overflow-hidden">
-                                <AnimatePresence mode="wait" initial={false}>
-                                    <motion.span
-                                        key={pricingLabels[pricingLabelIndex]}
-                                        initial={{ opacity: 0, y: 6 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -6 }}
-                                        transition={{ duration: 0.22, ease: "easeOut" }}
-                                        className="absolute inset-0 inline-flex items-center justify-center"
-                                    >
-                                        {pricingLabels[pricingLabelIndex]}
-                                    </motion.span>
-                                </AnimatePresence>
-                            </span>
-                        </Link>
-                    ) : (
-                        <Link
-                            href="/"
-                            className={cn(
-                                navActionBase,
-                                "gap-1.5 border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                            )}
-                        >
-                            <ArrowLeft className="w-3.5 h-3.5" />
-                            Back to shortener
-                        </Link>
-                    )}
                     {user && (
                         <Link
                             href="/analytics"

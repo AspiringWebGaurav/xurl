@@ -81,7 +81,8 @@ export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: Histo
                     if (sessionId) {
                         const q = query(
                             collection(db, "links"),
-                            where("guestSessionId", "==", sessionId)
+                            where("guestSessionId", "==", sessionId),
+                            where("userId", "==", "anonymous")
                         );
                         
                         unsub = onSnapshot(q, (snapshot) => {

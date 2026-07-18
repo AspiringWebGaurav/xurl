@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { LegalPageShell } from "@/components/layout/LegalPageShell";
 import { seo } from "@/lib/seo";
 
@@ -79,10 +80,11 @@ const sections = [
     },
 ];
 
-export default function AcceptableUsePage() {
+export default async function AcceptableUsePage() {
+    const headersList = await headers();
+    const isMobileDevice = headersList.get("x-is-mobile-device") === "true";
     return (
-        <LegalPageShell
-            title="Acceptable Use Policy"
+        <LegalPageShell isMobileDevice={isMobileDevice} title="Acceptable Use Policy"
             lastUpdated="Last Updated: July 17, 2026 (Originally Published: July 16, 2026)"
             sections={sections}
         />

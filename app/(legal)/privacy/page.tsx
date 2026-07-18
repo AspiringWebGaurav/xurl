@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { LegalPageShell } from "@/components/layout/LegalPageShell";
 import { seo } from "@/lib/seo";
 
@@ -72,10 +73,11 @@ const sections = [
     },
 ];
 
-export default function PrivacyPage() {
+export default async function PrivacyPage() {
+    const headersList = await headers();
+    const isMobileDevice = headersList.get("x-is-mobile-device") === "true";
     return (
-        <LegalPageShell
-            title="Privacy Policy"
+        <LegalPageShell isMobileDevice={isMobileDevice} title="Privacy Policy"
             lastUpdated="Last Updated: July 17, 2026 (Originally Published: July 16, 2026)"
             sections={sections}
         />

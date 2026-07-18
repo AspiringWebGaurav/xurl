@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ message: admin.message }, { status: admin.status });
         }
 
-        const { appealId, action, userId, email } = await request.json();
+        const { appealId, action, userId, guestSessionId, email } = await request.json();
 
         if (!appealId || !["approve", "reject"].includes(action)) {
             return NextResponse.json({ message: "Invalid payload" }, { status: 400 });
@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
                     message: "Your ban has been lifted by appeal. You may now access the platform.",
                 });
             }
+            if (guestSessionId) { await adminDb.collection('banned_guests').doc(guestSessionId).delete().catch(() => {}); const guestLinksSnapshot = await adminDb.collection('links').where('guestSessionId', '==', guestSessionId).get(); const batch = adminDb.batch(); guestLinksSnapshot.docs.forEach(doc => { batch.update(doc.ref, { isActive: true }); }); await batch.commit().catch(() => {}); }
             if (email) {
                 await adminDb.collection("banned_emails").doc(email.toLowerCase().trim()).delete().catch(() => {});
             }

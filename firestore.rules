@@ -12,13 +12,20 @@ service cloud.firestore {
     // All writes go through the admin SDK (server-side API routes).
     // Client reads are allowed for any authenticated user on their own links.
     match /links/{slug} {
-      allow read: if true;  // Needed for redirect lookups
-      allow list: if isAdmin();
+      allow get: if true;  // Needed for redirect lookups
+      allow list: if isAdmin() 
+                  || (request.auth != null && request.auth.uid == resource.data.userId)
+                  || (resource.data.userId == 'anonymous');
       allow write: if false; // All writes via admin SDK
     }
 
-    // ─── Guest Sessions ───────────────────────────────────────────────
+    // ─── Guest Sessions & Bans ───────────────────────────────────────────────
     match /guest_sessions/{sessionId} {
+      allow read: if true;
+      allow write: if false; // All writes via admin SDK
+    }
+    
+    match /banned_guests/{id} {
       allow read: if true;
       allow write: if false; // All writes via admin SDK
     }
