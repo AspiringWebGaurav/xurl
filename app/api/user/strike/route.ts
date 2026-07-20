@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (!guestId) {
-            const ip = request.headers.get("x-forwarded-for") || request.ip || "unknown-ip";
+            const ip = request.headers.get("x-forwarded-for") || "unknown-ip";
             // Simple hash for IP to use as guestId
             guestId = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip))))
                 .map(b => b.toString(16).padStart(2, "0"))
