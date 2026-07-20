@@ -19,6 +19,7 @@ import { RateLimitModal } from "@/components/ui/rate-limit-modal";
 import { HomePageSkeleton } from "@/app/_components/HomePageSkeleton";
 import type { GuestQuotaResult } from "@/lib/server/quota-check";
 import { formatCooldown } from "@/lib/utils/format-time";
+import { CustomAliasInput } from "@/components/home/CustomAliasInput";
 
 
 
@@ -99,13 +100,13 @@ export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps
             </AnimatePresence>
 
             <main
-                className={`flex-1 flex flex-col w-full px-4 overflow-hidden justify-center items-center`}
+                className={`flex-1 flex flex-col w-full px-4 overflow-hidden`}
             >
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, ease: "easeOut" }}
-                    className={`w-full max-w-sm flex flex-col gap-4 mt-2`}
+                    className={`w-full max-w-sm flex flex-col gap-4 m-auto py-6`}
                 >
                     <div className="text-center mb-1">
                             <h1 className="text-2xl font-bold tracking-tight text-foreground">
@@ -431,70 +432,20 @@ export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps
                                     />
                                 </div>
 
-                                <div className={`flex flex-col gap-1.5 ${isOverQuota ? 'opacity-50 pointer-events-none' : ''}`}>
-                                    <label className="text-xs font-medium text-foreground px-1 flex items-center gap-2">
-                                        <span>Custom Alias</span>
-                                        {(() => {
-                                            // Dynamic badge based on user state
-                                            if (!user) {
-                                                // Guest: show that a paid plan is needed
-                                                return (
-                                                    <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-sm border border-amber-200/50">
-                                                        <Lock className="w-2.5 h-2.5" /> Paid Plan
-                                                    </span>
-                                                );
-                                            }
-                                            if (quota && quota.plan !== 'free') {
-                                                // Paid user: show their current plan name
-                                                return (
-                                                    <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-sm border border-emerald-200/50">
-                                                        <Check className="w-2.5 h-2.5" /> {quota.plan}
-                                                    </span>
-                                                );
-                                            }
-                                            // Free plan user: show upgrade hint
-                                            return (
-                                                <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-sm border border-slate-200/50">
-                                                    <Lock className="w-2.5 h-2.5" /> Starter+
-                                                </span>
-                                            );
-                                        })()}
-                                    </label>
-                                    <div className={`${premiumFieldShellBase} ${aliasStatus === "taken" || aliasStatus === "invalid"
-                                        ? "border-red-200 focus-within:ring-red-500"
-                                        : "border-border/80 focus-within:border-foreground/20 focus-within:ring-slate-900/10"
-                                        } ${(isDisabled || loading || !user || (quota && quota.plan === 'free')) ? "bg-muted/50 cursor-not-allowed" : ""}`}>
-                                        <span className="pl-3 pr-1 text-muted-foreground text-sm select-none pointer-events-none whitespace-nowrap">
-                                            {shortDomain} /
-                                        </span>
-                                        <input
-                                            type="text"
-                                            placeholder={!user ? "Sign in with a paid plan" : (quota && quota.plan === 'free') ? "Upgrade to Starter+ to unlock" : "type-alias"}
-                                            value={alias}
-                                            onChange={(e) => setAlias(e.target.value.replace(/[^a-zA-Z0-9-]/g, ""))}
-                                            disabled={isDisabled || loading || !user || (quota != null && quota.plan === 'free')}
-                                            onKeyDown={(e) => e.key === "Enter" && !(!user) && isValidUrl && aliasStatus !== "checking" && aliasStatus !== "taken" && aliasStatus !== "invalid" && handleShorten()}
-                                            className={`flex-1 min-w-0 bg-transparent text-sm text-foreground focus:outline-none placeholder:text-muted-foreground h-full disabled:cursor-not-allowed ${alias.trim() ? "pr-[130px] sm:pr-[220px]" : "pr-3"
-                                                }`}
-                                        />
-                                        {alias.trim() && (
-                                            <div className={`absolute right-3 flex items-center select-none pointer-events-none pl-1 ${isDisabled || loading || !user ? "bg-transparent" : "bg-background"}`}>
-                                                {aliasStatus === "checking" && <span className="text-xs text-muted-foreground flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> checking...</span>}
-                                                {aliasStatus === "available" && <span className="text-xs text-emerald-600 flex items-center gap-1.5"><Check className="h-3.5 w-3.5" /> available</span>}
-                                                {aliasStatus === "taken" && <span className="text-xs text-red-500 flex items-center gap-1.5">already claimed — try another</span>}
-                                                {aliasStatus === "invalid" && <span className="text-xs text-red-500 flex items-center gap-1.5">invalid format</span>}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <p className="text-[11px] text-muted-foreground px-1 mt-0.5">
-                                        {!user ? (
-                                            <span className="text-amber-600/90 font-medium tracking-tight">Sign in with a paid plan to create custom aliases.</span>
-                                        ) : quota && quota.plan === 'free' ? (
-                                            <span className="text-amber-600/90 font-medium tracking-tight">Upgrade to Starter or above to unlock custom aliases.</span>
-                                        ) : (
-                                            "You can create your own alias or leave it empty — the system will generate one."
-                                        )}
-                                    </p>
+                                <div className={`${isOverQuota ? 'opacity-50 pointer-events-none' : ''}`}>
+                                    <CustomAliasInput
+                                        user={user}
+                                        quota={quota}
+                                        alias={alias}
+                                        setAlias={setAlias}
+                                        aliasStatus={aliasStatus}
+                                        shortDomain={shortDomain}
+                                        isDisabled={isDisabled}
+                                        loading={loading}
+                                        isValidUrl={isValidUrl}
+                                        handleShorten={handleShorten}
+                                        premiumFieldShellBase={premiumFieldShellBase}
+                                    />
                                 </div>
 
                                 {isOverQuota ? (
