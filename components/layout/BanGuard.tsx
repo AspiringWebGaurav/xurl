@@ -10,16 +10,27 @@ import { Logo } from "@/components/ui/Logo";
 import { getOrCreateGuestSessionId } from "@/lib/utils/fingerprint";
 import { MobileBanView } from "@/components/mobile/MobileBanView";
 
-export function BanGuard({ children, isMobileDevice = false }: { children: React.ReactNode, isMobileDevice?: boolean }) {
-    const [user, setUser] = useState<User | null>(null);
-    const [isChecking, setIsChecking] = useState(true);
+export function BanGuard({ children, isMobileDevice = false, initiallyBanned = false }: { children: React.ReactNode, isMobileDevice?: boolean, initiallyBanned?: boolean }) {
     const [isBanned, setIsBanned] = useState(false);
+
+    // Use the server-provided initiallyBanned prop to prevent hydration mismatch!
+    const [isChecking, setIsChecking] = useState(initiallyBanned);
+
+    const [user, setUser] = useState<User | null>(null);
     const [banReason, setBanReason] = useState<string>("");
-    
+
     // Appeal State
     const [appealText, setAppealText] = useState("");
     const [appealLoading, setAppealLoading] = useState(false);
     const [hasPendingAppeal, setHasPendingAppeal] = useState(false);
+    const [isClientMobile, setIsClientMobile] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => setIsClientMobile(window.innerWidth < 1024);
+        checkMobile();
+        window.addEventListener("resize", checkMobile);
+        return () => window.removeEventListener("resize", checkMobile);
+    }, []);
 
     const checkBanStatus = async (currentUser: User) => {
         try {
@@ -37,7 +48,7 @@ export function BanGuard({ children, isMobileDevice = false }: { children: React
                         effectivelyBanned = false;
                     }
                 }
-                
+
                 if (data.banScheduledAt && Date.now() >= data.banScheduledAt) {
                     effectivelyBanned = true;
                     if (data.unbanScheduledAt && data.unbanScheduledAt > data.banScheduledAt && Date.now() >= data.unbanScheduledAt) {
@@ -48,9 +59,11 @@ export function BanGuard({ children, isMobileDevice = false }: { children: React
                 if (effectivelyBanned) {
                     setIsBanned(true);
                     setBanReason(data.banReason || "Violated terms of service");
-                    setHasPendingAppeal(!!data.hasPendingAppeal);
+                    setHasPendingAppeal(data.appealStatus === "pending");
+                    document.cookie = "xurl_known_banned=true; path=/; max-age=31536000";
                 } else {
                     setIsBanned(false);
+                    document.cookie = "xurl_known_banned=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
                 }
             }
         } catch (e) {
@@ -60,20 +73,20 @@ export function BanGuard({ children, isMobileDevice = false }: { children: React
 
     useEffect(() => {
         let unsubscribeSnapshot: (() => void) | null = null;
-        
+
         const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
             setUser(u);
-            
+
             if (unsubscribeSnapshot) {
                 unsubscribeSnapshot();
                 unsubscribeSnapshot = null;
             }
-            
+
             if (u) {
-                setIsChecking(true);
+                // Only set checking if they were initially banned, to prevent ripping the homepage away from innocent users
+                if (initiallyBanned) setIsChecking(true);
                 await checkBanStatus(u); // Initial fetch to hydrate complex state (appeals, email bans)
-                setIsChecking(false);
-                
+
                 // Ignite the Real-Time Event Engine
                 unsubscribeSnapshot = onSnapshot(doc(db, "users", u.uid), (docSnap) => {
                     if (docSnap.exists()) {
@@ -86,7 +99,7 @@ export function BanGuard({ children, isMobileDevice = false }: { children: React
                                 effectivelyBanned = false;
                             }
                         }
-                        
+
                         if (data.banScheduledAt && Date.now() >= data.banScheduledAt) {
                             effectivelyBanned = true;
                             if (data.unbanScheduledAt && data.unbanScheduledAt > data.banScheduledAt && Date.now() >= data.unbanScheduledAt) {
@@ -97,16 +110,23 @@ export function BanGuard({ children, isMobileDevice = false }: { children: React
                         if (effectivelyBanned) {
                             setIsBanned(true);
                             if (data.banReason) setBanReason(data.banReason);
+                            setHasPendingAppeal(data.appealStatus === "pending");
+                            document.cookie = "xurl_known_banned=true; path=/; max-age=31536000";
                         } else {
                             setIsBanned(false);
+                            document.cookie = "xurl_known_banned=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
                         }
+                    } else {
+                        document.cookie = "xurl_known_banned=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
                     }
+                    setIsChecking(false);
                 }, (error) => {
                     console.debug("BanGuard user listener error (expected on logout):", error);
+                    setIsChecking(false);
                 });
             } else {
                 setIsBanned(false);
-                
+
                 // Guest Ban Check
                 const checkGuestBan = async () => {
                     try {
@@ -116,32 +136,37 @@ export function BanGuard({ children, isMobileDevice = false }: { children: React
                                 if (docSnap.exists()) {
                                     setIsBanned(true);
                                     setBanReason("Your device has been flagged for violating our terms of service.");
+                                    setHasPendingAppeal(docSnap.data().appealStatus === "pending");
+                                    document.cookie = "xurl_known_banned=true; path=/; max-age=31536000";
                                 } else {
                                     setIsBanned(false);
+                                    document.cookie = "xurl_known_banned=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
                                 }
                             }, (error) => {
                                 console.debug("BanGuard guest listener error:", error);
                             });
+                        } else {
+                            document.cookie = "xurl_known_banned=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
                         }
                     } catch (e) {
                         console.error("Guest ban check error");
+                    } finally {
+                        setIsChecking(false);
                     }
                 };
                 checkGuestBan();
-                
-                setIsChecking(false);
             }
         });
-        
+
         const handleFocus = () => {
             if (auth.currentUser && document.visibilityState === "visible") {
                 checkBanStatus(auth.currentUser);
             }
         };
-        
+
         window.addEventListener("focus", handleFocus);
         document.addEventListener("visibilitychange", handleFocus);
-        
+
         return () => {
             unsubscribeAuth();
             if (unsubscribeSnapshot) unsubscribeSnapshot();
@@ -149,6 +174,38 @@ export function BanGuard({ children, isMobileDevice = false }: { children: React
             document.removeEventListener("visibilitychange", handleFocus);
         };
     }, []);
+
+    // Robust Real-Time Appeal Synchronization
+    // If the user gets banned, actively query the ban_appeals database to ensure the form locks correctly,
+    // completely bypassing any corrupted appealStatus string fields on their user/guest documents.
+    useEffect(() => {
+        if (isBanned && !hasPendingAppeal) {
+            const verifyRealAppealStatus = async () => {
+                try {
+                    const headers: Record<string, string> = {};
+                    if (user) {
+                        const token = await user.getIdToken();
+                        headers["Authorization"] = `Bearer ${token}`;
+                    } else {
+                        const guestSessionId = await getOrCreateGuestSessionId();
+                        if (guestSessionId) {
+                            headers["x-guest-session-id"] = guestSessionId;
+                        }
+                    }
+                    const res = await fetch("/api/user/appeal", { headers });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.hasPendingAppeal) {
+                            setHasPendingAppeal(true);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to verify real appeal status");
+                }
+            };
+            verifyRealAppealStatus();
+        }
+    }, [isBanned, user, hasPendingAppeal]);
 
     const submitAppeal = async () => {
         if (appealText.trim().length < 10) return;
@@ -189,18 +246,18 @@ export function BanGuard({ children, isMobileDevice = false }: { children: React
 
     if (isChecking) {
         return (
-            <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-background">
+            <div className={`fixed inset-0 z-[99999] flex items-center justify-center ${initiallyBanned ? 'bg-rose-950' : 'bg-background'}`}>
                 <div className="animate-pulse">
-                    <Logo size="lg" href={null} />
+                    <Loader2 className={`h-8 w-8 animate-spin ${initiallyBanned ? 'text-rose-500' : 'text-primary'}`} />
                 </div>
             </div>
         );
     }
 
     if (isBanned) {
-        if (isMobileDevice) {
+        if (isMobileDevice || isClientMobile) {
             return (
-                <MobileBanView 
+                <MobileBanView
                     banReason={banReason}
                     user={user}
                     appealText={appealText}
@@ -213,23 +270,23 @@ export function BanGuard({ children, isMobileDevice = false }: { children: React
         }
 
         return (
-            <div className="fixed inset-0 z-[99999] flex flex-col lg:flex-row bg-rose-950 overflow-hidden">
+            <div className="fixed inset-0 z-[99999] flex flex-col lg:flex-row bg-rose-950 overflow-y-auto lg:overflow-hidden">
                 {/* Left Column: Information */}
                 <div className="flex-1 flex flex-col justify-center px-6 py-12 lg:px-16 xl:px-24 bg-gradient-to-br from-rose-950 via-rose-900 to-rose-950 relative">
                     <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 mix-blend-overlay pointer-events-none"></div>
-                    
+
                     <div className="max-w-xl relative z-10">
                         <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-500/10 shadow-inner border border-rose-500/20 mb-8">
                             <ShieldAlert className="h-8 w-8 text-rose-500" />
                         </div>
-                        
+
                         <h1 className="text-4xl lg:text-5xl font-bold tracking-tight text-white mb-4">
                             Account Suspended
                         </h1>
                         <p className="text-lg text-rose-200/90 leading-relaxed mb-10">
                             Your access to XURL has been strictly restricted by an administrator due to violations of our policies.
                         </p>
-                        
+
                         {banReason && (
                             <div className="mb-10 rounded-2xl border border-rose-800/60 bg-rose-950/60 p-6 backdrop-blur-sm">
                                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-400 mb-2">Reason for Suspension</p>
@@ -279,14 +336,13 @@ export function BanGuard({ children, isMobileDevice = false }: { children: React
                                         value={appealText}
                                         onChange={(e) => setAppealText(e.target.value)}
                                         placeholder="Explain in detail why your account should be reinstated..."
-                                        className={`w-full rounded-xl border bg-black/50 p-4 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-1 transition-all resize-none shadow-inner ${
-                                            (() => {
+                                        className={`w-full rounded-xl border bg-black/50 p-4 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-1 transition-all resize-none shadow-inner ${(() => {
                                                 const abusePattern = /(?:fuck|shit|bitch|cunt|asshole|bastard|dick|slut|whore)/i;
                                                 const hasAbuse = abusePattern.test(appealText);
                                                 if (hasAbuse) return 'border-red-500 focus:border-red-500 focus:ring-red-500';
                                                 return 'border-white/10 focus:border-rose-500 focus:ring-rose-500';
                                             })()
-                                        }`}
+                                            }`}
                                         rows={5}
                                     />
                                     <div className="mt-2 flex justify-between items-center text-xs px-1">
@@ -295,7 +351,7 @@ export function BanGuard({ children, isMobileDevice = false }: { children: React
                                             const currentLength = appealText.trim().length;
                                             const abusePattern = /(?:fuck|shit|bitch|cunt|asshole|bastard|dick|slut|whore)/i;
                                             const hasAbuse = abusePattern.test(appealText);
-                                            
+
                                             if (hasAbuse) {
                                                 return <span className="text-red-400 font-medium">Inappropriate language detected. Please maintain a professional tone.</span>;
                                             } else if (currentLength > 0 && currentLength < minLength) {
@@ -309,8 +365,8 @@ export function BanGuard({ children, isMobileDevice = false }: { children: React
                                 <button
                                     onClick={submitAppeal}
                                     disabled={
-                                        appealLoading || 
-                                        appealText.trim().length < 20 || 
+                                        appealLoading ||
+                                        appealText.trim().length < 20 ||
                                         /(?:fuck|shit|bitch|cunt|asshole|bastard|dick|slut|whore)/i.test(appealText)
                                     }
                                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3.5 text-sm font-semibold text-rose-950 transition hover:bg-rose-100 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
@@ -320,17 +376,19 @@ export function BanGuard({ children, isMobileDevice = false }: { children: React
                             </div>
                         )}
 
-                        <div className="mt-12 pt-8 border-t border-white/10">
-                            <button 
-                                onClick={async () => {
-                                    await signOut(auth);
-                                    window.location.href = "/";
-                                }}
-                                className="w-full rounded-xl border border-rose-800/50 bg-transparent px-5 py-3 text-sm font-semibold text-rose-200 transition hover:bg-rose-950/50 hover:border-rose-700/50 hover:text-white"
-                            >
-                                Sign out of this account
-                            </button>
-                        </div>
+                        {user && (
+                            <div className="mt-12 pt-8 border-t border-white/10">
+                                <button
+                                    onClick={async () => {
+                                        await signOut(auth);
+                                        window.location.href = "/";
+                                    }}
+                                    className="w-full rounded-xl border border-rose-800/50 bg-transparent px-5 py-3 text-sm font-semibold text-rose-200 transition hover:bg-rose-950/50 hover:border-rose-700/50 hover:text-white"
+                                >
+                                    Sign out of this account
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

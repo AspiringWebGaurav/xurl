@@ -45,6 +45,7 @@ const sections = [
                 <ul className="list-disc pl-6 space-y-2 mt-2">
                     <li>Attempt to bypass rate limits, abuse detection, or quota enforcement mechanisms through proxy networks or VPNs.</li>
                     <li>Conduct automated scanning, brute-forcing, or enumeration of shortened URLs to scrape private user data or analytics.</li>
+                    <li>Tamper with API requests, attempt to modify or delete links belonging to other users, or attempt to bypass premium restrictions on custom aliases via the API.</li>
                     <li>Use multiple identities or clear browser local storage to circumvent guest usage limits.</li>
                     <li>Impersonate XURL, its staff, or other users.</li>
                     <li>Interfere with or disrupt the availability of the Service via Denial of Service (DoS) attacks.</li>
@@ -69,7 +70,7 @@ const sections = [
     {
         title: "Enforcement and Penalties",
         content: (
-            <p>We employ highly advanced automated abuse scoring, dynamic rate limiting, device fingerprinting, and negative caching systems, along with manual reviews, to enforce this policy. Depending on the severity of the violation, we may issue warnings, disable offending URLs, suspend accounts, or permanently terminate accounts without prior notice or refund of any subscription fees. Our security systems automatically report flagrant malicious abuse to relevant network and law enforcement authorities.</p>
+            <p>We employ highly advanced automated abuse scoring, dynamic rate limiting, device fingerprinting, and negative caching systems, along with manual reviews, to enforce this policy. Violations involving IDOR tampering, unauthorized link modification, or API abuse will trigger an immediate, permanent ban enforced automatically by the system. Depending on the severity of other violations, we may issue warnings, disable offending URLs, suspend accounts, or permanently terminate accounts without prior notice or refund of any subscription fees. Our security systems automatically report flagrant malicious abuse to relevant network and law enforcement authorities.</p>
         ),
     },
     {

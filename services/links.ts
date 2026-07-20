@@ -24,6 +24,7 @@ import type { PlanType } from "@/lib/plans";
 import { PLAN_CONFIGS, GUEST_CONFIG, resolvePlanType } from "@/lib/plans";
 import { buildShortUrl } from "@/lib/utils/url-builder";
 import { safeRedis } from "@/lib/redis/client";
+import { recordAbuseStrike } from "@/lib/auth/ban-check";
 
 export interface CreateLinkInput extends OriginalCreateLinkInput {
     ipHash?: string;
@@ -82,6 +83,12 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
 
         // Block reserved slugs that would shadow application routes
         if (RESERVED_SLUGS.has(input.customSlug.toLowerCase())) {
+            const guestId = input.ipHash || input.fingerprintHash || undefined;
+            const strikeResult = await recordAbuseStrike(userId, "RESERVED", guestId);
+            
+            if (strikeResult.action === "warning" || strikeResult.action === "ban") {
+                throw new Error(strikeResult.message);
+            }
             throw new Error("This slug is reserved and cannot be used.");
         }
     }
@@ -511,7 +518,13 @@ export async function updateLink(
     // Verify ownership
     const existing = await getLinkBySlug(slug);
     if (!existing) throw new Error("Link not found.");
-    if (existing.userId !== userId) throw new Error("Unauthorized.");
+    if (existing.userId !== userId) {
+        const strikeResult = await recordAbuseStrike(userId, "IDOR");
+        if (strikeResult.action === "warning" || strikeResult.action === "ban") {
+            throw new Error(strikeResult.message);
+        }
+        throw new Error("Unauthorized.");
+    }
 
     // Validate URL if being changed
     if (updates.originalUrl) {
@@ -540,7 +553,13 @@ export async function deleteLink(slug: string, userId: string): Promise<void> {
     // Verify ownership
     const existing = await getLinkBySlug(slug);
     if (!existing) throw new Error("Link not found.");
-    if (existing.userId !== userId) throw new Error("Unauthorized.");
+    if (existing.userId !== userId) {
+        const strikeResult = await recordAbuseStrike(userId, "IDOR");
+        if (strikeResult.action === "warning" || strikeResult.action === "ban") {
+            throw new Error(strikeResult.message);
+        }
+        throw new Error("Unauthorized.");
+    }
 
     // 1) Delete the link document
     // Fix: Mark as deleted by API to prevent Cloud Function from double-decrementing activeLinks

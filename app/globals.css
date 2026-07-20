@@ -48,16 +48,39 @@
 }
 
 @keyframes notification-shake {
-  0%, 100% { transform: rotate(0deg); }
-  20% { transform: rotate(-8deg); }
-  40% { transform: rotate(6deg); }
-  60% { transform: rotate(-4deg); }
-  80% { transform: rotate(3deg); }
+
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  20% {
+    transform: rotate(-8deg);
+  }
+
+  40% {
+    transform: rotate(6deg);
+  }
+
+  60% {
+    transform: rotate(-4deg);
+  }
+
+  80% {
+    transform: rotate(3deg);
+  }
 }
 
 @keyframes highlight-pulse {
-  0%, 100% { background-color: rgba(148, 163, 184, 0.18); }
-  50% { background-color: rgba(148, 163, 184, 0.32); }
+
+  0%,
+  100% {
+    background-color: rgba(148, 163, 184, 0.18);
+  }
+
+  50% {
+    background-color: rgba(148, 163, 184, 0.32);
+  }
 }
 
 .animate-notification-shake {
@@ -145,33 +168,41 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   html {
     @apply min-h-screen m-0 p-0;
   }
+
   body {
     @apply min-h-screen overflow-x-hidden m-0 p-0 bg-background text-foreground;
   }
-  
+
   /* Hide scrollbar on homepage, pricing page, and login page when footer is collapsed */
   #home-root,
   #pricing-root,
   #login-root {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE/Edge */
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE/Edge */
   }
+
   #home-root::-webkit-scrollbar,
   #pricing-root::-webkit-scrollbar,
   #login-root::-webkit-scrollbar {
-    display: none; /* Chrome/Safari/Opera */
+    display: none;
+    /* Chrome/Safari/Opera */
   }
 
   /* Custom Scrollbar for Admin Panel */
-  #admin-root, #admin-root *,
-  .admin-scrollbar, .admin-scrollbar * {
+  #admin-root,
+  #admin-root *,
+  .admin-scrollbar,
+  .admin-scrollbar * {
     scrollbar-width: thin;
     scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
   }
-  
+
   #admin-root::-webkit-scrollbar,
   #admin-root *::-webkit-scrollbar,
   .admin-scrollbar::-webkit-scrollbar,

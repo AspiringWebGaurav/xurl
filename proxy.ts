@@ -115,7 +115,7 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
 
     // Validate slug format early to prevent cache pollution
     if (!slug || !/^[a-zA-Z0-9-]{1,30}$/.test(slug)) {
-        return NextResponse.redirect(new URL('/expired', request.url), 302);
+        return NextResponse.next(); // Let Next.js handle 404 natively
     }
 
     // 1) Edge Cache Hit -> Instant Redirect
@@ -161,13 +161,21 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
                     return NextResponse.redirect(new URL('/expired', request.url), 302);
                 }
             }
+        } else {
+            // Handle specific status codes
+            if (res.status === 410) {
+                return NextResponse.redirect(new URL('/expired', request.url), 302);
+            }
+            if (res.status === 404) {
+                return NextResponse.next(); // 404
+            }
         }
     } catch (err) {
         console.error("Edge Cache Fetch Error", err);
     }
 
-    // If not found or completely invalid
-    return NextResponse.redirect(new URL('/expired', request.url), 302);
+    // If completely invalid/missing (e.g., 500 error, network failure)
+    return NextResponse.next();
 }
 
 export const config = {

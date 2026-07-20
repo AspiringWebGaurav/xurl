@@ -4,18 +4,20 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { Sparkles, Percent, Gift, ClipboardList, ListChecks, Loader2, ShieldCheck, Link as LinkIcon } from "lucide-react";
+import { Sparkles, Percent, Gift, ClipboardList, ListChecks, Loader2, ShieldCheck, Link as LinkIcon, ShieldAlert, Ban } from "lucide-react";
 import { auth } from "@/lib/firebase/config";
 import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { isAdminEmail } from "@/lib/admin-config";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { cn } from "@/lib/utils";
+import { getOrCreateGuestSessionId } from "@/lib/utils/fingerprint";
 
 const NAV_ITEMS = [
     { href: "/admin", label: "Dashboard", icon: Sparkles },
     { href: "/admin/promo-codes", label: "Promo Codes", icon: Percent },
     { href: "/admin/grant-plan", label: "Grant Plan", icon: Gift },
     { href: "/admin/bans", label: "Bans & Appeals", icon: ShieldCheck },
+    { href: "/admin/system-bans", label: "System Bans", icon: ShieldAlert },
     { href: "/admin/links", label: "Link Management", icon: LinkIcon },
     { href: "/admin/purchase-history", label: "Purchase History", icon: ClipboardList },
     { href: "/admin/logs", label: "Admin Logs", icon: ListChecks },
@@ -25,6 +27,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
+    const [strikeWarning, setStrikeWarning] = useState<string | null>(null);
+    const [isBanned, setIsBanned] = useState(false);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
@@ -39,6 +43,44 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     }, []);
 
     const isAdmin = isAdminEmail(user?.email);
+
+    useEffect(() => {
+        let mounted = true;
+        if (!isAdmin && !loading) {
+            const logStrike = async () => {
+                try {
+                    let headers: Record<string, string> = {
+                        "Content-Type": "application/json"
+                    };
+                    if (user) {
+                        const token = await user.getIdToken();
+                        headers["Authorization"] = `Bearer ${token}`;
+                    }
+
+                    const guestId = await getOrCreateGuestSessionId();
+
+                    const res = await fetch("/api/user/strike", {
+                        method: "POST",
+                        headers,
+                        body: JSON.stringify({ type: "ADMIN_ACCESS", guestId })
+                    });
+                    const data = await res.json();
+                    if (!mounted) return;
+                    if (data.action === "ban") {
+                        // BanGuard will take over the UI automatically since it listens to Firestore in real-time.
+                        setStrikeWarning(data.message);
+                    } else if (data.action === "warning") {
+                        setStrikeWarning(data.message);
+                    }
+                } catch (e) {
+                    console.error("Failed to log strike:", e);
+                }
+            };
+            logStrike();
+        }
+        return () => { mounted = false; };
+    }, [user, isAdmin, loading]);
+
     const title = useMemo(() => {
         return NAV_ITEMS.find((item) => item.href === pathname)?.label || "Admin Console";
     }, [pathname]);
@@ -63,13 +105,15 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                     <TopNavbar />
                 </div>
                 <main className="flex min-h-screen items-center justify-center px-6 pt-14">
-                    <div className="w-full max-w-2xl rounded-[32px] border border-white/70 bg-white/85 p-10 text-center shadow-[0_30px_80px_-32px_rgba(15,23,42,0.35)] backdrop-blur-xl">
-                        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-slate-900 text-white shadow-lg shadow-slate-900/20">
-                            <ShieldCheck className="h-9 w-9" />
+                    <div className={cn("w-full max-w-2xl rounded-[32px] border bg-white/85 p-10 text-center shadow-[0_30px_80px_-32px_rgba(15,23,42,0.35)] backdrop-blur-xl transition-colors", strikeWarning ? "border-amber-400 shadow-amber-500/20" : "border-white/70")}>
+                        <div className={cn("mx-auto flex h-20 w-20 items-center justify-center rounded-3xl text-white shadow-lg", strikeWarning ? "bg-amber-500 shadow-amber-500/30" : "bg-slate-900 shadow-slate-900/20")}>
+                            {strikeWarning ? <ShieldAlert className="h-9 w-9" /> : <ShieldCheck className="h-9 w-9" />}
                         </div>
-                        <h1 className="mt-6 text-4xl font-semibold tracking-tight text-slate-900">Admin access required</h1>
-                        <p className="mx-auto mt-4 max-w-xl text-base text-slate-600">
-                            This workspace is reserved for configured XURL administrators. Sign in with an authorized admin email to access promo tools, grants, and billing controls.
+                        <h1 className="mt-6 text-4xl font-semibold tracking-tight text-slate-900">
+                            {strikeWarning ? "Access Violation Warning" : "Admin access required"}
+                        </h1>
+                        <p className={cn("mx-auto mt-4 max-w-xl text-base font-medium", strikeWarning ? "text-amber-700" : "text-slate-600")}>
+                            {strikeWarning || "This workspace is reserved for configured XURL administrators. Sign in with an authorized admin email to access promo tools, grants, and billing controls."}
                         </p>
                         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                             <Link href="/" className="inline-flex h-11 items-center rounded-xl border border-slate-200 bg-white px-5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50">

@@ -40,9 +40,58 @@ export async function POST(request: NextRequest) {
             createdAt: Date.now()
         });
 
+        // Update the user or guest document so the frontend can lock the UI across refreshes
+        if (userId) {
+            await adminDb.collection("users").doc(userId).set({
+                appealStatus: "pending"
+            }, { merge: true });
+        } else if (guestSessionId) {
+            await adminDb.collection("banned_guests").doc(guestSessionId).set({
+                appealStatus: "pending"
+            }, { merge: true });
+        }
+
         return NextResponse.json({ success: true });
     } catch (error: any) {
         console.error("Error submitting appeal:", error);
         return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    }
+}
+
+export async function GET(request: NextRequest) {
+    try {
+        const authHeader = request.headers.get("authorization");
+        const guestSessionId = request.headers.get("x-guest-session-id");
+        
+        let userId = "";
+
+        if (authHeader?.startsWith("Bearer ")) {
+            const token = authHeader.split("Bearer ")[1];
+            try {
+                const decoded = await adminAuth.verifyIdToken(token);
+                userId = decoded.uid;
+            } catch {
+                // Ignore, we will check guest ID if provided
+            }
+        }
+
+        if (!userId && !guestSessionId) {
+            return NextResponse.json({ hasPendingAppeal: false });
+        }
+
+        let query = adminDb.collection("ban_appeals").where("status", "==", "pending").limit(1);
+
+        if (userId) {
+            query = query.where("userId", "==", userId);
+        } else if (guestSessionId) {
+            query = query.where("guestSessionId", "==", guestSessionId);
+        }
+
+        const snapshot = await query.get();
+
+        return NextResponse.json({ hasPendingAppeal: !snapshot.empty });
+    } catch (error) {
+        console.error("Error checking appeal status:", error);
+        return NextResponse.json({ hasPendingAppeal: false });
     }
 }

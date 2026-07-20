@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { authenticateApiRequest } from "@/lib/api/auth";
 import { logApiRequest } from "@/lib/api/logging";
 import { deleteLink, getLinkBySlug } from "@/services/links";
+import { recordAbuseStrike } from "@/lib/auth/ban-check";
 
 function getRequestIp(request: NextRequest): string {
     return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
@@ -77,10 +78,12 @@ export async function DELETE(
 
         if (link.userId !== auth.userId) {
             statusCode = 403;
+            const strikeResult = await recordAbuseStrike(auth.userId, "IDOR");
+            
             queueLog({
                 requestId: auth.requestId,
                 userId: auth.userId,
-                endpoint: `/api/v1/links/${id}`,
+                endpoint: "DELETE /api/v1/links/[id]",
                 method: "DELETE",
                 statusCode,
                 startTime,
@@ -88,6 +91,11 @@ export async function DELETE(
                 quotaUsage: auth.quotaUsage,
                 quotaTotal: auth.quotaTotal,
             });
+
+            if (strikeResult.action === "warning" || strikeResult.action === "ban") {
+                return NextResponse.json({ error: strikeResult.message }, { status: statusCode });
+            }
+
             return NextResponse.json({ error: "Unauthorized access to this link" }, { status: statusCode });
         }
 

@@ -39,7 +39,7 @@ const sections = [
         title: "Custom Aliases Policy",
         id: "custom-aliases",
         content: (
-            <p>Premium and registered users may select custom vanity aliases (e.g., `xurl.com/my-brand`). Custom aliases are issued on a first-come, first-served basis. We absolutely reserve the right to revoke, reclaim, or reassign custom aliases if they are deemed offensive, impersonate established brands (trademark infringement), or are parked maliciously.</p>
+            <p>Premium and registered users may select custom vanity aliases (e.g., `xurl.com/my-brand`). Custom aliases are issued on a first-come, first-served basis. Any attempt to bypass premium restrictions on custom aliases via the API is a violation of the Terms of Service. We absolutely reserve the right to revoke, reclaim, or reassign custom aliases if they are deemed offensive, impersonate established brands (trademark infringement), or are parked maliciously.</p>
         ),
     },
     {
@@ -64,9 +64,9 @@ const sections = [
         ),
     },
     {
-        title: "Account Termination, Bans, and Appeals",
+        title: "Account Security & Termination",
         content: (
-            <p>We reserve the right to suspend or terminate your account, without prior notice or refund, if you violate these Terms or engage in abusive behavior. The platform maintains a strict zero-tolerance policy for malicious links. If your account is suspended ("banned"), you will be locked out of the application and your active shortened links may be deactivated immediately to protect our users. You have the right to submit an appeal through the suspension interface. Appeals are reviewed manually by our trust and safety team. Submitting an appeal does not guarantee account reinstatement. If reinstated, your account may be placed under strict scrutiny.</p>
+            <p>We maintain absolute ownership and strict authorization over all links. You may not tamper with API requests, reverse engineer the platform, or attempt to modify or delete links that belong to other users. The platform maintains a strict zero-tolerance auto-ban policy for malicious links or any unauthorized resource access (such as IDOR tampering). If the system detects such activity, your account will be instantly and permanently banned without warning, and your active shortened links may be deactivated immediately to protect our users. You have the right to submit an appeal through the suspension interface. Appeals are reviewed manually by our trust and safety team. Submitting an appeal does not guarantee account reinstatement. If reinstated, your account may be placed under strict scrutiny.</p>
         ),
     },
     {

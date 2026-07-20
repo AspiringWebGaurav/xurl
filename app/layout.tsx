@@ -5,7 +5,7 @@ import { BanGuard } from "@/components/layout/BanGuard";
 import { Toaster } from "@/components/ui/sonner";
 import { seo } from "@/lib/seo";
 import { StructuredData } from "@/components/seo/StructuredData";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
 
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
@@ -67,6 +67,9 @@ export default async function RootLayout({
     const headersList = await headers();
     const isMobileDevice = headersList.get('x-is-mobile-device') === 'true';
 
+    const cookieStore = await cookies();
+    const isKnownBanned = cookieStore.get("xurl_known_banned")?.value === "true";
+
     return (
         <html lang="en" suppressHydrationWarning>
             <head>
@@ -74,7 +77,7 @@ export default async function RootLayout({
             </head>
             <body className={`${inter.className} bg-background text-foreground`} suppressHydrationWarning>
                 <StructuredData />
-                <BanGuard isMobileDevice={isMobileDevice}>
+                <BanGuard isMobileDevice={isMobileDevice} initiallyBanned={isKnownBanned}>
                     {children}
                 </BanGuard>
                 <Toaster />

@@ -50,7 +50,7 @@ const sections = [
     {
         title: "Data Retention & Account Bans",
         content: (
-            <p>We retain your personal data for as long as your account is active. However, if your account is suspended or banned for violating our Terms of Service, we reserve the right to retain minimal identifying information (including hashed email, IP addresses, and device fingerprints) indefinitely. This retention is crucial to enforce our zero-tolerance abuse policies, maintain platform security, and prevent ban evasion.</p>
+            <p>We retain your personal data for as long as your account is active. However, if your account is suspended or banned for violating our Terms of Service (including being automatically flagged by the system for API tampering or unauthorized access attempts), we reserve the right to retain minimal identifying information (including hashed email, IP addresses, and device fingerprints) indefinitely. This retention is crucial to enforce our zero-tolerance abuse policies, maintain platform security, and prevent ban evasion.</p>
         ),
     },
     {
