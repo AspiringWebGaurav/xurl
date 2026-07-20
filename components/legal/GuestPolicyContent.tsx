@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { HomeFooter } from "@/components/layout/HomeFooter";
-
 type PolicySection = {
     title: string;
     paragraphs?: readonly string[];
@@ -172,8 +170,6 @@ export function GuestPolicyContent({ updatedAt, sections }: GuestPolicyContentPr
                     </article>
                 </div>
             </main>
-
-            <HomeFooter />
         </>
     );
 }

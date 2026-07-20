@@ -5,7 +5,6 @@ import { useUrlShortener } from "@/lib/hooks/useUrlShortener";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "@/lib/firebase/config";
-import { HomeFooter } from "@/components/layout/HomeFooter";
 import { HistorySidebar } from "@/components/layout/HistorySidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
