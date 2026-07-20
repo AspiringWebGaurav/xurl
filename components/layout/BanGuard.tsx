@@ -101,6 +101,8 @@ export function BanGuard({ children, isMobileDevice = false }: { children: React
                             setIsBanned(false);
                         }
                     }
+                }, (error) => {
+                    console.debug("BanGuard user listener error (expected on logout):", error);
                 });
             } else {
                 setIsBanned(false);
@@ -117,6 +119,8 @@ export function BanGuard({ children, isMobileDevice = false }: { children: React
                                 } else {
                                     setIsBanned(false);
                                 }
+                            }, (error) => {
+                                console.debug("BanGuard guest listener error:", error);
                             });
                         }
                     } catch (e) {

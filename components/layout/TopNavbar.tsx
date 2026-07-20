@@ -134,6 +134,8 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                         setLinkCount(snapshot.size);
                         setHasGuestHistory(false);
                         setQuota(prev => prev ? { ...prev, currentActive: activeCount } : null);
+                    }, (error) => {
+                        console.debug("TopNavbar links listener error (expected on logout):", error);
                     });
                     
                     void syncUserHistoryState(currentUser);
@@ -151,6 +153,8 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                             });
                             setLinkCount(activeCount);
                             setHasGuestHistory(activeCount > 0);
+                        }, (error) => {
+                            console.debug("TopNavbar guest links listener error:", error);
                         });
                     } else {
                         setLinkCount(0);
@@ -275,6 +279,8 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                         // Whenever the user document changes (e.g. updatedAt pinged by admin), refresh data
                         window.dispatchEvent(new Event("linkGenerated"));
                     }
+                }, (error) => {
+                    console.debug("TopNavbar users listener error (expected on logout):", error);
                 });
             } else {
                 setForceSync(f => f + 1);
