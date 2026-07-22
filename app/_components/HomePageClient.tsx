@@ -108,7 +108,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                         <h1 className="text-[42px] font-extrabold leading-[1.1] tracking-[-0.05em] sm:text-[52px] bg-clip-text text-transparent bg-gradient-to-br from-slate-900 via-slate-800 to-slate-500 pb-1">
                             Shorten your URL
                         </h1>
-                        <p className="mx-auto mt-3 max-w-[34rem] text-[15px] leading-6 text-slate-500 font-medium sm:text-[17px]">
+                        <p className="mx-auto mt-3 max-w-[28rem] text-balance text-[15px] leading-6 text-slate-500 font-medium sm:text-[17px]">
                             Turn long URLs into clean, shareable links with optional custom aliases in a few quick steps.
                         </p>
                         {!authLoading && (
