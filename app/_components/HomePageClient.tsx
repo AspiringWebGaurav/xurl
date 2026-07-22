@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { auth, db } from "@/lib/firebase/config";
 import { HomeFooter } from "@/components/layout/HomeFooter";
+import { MobileFooter } from "@/components/mobile/MobileFooter";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +29,7 @@ function SearchParamsHandler({ onFocus }: { onFocus: () => void }) {
         if (searchParams.get("focus") === "true") {
             onFocus();
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
     return null;
 }
@@ -95,58 +96,57 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
 
             <main
                 className="flex-1 flex flex-col w-full px-6 md:px-8 overflow-x-hidden overflow-y-auto"
-                
+
             >
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, ease: "easeOut" }}
-                    className="w-full max-w-xl flex flex-col gap-6 m-auto"
+                    className="w-full max-w-xl flex flex-col gap-6 mx-auto mt-12 mb-auto"
                 >
                     <div className="text-center">
-                            <h1 className="text-[40px] font-semibold leading-[0.98] tracking-[-0.045em] text-foreground sm:text-[46px]">
-                                Shorten your URL
-                            </h1>
-                            <p className="mx-auto mt-3 max-w-[34rem] text-sm leading-6 text-muted-foreground/90 sm:text-[15px]">
-                                Turn long URLs into clean, shareable links with optional custom aliases in a few quick steps.
-                            </p>
-                            {!authLoading && (
-                                <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
-                                    {user ? (
-                                        quota ? (
-                                            <>
-                                                {/* Free Plan Status - Show usage count and cooldown */}
-                                                {quota.plan === "free" && (
-                                                    <>
-                                                        <button 
-                                                            onClick={() => !viewingPastLink && setSelectedQuota('free')}
-                                                            disabled={viewingPastLink}
-                                                            title={selectedQuota === 'free' ? 'Currently selected' : 'Click to use Free Quota'}
-                                                            className={`${statusPillBase} transition-all duration-200 ${viewingPastLink ? 'cursor-default' : 'cursor-pointer'} ${
-                                                                selectedQuota === 'free' 
-                                                                    ? 'bg-indigo-100 border-indigo-400 text-indigo-800 ring-2 ring-indigo-400 ring-offset-2 ring-offset-background shadow-md scale-105' 
-                                                                    : 'bg-indigo-50/90 border-indigo-200/80 text-indigo-700 hover:bg-indigo-100/80 hover:border-indigo-300'
+                        <h1 className="text-[40px] font-semibold leading-[0.98] tracking-[-0.045em] text-foreground sm:text-[46px]">
+                            Shorten your URL
+                        </h1>
+                        <p className="mx-auto mt-3 max-w-[34rem] text-sm leading-6 text-muted-foreground/90 sm:text-[15px]">
+                            Turn long URLs into clean, shareable links with optional custom aliases in a few quick steps.
+                        </p>
+                        {!authLoading && (
+                            <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+                                {user ? (
+                                    quota ? (
+                                        <>
+                                            {/* Free Plan Status - Show usage count and cooldown */}
+                                            {quota.plan === "free" && (
+                                                <>
+                                                    <button
+                                                        onClick={() => !viewingPastLink && setSelectedQuota('free')}
+                                                        disabled={viewingPastLink}
+                                                        title={selectedQuota === 'free' ? 'Currently selected' : 'Click to use Free Quota'}
+                                                        className={`${statusPillBase} transition-all duration-200 ${viewingPastLink ? 'cursor-default' : 'cursor-pointer'} ${selectedQuota === 'free'
+                                                                ? 'bg-indigo-100 border-indigo-400 text-indigo-800 ring-2 ring-indigo-400 ring-offset-2 ring-offset-background shadow-md scale-105'
+                                                                : 'bg-indigo-50/90 border-indigo-200/80 text-indigo-700 hover:bg-indigo-100/80 hover:border-indigo-300'
                                                             } ${viewingPastLink && selectedQuota !== 'free' ? 'opacity-50 hover:bg-indigo-50/90 hover:border-indigo-200/80' : ''}`}
-                                                        >
-                                                            <Link2 className={`w-3.5 h-3.5 ${selectedQuota === 'free' ? 'text-indigo-600' : 'text-indigo-500'}`} />
-                                                            {Math.min(quota.freeUsageCount || 0, quota.freeMaxUses || 3)} / {quota.freeMaxUses || 3} free links
-                                                            {quota.cooldownRemainingMs && quota.cooldownRemainingMs > 0 ? (
-                                                                <>
-                                                                    <span className="text-indigo-300 mx-0.5">|</span>
-                                                                    <Clock className={`w-3.5 h-3.5 ${selectedQuota === 'free' ? 'text-indigo-600' : 'text-indigo-500'}`} />
-                                                                    Next in {formatCooldown(quota.cooldownRemainingMs)}
-                                                                </>
-                                                            ) : null}
-                                                        </button>
-                                                        {/* Render Aggregate Gift Badge */
-                                                         (() => {
+                                                    >
+                                                        <Link2 className={`w-3.5 h-3.5 ${selectedQuota === 'free' ? 'text-indigo-600' : 'text-indigo-500'}`} />
+                                                        {Math.min(quota.freeUsageCount || 0, quota.freeMaxUses || 3)} / {quota.freeMaxUses || 3} free links
+                                                        {quota.cooldownRemainingMs && quota.cooldownRemainingMs > 0 ? (
+                                                            <>
+                                                                <span className="text-indigo-300 mx-0.5">|</span>
+                                                                <Clock className={`w-3.5 h-3.5 ${selectedQuota === 'free' ? 'text-indigo-600' : 'text-indigo-500'}`} />
+                                                                Next in {formatCooldown(quota.cooldownRemainingMs)}
+                                                            </>
+                                                        ) : null}
+                                                    </button>
+                                                    {/* Render Aggregate Gift Badge */
+                                                        (() => {
                                                             const totalGiftBonus = quota.activeGiftQuotas?.reduce((sum: number, g: any) => sum + (g.amount || 0), 0) || 0;
                                                             if (totalGiftBonus === 0) return null;
                                                             const remainingGiftLinks = Math.max(0, totalGiftBonus - (quota.giftUsageCount || 0));
                                                             if (remainingGiftLinks === 0) return null;
 
                                                             const isPermanent = quota.activeGiftQuotas!.some((g: any) => !g.expiresAt);
-                                                            
+
                                                             let expiryText = "Expiring";
                                                             if (!isPermanent && quota.activeGiftQuotas!.length > 0) {
                                                                 const earliestExpiry = Math.min(...quota.activeGiftQuotas!.map((g: any) => g.expiresAt));
@@ -157,12 +157,12 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                                                     expiryText = `Expires in ${Math.ceil(hoursLeft)}h`;
                                                                 }
                                                             }
-                                                            
+
                                                             const hasGiftsAvailable = remainingGiftLinks > 0;
-                                                            
+
                                                             const isSelected = selectedQuota === 'gift';
-                                                            const baseColors = isPermanent 
-                                                                ? 'bg-fuchsia-50/90 border-fuchsia-300/80 text-fuchsia-700 shadow-[0_0_12px_rgba(232,121,249,0.3)]' 
+                                                            const baseColors = isPermanent
+                                                                ? 'bg-fuchsia-50/90 border-fuchsia-300/80 text-fuchsia-700 shadow-[0_0_12px_rgba(232,121,249,0.3)]'
                                                                 : 'bg-pink-50/90 border-pink-200/80 text-pink-700';
                                                             const hoverColors = isPermanent
                                                                 ? 'hover:bg-fuchsia-100 hover:border-fuchsia-400'
@@ -170,16 +170,15 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                                             const selectedColors = isPermanent
                                                                 ? 'bg-fuchsia-100 border-fuchsia-500 text-fuchsia-900 ring-2 ring-fuchsia-500 ring-offset-2 ring-offset-background shadow-lg scale-105'
                                                                 : 'bg-pink-100 border-pink-400 text-pink-800 ring-2 ring-pink-400 ring-offset-2 ring-offset-background shadow-md scale-105';
-                                                                
+
                                                             return (
-                                                                <button 
-                                                                    key="aggregate-gift" 
+                                                                <button
+                                                                    key="aggregate-gift"
                                                                     onClick={() => !viewingPastLink && hasGiftsAvailable && setSelectedQuota('gift')}
                                                                     disabled={!hasGiftsAvailable || viewingPastLink}
                                                                     title={isSelected ? 'Currently selected' : (hasGiftsAvailable ? 'Click to use Gift Quota' : 'No gift quota available')}
-                                                                    className={`${statusPillBase} transition-all duration-200 ${hasGiftsAvailable && !viewingPastLink ? 'cursor-pointer' : (viewingPastLink ? 'cursor-default' : 'opacity-50 cursor-not-allowed')} ${
-                                                                        isSelected ? selectedColors : `${baseColors} ${hoverColors}`
-                                                                    } ${viewingPastLink && !isSelected ? 'opacity-50' : ''} ${viewingPastLink && !isSelected && isPermanent ? 'hover:bg-fuchsia-50/90 hover:border-fuchsia-300/80' : ''} ${viewingPastLink && !isSelected && !isPermanent ? 'hover:bg-pink-50/90 hover:border-pink-200/80' : ''}`}
+                                                                    className={`${statusPillBase} transition-all duration-200 ${hasGiftsAvailable && !viewingPastLink ? 'cursor-pointer' : (viewingPastLink ? 'cursor-default' : 'opacity-50 cursor-not-allowed')} ${isSelected ? selectedColors : `${baseColors} ${hoverColors}`
+                                                                        } ${viewingPastLink && !isSelected ? 'opacity-50' : ''} ${viewingPastLink && !isSelected && isPermanent ? 'hover:bg-fuchsia-50/90 hover:border-fuchsia-300/80' : ''} ${viewingPastLink && !isSelected && !isPermanent ? 'hover:bg-pink-50/90 hover:border-pink-200/80' : ''}`}
                                                                 >
                                                                     <Gift className={`w-3.5 h-3.5 ${isPermanent ? (isSelected ? 'text-fuchsia-600' : 'text-fuchsia-500') : (isSelected ? 'text-pink-600' : 'text-pink-500')}`} />
                                                                     {remainingGiftLinks} Gift Links
@@ -193,52 +192,52 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                                                 </button>
                                                             );
                                                         })()}
-                                                    </>
-                                                )}
+                                                </>
+                                            )}
 
-                                                {/* Paid Plan Status (if any) */}
-                                                {quota.plan !== "free" && (
-                                                    <div className={`${statusPillBase} bg-emerald-50/90 border-emerald-200/80 text-emerald-700`}>
-                                                        <Link2 className="w-3.5 h-3.5 text-emerald-500" />
-                                                        {quota.paidLinksCreated} / {quota.limit} {quota.plan} links
-                                                        {quota.planRenewals && quota.planRenewals > 1 ? ` (×${quota.planRenewals})` : ""}
-                                                        <span className="text-emerald-300 mx-0.5">|</span>
-                                                        <Clock className="w-3.5 h-3.5 text-emerald-500" />
-                                                        Expires in {quota.planTtlHours === "Unlimited" ? "never" : (quota.planTtlHours !== undefined && quota.planTtlHours < 1 ? `${Math.round(quota.planTtlHours * 60)}m` : `${quota.planTtlHours || 12}h`)}
-                                                    </div>
-                                                )}
+                                            {/* Paid Plan Status (if any) */}
+                                            {quota.plan !== "free" && (
+                                                <div className={`${statusPillBase} bg-emerald-50/90 border-emerald-200/80 text-emerald-700`}>
+                                                    <Link2 className="w-3.5 h-3.5 text-emerald-500" />
+                                                    {quota.paidLinksCreated} / {quota.limit} {quota.plan} links
+                                                    {quota.planRenewals && quota.planRenewals > 1 ? ` (×${quota.planRenewals})` : ""}
+                                                    <span className="text-emerald-300 mx-0.5">|</span>
+                                                    <Clock className="w-3.5 h-3.5 text-emerald-500" />
+                                                    Expires in {quota.planTtlHours === "Unlimited" ? "never" : (quota.planTtlHours !== undefined && quota.planTtlHours < 1 ? `${Math.round(quota.planTtlHours * 60)}m` : `${quota.planTtlHours || 12}h`)}
+                                                </div>
+                                            )}
 
-                                                {/* Expired Links Warning */}
-                                                {quota.expiredLinksCount !== undefined && quota.expiredLinksCount > 0 && (
-                                                    <button 
-                                                        onClick={() => window.dispatchEvent(new Event("openHistory"))}
-                                                        className={`${statusPillBase} transition-all duration-200 cursor-pointer bg-amber-50/90 border-amber-200/80 text-amber-700 hover:bg-amber-100 hover:border-amber-300 hover:shadow-sm`} 
-                                                        title={`${quota.expiredLinksCount} links have expired (click to view)`}
-                                                    >
-                                                        <Clock className="w-3.5 h-3.5 text-amber-500" />
-                                                        {quota.expiredLinksCount} expired history
-                                                    </button>
-                                                )}
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Skeleton className="h-[28px] w-[110px] rounded-full bg-blue-50/50" />
-                                                <Skeleton className="h-[28px] w-[140px] rounded-full bg-emerald-50/50" />
-                                            </>
-                                        )
+                                            {/* Expired Links Warning */}
+                                            {quota.expiredLinksCount !== undefined && quota.expiredLinksCount > 0 && (
+                                                <button
+                                                    onClick={() => window.dispatchEvent(new Event("openHistory"))}
+                                                    className={`${statusPillBase} transition-all duration-200 cursor-pointer bg-amber-50/90 border-amber-200/80 text-amber-700 hover:bg-amber-100 hover:border-amber-300 hover:shadow-sm`}
+                                                    title={`${quota.expiredLinksCount} links have expired (click to view)`}
+                                                >
+                                                    <Clock className="w-3.5 h-3.5 text-amber-500" />
+                                                    {quota.expiredLinksCount} expired history
+                                                </button>
+                                            )}
+                                        </>
                                     ) : (
-                                        <Link href="/guest-policy" target="_blank" className="group flex items-center px-4 py-1.5 rounded-full bg-amber-50/85 border border-amber-300/40 text-amber-700 hover:bg-amber-100/80 hover:border-amber-400/50 shadow-[0_10px_24px_-18px_rgba(217,119,6,0.4)] hover:shadow-[0_14px_32px_-20px_rgba(217,119,6,0.45)] hover:-translate-y-0.5 transition-all duration-300 text-xs font-semibold tracking-wide cursor-pointer">
-                                            <Lock className="w-3.5 h-3.5 mr-1.5 text-amber-600/80 group-hover:text-amber-700 transition-colors" />
-                                            <span>1 free link for no login policy</span>
-                                            <span className="mx-2 text-amber-300">—</span>
-                                            <Clock className="w-3.5 h-3.5 mr-1.5 text-amber-600/80 group-hover:text-amber-700 transition-colors" />
-                                            <span>Expires in 5m</span>
-                                            <ArrowRight className="w-3.5 h-3.5 ml-1.5 text-amber-500/80 group-hover:text-amber-700 group-hover:translate-x-0.5 transition-all" />
-                                        </Link>
-                                    )}
-                                </div>
-                            )}
-                        </div>
+                                        <>
+                                            <Skeleton className="h-[28px] w-[110px] rounded-full bg-blue-50/50" />
+                                            <Skeleton className="h-[28px] w-[140px] rounded-full bg-emerald-50/50" />
+                                        </>
+                                    )
+                                ) : (
+                                    <Link href="/guest-policy" target="_blank" className="group flex items-center px-4 py-1.5 rounded-full bg-amber-50/85 border border-amber-300/40 text-amber-700 hover:bg-amber-100/80 hover:border-amber-400/50 shadow-[0_10px_24px_-18px_rgba(217,119,6,0.4)] hover:shadow-[0_14px_32px_-20px_rgba(217,119,6,0.45)] hover:-translate-y-0.5 transition-all duration-300 text-xs font-semibold tracking-wide cursor-pointer">
+                                        <Lock className="w-3.5 h-3.5 mr-1.5 text-amber-600/80 group-hover:text-amber-700 transition-colors" />
+                                        <span>1 free link for no login policy</span>
+                                        <span className="mx-2 text-amber-300">—</span>
+                                        <Clock className="w-3.5 h-3.5 mr-1.5 text-amber-600/80 group-hover:text-amber-700 transition-colors" />
+                                        <span>Expires in 5m</span>
+                                        <ArrowRight className="w-3.5 h-3.5 ml-1.5 text-amber-500/80 group-hover:text-amber-700 group-hover:translate-x-0.5 transition-all" />
+                                    </Link>
+                                )}
+                            </div>
+                        )}
+                    </div>
 
                     <AnimatePresence mode="wait">
                         {isStrictlyLoading ? (
@@ -448,7 +447,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                         <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mb-3 ring-4 ring-emerald-50/50">
                                             <Lock className="w-5 h-5 text-emerald-600" />
                                         </div>
-                                        
+
                                         {/* Guest limit */}
                                         {isGuestLocked ? (
                                             <>
@@ -566,8 +565,8 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                         )}
                                     </Button>
                                 )}
-                                <div className="mt-3 text-center text-[11px] text-muted-foreground/60 leading-relaxed px-4">
-                                    By shortening a URL, you agree to our <a href="/terms#link-shortening" className="hover:text-emerald-500 hover:underline underline-offset-2 transition-colors">Terms of Service</a>, <a href="/acceptable-use" className="hover:text-emerald-500 hover:underline underline-offset-2 transition-colors">Acceptable Use Policy</a>, and <a href="/code-of-conduct" className="hover:text-emerald-500 hover:underline underline-offset-2 transition-colors">Code of Conduct</a>.
+                                <div className="mt-3 text-center text-[11px] text-muted-foreground/70 leading-relaxed px-4">
+                                    By shortening a URL, you agree to our <a href="/terms" className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Terms of Service <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>, <a href="/acceptable-use" className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Acceptable Use Policy <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>, and <a href="/code-of-conduct" className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Code of Conduct <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>.
                                 </div>
                             </motion.div>
                         )}
@@ -580,7 +579,12 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                 onClose={() => setIsRateLimited(false)}
             />
 
-            <HomeFooter />
+            <div className="hidden md:block">
+                <HomeFooter />
+            </div>
+            <div className="block md:hidden">
+                <MobileFooter />
+            </div>
         </div>
     );
 }

@@ -569,7 +569,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
     const canAccessAdmin = isAdminEmail(user?.email);
 
     return (
-        <header className="flex h-14 shrink-0 items-center border-b border-border bg-background px-6">
+        <header className="flex h-14 shrink-0 items-center border-b border-border bg-background px-2 sm:px-6">
             <div className="flex flex-1 items-center gap-3">
                 <Logo size="md" />
                 {user && canAccessAdmin && (
@@ -631,7 +631,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
             </div>
 
             <div className="flex flex-1 items-center justify-end gap-1.5 sm:gap-2.5">
-                {(pathname !== "/pricing" && pathname !== "/mobile/plan") ? (
+                {pathname === "/" ? (
                     <Link
                         href="/pricing"
                         className={cn(
@@ -661,12 +661,12 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                         href="/"
                         className={cn(
                             navActionBase,
-                            "gap-1.5 border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900 whitespace-nowrap"
+                            "gap-1.5 border border-emerald-400 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 shadow-[0_0_12px_rgba(16,185,129,0.35)] whitespace-nowrap transition-all active:scale-95"
                         )}
                     >
                         <ArrowLeft className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Back to shortener</span>
-                        <span className="sm:hidden">Home</span>
+                        <span className="hidden sm:inline font-medium">Back to shortener</span>
+                        <span className="sm:hidden font-semibold">Home</span>
                     </Link>
                 )}
                 <div className="hidden sm:flex items-center gap-2">

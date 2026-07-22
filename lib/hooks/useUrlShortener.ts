@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation";
 import type { GuestQuotaResult } from "@/lib/server/quota-check";
 
 export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
-const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<User | null>(null);
     const [authLoading, setAuthLoading] = useState(true);
     const [quotaLoading, setQuotaLoading] = useState(false);
     const [quotaFetched, setQuotaFetched] = useState(false);
@@ -96,12 +96,12 @@ const [user, setUser] = useState<User | null>(null);
 
             setUser(u);
             setAuthLoading(false);
-            
+
             if (u) {
                 // CRITICAL: Block render until quota fetched
                 setQuotaLoading(true);
                 setQuotaFetched(false);
-                
+
                 void ensureUserDocument(u);
                 // Clear any guest state so logged-in user gets a fresh form
                 setUrl("");
@@ -119,9 +119,9 @@ const [user, setUser] = useState<User | null>(null);
 
                 quotaAbortController = new AbortController();
                 const { signal } = quotaAbortController;
-                
+
                 u.getIdToken()
-                    .then(token => fetch("/api/links?pageSize=1", { 
+                    .then(token => fetch("/api/links?pageSize=1", {
                         headers: { "Authorization": `Bearer ${token}` },
                         signal
                     }))
@@ -146,12 +146,12 @@ const [user, setUser] = useState<User | null>(null);
                                 activeGiftQuotas: d.activeGiftQuotas,
                                 giftUsageCount: d.giftUsageCount
                             });
-                            
+
                             // Initialize selectedQuota (prioritize gift, fallback to free)
                             const totalGiftBonus = d.activeGiftQuotas?.reduce((sum: number, g: any) => sum + (g.amount || 0), 0) || 0;
                             const hasGiftsAvailable = totalGiftBonus > (d.giftUsageCount || 0);
                             const savedPref = typeof window !== 'undefined' ? localStorage.getItem('xurl_quota_pref') : null;
-                            
+
                             if (hasGiftsAvailable && savedPref !== 'free') {
                                 setSelectedQuotaState('gift');
                             } else if (d.canCreateFreeLink || savedPref === 'free') {
@@ -415,11 +415,11 @@ const [user, setUser] = useState<User | null>(null);
             if (initialGuestStatus.expiresIn && initialGuestStatus.expiresIn > 0) {
                 const expiresAt = Date.now() + (initialGuestStatus.expiresIn * 1000);
                 setGuestExpiresAt(expiresAt);
-                localStorage.setItem("xurl_guest_link_history", JSON.stringify({ 
-                    slug: initialGuestStatus.slug, 
-                    expiresAt 
+                localStorage.setItem("xurl_guest_link_history", JSON.stringify({
+                    slug: initialGuestStatus.slug,
+                    expiresAt
                 }));
-                
+
                 // Restore the success card data
                 setShortUrl(buildShortUrl(initialGuestStatus.slug));
                 if (initialGuestStatus.originalUrl) {
@@ -675,7 +675,7 @@ const [user, setUser] = useState<User | null>(null);
                                 const totalGiftBonus = d.activeGiftQuotas?.reduce((sum: number, g: any) => sum + (g.amount || 0), 0) || 0;
                                 const hasGiftsAvailable = totalGiftBonus > (d.giftUsageCount || 0);
                                 const savedPref = typeof window !== 'undefined' ? localStorage.getItem('xurl_quota_pref') : null;
-                                
+
                                 if (hasGiftsAvailable && savedPref !== 'free') {
                                     setSelectedQuotaState('gift');
                                 } else if (d.canCreateFreeLink || savedPref === 'free') {
@@ -717,9 +717,9 @@ const [user, setUser] = useState<User | null>(null);
     };
 
     // STRICT LOADING GATE - All conditions must pass before rendering
-    const isStrictlyLoading = 
-        authLoading || 
-        quotaLoading || 
+    const isStrictlyLoading =
+        authLoading ||
+        quotaLoading ||
         !mounted ||
         (user !== null && !quotaFetched);
 
@@ -738,9 +738,9 @@ const [user, setUser] = useState<User | null>(null);
 
     // Determine if the user has reached their quota limit or is in cooldown
     const isFreeLimitReached = !!(user && quota?.plan === "free" && (
-        selectedQuota === 'free' 
+        selectedQuota === 'free'
             ? ((quota.freeUsageCount !== undefined && quota.freeMaxUses !== undefined && quota.freeUsageCount >= quota.freeMaxUses) ||
-               (quota.cooldownRemainingMs !== undefined && quota.cooldownRemainingMs > 0))
+                (quota.cooldownRemainingMs !== undefined && quota.cooldownRemainingMs > 0))
             : (selectedQuota === 'gift'
                 ? ((quota.activeGiftQuotas?.reduce((sum: number, g: any) => sum + (g.amount || 0), 0) || 0) <= (quota.giftUsageCount || 0))
                 : true) // default disable if nothing selected
@@ -751,11 +751,11 @@ const [user, setUser] = useState<User | null>(null);
 
     const heroCardBase = "w-full bg-card border border-border/70 rounded-2xl p-5 sm:p-6 shadow-[0_18px_45px_-28px_rgba(15,23,42,0.22)] relative overflow-hidden";
     const statusPillBase = "flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-xs font-semibold tracking-wide shadow-[0_10px_24px_-18px_rgba(15,23,42,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_32px_-20px_rgba(15,23,42,0.28)]";
-    const premiumInputClass = "h-12 bg-background/95 border-border/80 shadow-[0_1px_2px_rgba(15,23,42,0.05)] rounded-xl text-[15px] placeholder:text-muted-foreground/75 focus-visible:border-foreground/20 focus-visible:bg-background focus-visible:ring-[3px] focus-visible:ring-slate-900/10 focus-visible:shadow-[0_0_0_1px_rgba(15,23,42,0.04),0_16px_32px_-22px_rgba(15,23,42,0.32)] transition-all duration-200";
-    const premiumFieldShellBase = "relative flex items-center w-full h-12 rounded-xl border bg-background/95 shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-all duration-200 focus-within:shadow-[0_0_0_1px_rgba(15,23,42,0.04),0_16px_32px_-22px_rgba(15,23,42,0.32)]";
-    const premiumPrimaryButtonClass = "w-full h-12 rounded-xl py-0 shadow-[0_14px_28px_-18px_rgba(15,23,42,0.55)] bg-foreground text-background hover:-translate-y-0.5 hover:bg-foreground/92 hover:shadow-[0_20px_36px_-20px_rgba(15,23,42,0.58)] active:translate-y-0 font-medium mt-2 transition-all duration-200 relative overflow-hidden";
+    const premiumInputClass = "h-12 bg-background/95 border-border/80 shadow-[0_1px_2px_rgba(15,23,42,0.05)] rounded-xl text-[15px] placeholder:text-muted-foreground/75 focus-visible:border-emerald-500/50 focus-visible:bg-background focus-visible:ring-[3px] focus-visible:ring-emerald-500/20 focus-visible:shadow-[0_0_0_1px_rgba(16,185,129,0.1),0_16px_32px_-22px_rgba(16,185,129,0.2)] transition-all duration-200 active:bg-emerald-50/50";
+    const premiumFieldShellBase = "relative flex items-center w-full h-12 rounded-xl border bg-background/95 shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-all duration-200 focus-within:border-emerald-500/50 focus-within:ring-[3px] focus-within:ring-emerald-500/20 focus-within:shadow-[0_0_0_1px_rgba(16,185,129,0.1),0_16px_32px_-22px_rgba(16,185,129,0.2)] active:bg-emerald-50/50";
+    const premiumPrimaryButtonClass = "w-full h-12 rounded-xl py-0 shadow-[0_14px_28px_-18px_rgba(15,23,42,0.55)] bg-foreground text-background hover:-translate-y-0.5 hover:bg-foreground/92 hover:shadow-[0_20px_36px_-20px_rgba(15,23,42,0.58)] active:translate-y-0 active:scale-[0.96] active:bg-gradient-to-r active:from-emerald-500 active:to-teal-500 active:text-white active:shadow-[0_0_30px_rgba(16,185,129,0.6)] font-medium mt-2 transition-all duration-200 relative overflow-hidden";
 
-    
+
 
     return {
         user, setUser, authLoading, quotaLoading, quotaFetched,

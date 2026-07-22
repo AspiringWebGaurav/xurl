@@ -36,20 +36,20 @@ export function CustomAliasInput({
     const textControls = useAnimation();
     const [isShaking, setIsShaking] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
-    
+
     // Check if the user is allowed to use custom aliases (paid plan)
     const isAllowed = user && quota && quota.plan !== "free";
-    
+
     const handleInteraction = () => {
         if (!isAllowed) {
             setIsShaking(true);
-            
+
             // Shake animation for input shell
             controls.start({
                 x: [0, -8, 8, -6, 6, -4, 4, 0],
                 transition: { duration: 0.4, ease: "easeInOut" }
             }).then(() => setIsShaking(false));
-            
+
             // Pop animation for the hint text
             textControls.start({
                 scale: [1, 1.05, 0.98, 1],
@@ -86,7 +86,7 @@ export function CustomAliasInput({
                     }
                     if (quota && quota.plan !== 'free') {
                         return (
-                            <motion.span 
+                            <motion.span
                                 initial={{ opacity: 0, scale: 0.9 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-sm border border-emerald-200/50"
@@ -102,15 +102,14 @@ export function CustomAliasInput({
                     );
                 })()}
             </label>
-            
-            <motion.div 
+
+            <motion.div
                 animate={controls}
-                className={`${premiumFieldShellBase.replace("transition-all", "transition-colors")} relative ${
-                    isShaking ? "border-red-400/80 bg-red-50/50 dark:bg-red-900/20" :
-                    (isFocused && isAllowed) ? "!border-emerald-400/80 !bg-emerald-50/30 !ring-4 !ring-emerald-500/15 dark:!bg-emerald-900/20" :
-                    aliasStatus === "taken" || aliasStatus === "invalid"
-                    ? "border-red-200 focus-within:ring-red-500"
-                    : "border-border/80 focus-within:border-foreground/20 focus-within:ring-slate-900/10"
+                className={`${premiumFieldShellBase.replace("transition-all", "transition-colors")} relative ${isShaking ? "border-red-400/80 bg-red-50/50 dark:bg-red-900/20" :
+                        (isFocused && isAllowed) ? "!border-emerald-400/80 !bg-emerald-50/30 !ring-4 !ring-emerald-500/15 dark:!bg-emerald-900/20" :
+                            aliasStatus === "taken" || aliasStatus === "invalid"
+                                ? "border-red-200 focus-within:ring-red-500"
+                                : "border-border/80 focus-within:border-foreground/20 focus-within:ring-slate-900/10"
                     } ${(isDisabled || loading || !isAllowed) ? (isShaking ? "cursor-not-allowed" : "bg-muted/50 cursor-not-allowed") : ""}`}
             >
                 {/* Invisible overlay to capture clicks when disabled so input doesn't eat them */}
@@ -133,11 +132,11 @@ export function CustomAliasInput({
                     className={`flex-1 min-w-0 bg-transparent text-sm text-foreground focus:outline-none placeholder:text-muted-foreground h-full disabled:cursor-not-allowed ${alias.trim() ? "pr-[130px] sm:pr-[220px]" : "pr-3"
                         }`}
                 />
-                
+
                 {/* Idle animation for allowed users */}
                 {isAllowed && !alias.trim() && !loading && (
-                    <motion.div 
-                        animate={{ opacity: [0.2, 0.6, 0.2] }} 
+                    <motion.div
+                        animate={{ opacity: [0.2, 0.6, 0.2] }}
                         transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
                         className="absolute right-3 w-1.5 h-1.5 rounded-full bg-emerald-400 pointer-events-none"
                     />
@@ -152,7 +151,7 @@ export function CustomAliasInput({
                     </div>
                 )}
             </motion.div>
-            <motion.div 
+            <motion.div
                 animate={textControls}
                 className="text-[11px] px-1 mt-0.5"
             >

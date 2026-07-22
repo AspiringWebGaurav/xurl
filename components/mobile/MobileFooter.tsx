@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { Logo } from "@/components/ui/Logo";
+import { ConfirmLinkModal } from "@/components/ui/confirm-link-modal";
 import { cn } from "@/lib/utils";
-import { ChevronUp } from "lucide-react";
+import { ChevronUp, ExternalLink } from "lucide-react";
 
 const footerColumns = [
     {
@@ -41,43 +44,26 @@ const minimalLegalLinks = [
 ];
 
 export function MobileFooter() {
+    const router = useRouter();
     const [expanded, setExpanded] = useState(false);
-    const expandedRef = useRef<HTMLDivElement>(null);
+    const [confirmLink, setConfirmLink] = useState<string | null>(null);
     const footerRef = useRef<HTMLDivElement>(null);
-    const [contentHeight, setContentHeight] = useState(0);
 
-    useEffect(() => {
-        const el = expandedRef.current;
-        if (!el) return;
-        const measure = () => setContentHeight(el.scrollHeight);
-        measure();
-        const observer = new ResizeObserver(measure);
-        observer.observe(el);
-        return () => observer.disconnect();
-    }, []);
-
-    useEffect(() => {
-        const root =
-            document.getElementById("home-root") ||
-            document.getElementById("pricing-root") ||
-            document.getElementById("login-root") ||
-            document.documentElement;
-            
-        if (!root) return;
-
-        if (expanded) {
-            root.style.overflow = "auto";
-            requestAnimationFrame(() => {
-                root.scrollTo({ top: root.scrollHeight, behavior: "smooth" });
-            });
-        } else {
-            root.style.overflow = "";
+    const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+        const legalRoutes = [
+            "/terms", "/privacy", "/acceptable-use", 
+            "/code-of-conduct", "/guest-policy", "/refund", "/open-source"
+        ];
+        
+        if (legalRoutes.includes(href)) {
+            e.preventDefault();
+            setConfirmLink(href);
+            // Subtle vibration when popup opens
+            if (typeof navigator !== "undefined" && navigator.vibrate) {
+                navigator.vibrate(50);
+            }
         }
-
-        return () => {
-            root.style.overflow = "";
-        };
-    }, [expanded]);
+    };
 
     useEffect(() => {
         const handleMouseDown = (e: TouchEvent | MouseEvent) => {
@@ -125,34 +111,36 @@ export function MobileFooter() {
 
             <footer ref={footerRef} className="shrink-0 border-t border-border bg-background mt-auto pb-[env(safe-area-inset-bottom)]">
                 {/* ── Minimal row (always visible) ── */}
-                <div className="flex w-full items-center justify-between gap-2 px-4 py-4 text-[11px] text-muted-foreground">
+                <div className="relative flex w-full items-center justify-center px-4 py-4 min-h-[56px] text-[11px] text-muted-foreground">
                     
                     {/* Left — logo */}
-                    <div className="flex items-center gap-2 opacity-80 transition-opacity hover:opacity-100">
+                    <div className="absolute left-2 flex items-center gap-2 opacity-80 transition-opacity hover:opacity-100">
                         <Logo size="sm" className="shrink-0" />
                     </div>
 
-                    {/* Right — links + expand button */}
+                    {/* Center — links */}
                     <nav
                         aria-label="Footer navigation"
-                        className="flex items-center justify-end gap-1 flex-wrap"
+                        className="flex items-center justify-center gap-1 flex-wrap z-10"
                     >
                         {minimalLegalLinks.map((link) => (
                             <Link
                                 key={link.href}
                                 href={link.href}
+                                onClick={(e) => handleLinkClick(e, link.href)}
                                 className="rounded-md px-1.5 py-1 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground"
                             >
                                 {link.label}
                             </Link>
                         ))}
+                    </nav>
 
-                        <span className="mx-1 h-3 w-px bg-border" aria-hidden="true" />
-
+                    {/* Right — expand button */}
+                    <div className="absolute right-2 flex items-center">
                         <button
                             type="button"
                             onClick={() => setExpanded((prev) => !prev)}
-                            className="group ml-0.5 flex items-center gap-1 rounded-md px-1.5 py-1 text-muted-foreground/70 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground"
+                            className="group flex items-center gap-1 rounded-md px-1.5 py-1 text-muted-foreground/70 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground"
                             aria-expanded={expanded}
                             aria-label={expanded ? "Collapse footer" : "Expand footer"}
                         >
@@ -169,19 +157,18 @@ export function MobileFooter() {
                                 <ChevronUp className="h-full w-full" />
                             </span>
                         </button>
-                    </nav>
+                    </div>
                 </div>
 
                 {/* ── Expandable section ── */}
                 <div
-                    style={{
-                        maxHeight: expanded ? contentHeight : 0,
-                        opacity: expanded ? 1 : 0,
-                    }}
-                    className="overflow-hidden transition-all duration-300 ease-out"
+                    className={cn(
+                        "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
+                        expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                    )}
                     aria-hidden={!expanded}
                 >
-                    <div ref={expandedRef} className="border-t border-border">
+                    <div className="overflow-hidden border-t border-border">
                         <div className="w-full px-5 py-8">
                             <div className="grid grid-cols-2 gap-x-4 gap-y-8">
                                 {footerColumns.map((col) => (
@@ -201,6 +188,7 @@ export function MobileFooter() {
                                                 <Link
                                                     key={link.href}
                                                     href={link.href}
+                                                    onClick={(e) => handleLinkClick(e, link.href)}
                                                     className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium"
                                                 >
                                                     {link.label}
@@ -218,6 +206,8 @@ export function MobileFooter() {
                     </div>
                 </div>
             </footer>
+
+            <ConfirmLinkModal confirmLink={confirmLink} setConfirmLink={setConfirmLink} />
         </>
     );
 }

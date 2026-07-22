@@ -50,41 +50,7 @@ const minimalLegalLinks = [
 
 export function HomeFooter() {
     const [expanded, setExpanded] = useState(false);
-    const expandedRef = useRef<HTMLDivElement>(null);
     const footerRef = useRef<HTMLDivElement>(null);
-    const [contentHeight, setContentHeight] = useState(0);
-
-    useEffect(() => {
-        const el = expandedRef.current;
-        if (!el) return;
-        const measure = () => setContentHeight(el.scrollHeight);
-        measure();
-        const observer = new ResizeObserver(measure);
-        observer.observe(el);
-        return () => observer.disconnect();
-    }, []);
-
-    useEffect(() => {
-        const root =
-            document.getElementById("home-root") ||
-            document.getElementById("pricing-root") ||
-            document.getElementById("login-root");
-        if (!root) return;
-
-        if (expanded) {
-            root.style.overflow = "auto";
-            requestAnimationFrame(() => {
-                root.scrollTo({ top: root.scrollHeight, behavior: "smooth" });
-            });
-        } else {
-            root.style.overflow = "hidden";
-            root.scrollTo({ top: 0, behavior: "smooth" });
-        }
-
-        return () => {
-            root.style.overflow = "";
-        };
-    }, [expanded]);
 
     useEffect(() => {
         const handleMouseDown = (e: MouseEvent) => {
@@ -185,14 +151,13 @@ export function HomeFooter() {
 
                 {/* ── Expandable section ── */}
                 <div
-                    style={{
-                        maxHeight: expanded ? contentHeight : 0,
-                        opacity: expanded ? 1 : 0,
-                    }}
-                    className="overflow-hidden transition-all duration-300 ease-out"
+                    className={cn(
+                        "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
+                        expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                    )}
                     aria-hidden={!expanded}
                 >
-                    <div ref={expandedRef} className="border-t border-border">
+                    <div className="overflow-hidden border-t border-border">
                         <div className="w-full px-10 xl:px-20 pt-10 pb-8">
                             {/* Link columns — 4-equal grid on desktop */}
                             <div className="grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-4">
