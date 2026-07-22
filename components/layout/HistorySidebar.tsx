@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/firebase/config";
 import { getDeviceFingerprint, getOrCreateGuestSessionId } from "@/lib/utils/fingerprint";
 import { buildShortUrl } from "@/lib/utils/url-builder";
+import { getPlanConfig } from "@/lib/plans";
 
 interface HistorySidebarProps {
     isOpen: boolean;
@@ -30,7 +31,25 @@ export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: Histo
     const [copied, setCopied] = useState<string | null>(null);
     const [userPlan, setUserPlan] = useState<string | null>(null);
     const [forceSync, setForceSync] = useState(0);
+    const [dynamicConfig, setDynamicConfig] = useState<any>(null);
     const linksRef = useRef<LinkItem[]>([]);
+    
+    useEffect(() => {
+        let mounted = true;
+        fetch("/api/config/public")
+            .then(res => res.json())
+            .then(data => {
+                if (mounted && data.config) setDynamicConfig(data.config);
+            })
+            .catch(console.error);
+        return () => { mounted = false; };
+    }, []);
+
+    const baseConfig = getPlanConfig(userPlan);
+    const currentPlanConfig = {
+        ...baseConfig,
+        ...(dynamicConfig?.plans?.[userPlan || "free"] || {})
+    };
 
     useEffect(() => {
         linksRef.current = links;
@@ -175,14 +194,12 @@ export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: Histo
                                         <ExternalLink className="w-8 h-8 text-slate-300" />
                                     </div>
                                     <h3 className="text-base font-semibold text-slate-900 mb-1">
-                                        {userPlan === "guest" ? "No links found" : 
-                                         userPlan === "free" ? "Ready to create?" : 
-                                         "Your dashboard is empty"}
+                                        {userPlan === "guest" ? "No links found" : "Ready to create?"}
                                     </h3>
                                     <p className="text-sm text-slate-500 mb-6 max-w-[200px]">
-                                        {userPlan === "guest" ? "Guests can create 1 free temporary link. Try it out!" :
-                                         userPlan === "free" ? "You have 1 free permanent link available. Create it now!" :
-                                         `Make the most of your ${userPlan} plan by creating your first custom link!`}
+                                        {userPlan === "guest" ? `Guests can create ${currentPlanConfig.limit} free temporary link. Try it out!` :
+                                         userPlan === "free" ? `You have ${currentPlanConfig.maxUses || currentPlanConfig.limit} free links available. Create it now!` :
+                                         `You have a limit of ${currentPlanConfig.limit} active links on your ${currentPlanConfig.label} plan. Create your first link now!`}
                                     </p>
                                     <Button 
                                         onClick={() => {
@@ -201,8 +218,8 @@ export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: Histo
                                         }`}
                                     >
                                         {userPlan === "guest" ? "Create your free link" :
-                                         userPlan === "free" ? "Create 1 free link" :
-                                         `Create ${userPlan} link`}
+                                         userPlan === "free" ? `Create ${currentPlanConfig.maxUses || currentPlanConfig.limit} free links` :
+                                         `Create custom link`}
                                     </Button>
                                 </div>
                             ) : (

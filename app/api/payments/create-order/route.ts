@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { razorpayService } from "@/services/payments/razorpay";
 import { getPricePaise, isPaidPlan, resolvePlanType } from "@/lib/plans";
+import { getComputedPlanConfig, getBestActiveOffer, calculateDiscountedPrice } from "@/lib/services/dynamic-config";
 import type { OrderDocument } from "@/types";
 import { logger } from "@/lib/utils/logger";
 import { getRedisClient } from "@/lib/redis/client";
@@ -94,9 +95,55 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const finalAmountPaise = promoValidation?.valid
-            ? promoValidation.finalAmount
-            : getPricePaise(planId);
+        // --- Dynamic Pricing & Best Price Wins Logic ---
+        const dynamicPlanConfig = await getComputedPlanConfig(planId);
+        const dynamicPriceINR = dynamicPlanConfig.priceINR;
+        const baseAmountPaise = Math.round(dynamicPriceINR * 100);
+
+        const globalOffer = await getBestActiveOffer(dynamicPriceINR);
+
+        let finalAmountPaise = baseAmountPaise;
+        let globalDiscountPaise = 0;
+        
+        if (globalOffer) {
+            const discountedINR = calculateDiscountedPrice(dynamicPriceINR, globalOffer);
+            globalDiscountPaise = baseAmountPaise - Math.round(discountedINR * 100);
+            finalAmountPaise -= globalDiscountPaise;
+        }
+
+        let promoDiscountPaise = 0;
+        if (promoValidation?.valid) {
+            if (promoValidation.discountType === "free_plan") {
+                promoDiscountPaise = finalAmountPaise;
+            } else if (promoValidation.discountType === "percentage") {
+                // Multiplicative stacking: apply percentage to the remaining amount
+                promoDiscountPaise = Math.round(finalAmountPaise * (promoValidation.discountValue / 100));
+            } else if (promoValidation.discountType === "fixed") {
+                promoDiscountPaise = Math.round(promoValidation.discountValue * 100);
+            }
+            // Cap promo discount to the remaining amount
+            promoDiscountPaise = Math.min(promoDiscountPaise, finalAmountPaise);
+            finalAmountPaise -= promoDiscountPaise;
+        }
+
+        const finalDiscountAmount = baseAmountPaise - finalAmountPaise;
+
+        let appliedPromoCode: string | null = null;
+        let appliedPromoType: string | null = null;
+        let appliedPromoValue: number | null = null;
+        let appliedPromoId: string | null = null;
+
+        if (promoValidation?.valid) {
+            appliedPromoCode = promoValidation.code;
+            appliedPromoType = promoValidation.discountType;
+            appliedPromoValue = promoValidation.discountValue;
+            appliedPromoId = promoValidation.promoId;
+        } else if (globalOffer) {
+            appliedPromoCode = `GLOBAL_OFFER_${globalOffer.id}`;
+            appliedPromoType = globalOffer.type;
+            appliedPromoValue = globalOffer.value;
+            appliedPromoId = globalOffer.id || null;
+        }
 
         const now = Date.now();
 
@@ -113,12 +160,12 @@ export async function POST(request: NextRequest) {
                 userId: decoded.uid,
                 planId,
                 amount: finalAmountPaise,
-                baseAmount: promoValidation?.valid ? promoValidation.originalAmount : finalAmountPaise,
-                discountAmount: promoValidation?.valid ? promoValidation.discountAmount : 0,
-                promoCodeId: promoValidation?.valid ? promoValidation.promoId : null,
-                promoCode: promoValidation?.valid ? promoValidation.code : null,
-                promoDiscountType: promoValidation?.valid ? promoValidation.discountType : null,
-                promoDiscountValue: promoValidation?.valid ? promoValidation.discountValue : null,
+                baseAmount: baseAmountPaise,
+                discountAmount: finalDiscountAmount,
+                promoCodeId: appliedPromoId,
+                promoCode: appliedPromoCode,
+                promoDiscountType: appliedPromoType as any,
+                promoDiscountValue: appliedPromoValue,
                 currency: "INR",
                 status: "paid",
                 source: "developer_mode",
@@ -145,7 +192,7 @@ export async function POST(request: NextRequest) {
                 currency: "INR",
                 pricing: {
                     originalAmount: orderDoc.baseAmount,
-                    discountAmount: orderDoc.baseAmount,
+                    discountAmount: orderDoc.discountAmount,
                     finalAmount: 0,
                     promoCode: orderDoc.promoCode,
                 },
@@ -161,12 +208,12 @@ export async function POST(request: NextRequest) {
                 userId: decoded.uid,
                 planId,
                 amount: 0,
-                baseAmount: promoValidation.originalAmount,
-                discountAmount: promoValidation.discountAmount,
-                promoCodeId: promoValidation.promoId,
-                promoCode: promoValidation.code,
-                promoDiscountType: promoValidation.discountType,
-                promoDiscountValue: promoValidation.discountValue,
+                baseAmount: baseAmountPaise,
+                discountAmount: finalDiscountAmount,
+                promoCodeId: appliedPromoId,
+                promoCode: appliedPromoCode,
+                promoDiscountType: appliedPromoType as any,
+                promoDiscountValue: appliedPromoValue,
                 currency: "INR",
                 status: "paid",
                 source: "promo_free",
@@ -208,11 +255,11 @@ export async function POST(request: NextRequest) {
             planId,
             amount: finalAmountPaise,
             currency: "INR",
-            notes: promoValidation?.valid
+            notes: appliedPromoCode
                 ? {
-                    promoCode: promoValidation.code,
-                    promoDiscountType: promoValidation.discountType,
-                    promoDiscountValue: String(promoValidation.discountValue),
+                    promoCode: appliedPromoCode,
+                    promoDiscountType: appliedPromoType,
+                    promoDiscountValue: String(appliedPromoValue),
                 }
                 : undefined,
         });
@@ -222,12 +269,12 @@ export async function POST(request: NextRequest) {
             userId: decoded.uid,
             planId,
             amount: finalAmountPaise,
-            baseAmount: promoValidation?.valid ? promoValidation.originalAmount : finalAmountPaise,
-            discountAmount: promoValidation?.valid ? promoValidation.discountAmount : 0,
-            promoCodeId: promoValidation?.valid ? promoValidation.promoId : null,
-            promoCode: promoValidation?.valid ? promoValidation.code : null,
-            promoDiscountType: promoValidation?.valid ? promoValidation.discountType : null,
-            promoDiscountValue: promoValidation?.valid ? promoValidation.discountValue : null,
+            baseAmount: baseAmountPaise,
+            discountAmount: finalDiscountAmount,
+            promoCodeId: appliedPromoId,
+            promoCode: appliedPromoCode,
+            promoDiscountType: appliedPromoType as any,
+            promoDiscountValue: appliedPromoValue,
             currency: "INR",
             status: "created",
             createdAt: now,

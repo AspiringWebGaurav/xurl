@@ -79,6 +79,7 @@ interface PricingTier {
     features?: string[];
     ctaText: string;
     comparisonHint?: string;
+    originalPriceINR?: number;
 }
 
 const PLAN_UI_META: Record<string, { description: string; features: string[]; ctaText: string; comparisonHint?: string }> = {
@@ -95,22 +96,39 @@ function formatTtl(ttlMs: number): string {
     return `Expires in ${hours} hour${hours > 1 ? "s" : ""}`;
 }
 
-const tiers: PricingTier[] = PAID_PLAN_ORDER.map((planId: PlanType) => {
-    const cfg = PLAN_CONFIGS[planId];
-    const ui = PLAN_UI_META[planId] || { description: "", features: [], ctaText: cfg.label };
-    return {
-        name: cfg.label,
-        planId,
-        description: ui.description,
-        priceINR: cfg.priceINR,
-        links: `${cfg.limit} links`,
-        expiry: formatTtl(cfg.ttlMs),
-        isPopular: cfg.badge === "MOST_POPULAR",
-        features: ui.features,
-        ctaText: ui.ctaText,
-        comparisonHint: ui.comparisonHint,
-    };
-});
+const generateTiers = (dynamicConfig?: any, bestOffer?: any): PricingTier[] => {
+    return PAID_PLAN_ORDER.map((planId: PlanType) => {
+        const defaultCfg = PLAN_CONFIGS[planId];
+        const ui = PLAN_UI_META[planId] || { description: "", features: [], ctaText: defaultCfg.label };
+        const override = dynamicConfig?.plans?.[planId] || {};
+        const priceINR = override.priceINR !== undefined ? override.priceINR : defaultCfg.priceINR;
+        const limit = override.limit !== undefined ? override.limit : defaultCfg.limit;
+        const ttlMs = override.ttlMs !== undefined ? override.ttlMs : defaultCfg.ttlMs;
+
+        let finalPrice = priceINR;
+        if (bestOffer) {
+            if (bestOffer.type === "percentage") {
+                finalPrice = Math.max(0, priceINR * (1 - bestOffer.value / 100));
+            } else if (bestOffer.type === "flat") {
+                finalPrice = Math.max(0, priceINR - bestOffer.value);
+            }
+        }
+
+        return {
+            name: defaultCfg.label,
+            planId,
+            description: ui.description,
+            priceINR: finalPrice,
+            originalPriceINR: bestOffer ? priceINR : undefined,
+            links: `${limit} links`,
+            expiry: formatTtl(ttlMs),
+            isPopular: defaultCfg.badge === "MOST_POPULAR",
+            features: ui.features,
+            ctaText: ui.ctaText,
+            comparisonHint: ui.comparisonHint,
+        };
+    });
+};
 
 const containerVariants: Variants = {
     hidden: {},
@@ -163,9 +181,36 @@ export default function PricingPage() {
     const [freeSlideIndex, setFreeSlideIndex] = useState(0);
     const [isFreeCardHovered, setIsFreeCardHovered] = useState(false);
     const [freeSlideCycleKey, setFreeSlideCycleKey] = useState(0);
+    const [dynamicTiers, setDynamicTiers] = useState<PricingTier[]>(generateTiers());
+    const [activeOffer, setActiveOffer] = useState<any>(null);
 
     const router = useRouter();
     const [focusPlan, setFocusPlan] = useState<string | null>(null);
+
+    useEffect(() => {
+        let mounted = true;
+        fetch("/api/config/public")
+            .then(res => res.json())
+            .then(data => {
+                if (!mounted || !data.config) return;
+                const config = data.config;
+                const now = Date.now();
+                const validOffers = (config.offers || []).filter((o: any) => o.isActive && (!o.expiresAt || o.expiresAt > now));
+                let best = null;
+                // Simplified "Best Offer" logic for frontend display (assumes highest % or flat is best for average plan)
+                // For exact accuracy, backend evaluates per plan, but we'll take the max discount on the Business plan as a proxy
+                const proxyPrice = config.plans?.business?.priceINR ?? PLAN_CONFIGS.business.priceINR;
+                let maxD = 0;
+                for (const o of validOffers) {
+                    const d = o.type === "percentage" ? proxyPrice * (o.value/100) : o.value;
+                    if (d > maxD) { maxD = d; best = o; }
+                }
+                setActiveOffer(best);
+                setDynamicTiers(generateTiers(config, best));
+            })
+            .catch(console.error);
+        return () => { mounted = false; };
+    }, []);
 
     /* ── Cinematic intro scroll (every page visit) ── */
     useEffect(() => {
@@ -258,8 +303,12 @@ export default function PricingPage() {
 
     const formatPrice = (priceINR: number) => {
         const converted = priceINR * rates[currency];
-        if (currency === "INR") return converted.toString();
-        return Number(converted.toFixed(1)).toString();
+        // If the calculated price is a clean integer, drop the decimals for a cleaner UI
+        if (Number.isInteger(converted)) {
+            return converted.toString();
+        }
+        // Otherwise, enforce strict 2-decimal formatting (e.g. 19.60 instead of 19.6)
+        return converted.toFixed(2);
     };
 
     const activeFreeSlide = FREE_FEATURE_SLIDES[freeSlideIndex];
@@ -293,10 +342,10 @@ export default function PricingPage() {
         router.push(`/login?plan=${tierPlanId}`);
     };
 
-    const cardBase = "relative flex h-full flex-col rounded-2xl border bg-white p-8 shadow-[0_16px_40px_-30px_rgba(15,23,42,0.22)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[0_26px_56px_-30px_rgba(15,23,42,0.3)]";
-    const priceValueBase = "text-[52px] leading-none font-extrabold tracking-[-0.06em] text-slate-900";
+    const cardBase = "relative flex h-full flex-col rounded-2xl border bg-white p-6 shadow-[0_16px_40px_-30px_rgba(15,23,42,0.22)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[0_26px_56px_-30px_rgba(15,23,42,0.3)]";
+    const priceValueBase = "text-[42px] leading-none font-extrabold tracking-[-0.06em] text-slate-900 pr-1 -mr-1";
     const featureItemBase = "flex items-start gap-3.5";
-    const ctaBase = "mt-0 h-11 w-full rounded-xl text-[15px] font-semibold transition-all duration-200 ease-out active:scale-[0.99]";
+    const ctaBase = "mt-0 h-10 w-full rounded-xl text-[14px] font-semibold transition-all duration-200 ease-out active:scale-[0.99]";
 
     return (
         <div id="pricing-root" className="h-[100dvh] bg-slate-50 flex flex-col relative overflow-x-hidden overflow-y-auto">
@@ -305,12 +354,12 @@ export default function PricingPage() {
             </Suspense>
             <TopNavbar />
 
-            <main className="flex-1 py-16 px-6 lg:px-8 flex flex-col items-center z-10">
-                <div className="text-center max-w-3xl mb-12">
-                    <h1 className="mb-4 text-[42px] font-extrabold tracking-[-0.055em] text-slate-900 sm:text-[56px]">
+            <main className="flex-1 py-10 px-6 lg:px-8 flex flex-col items-center z-10">
+                <div className="text-center max-w-3xl mb-8 relative">
+                    <h1 className="mb-3 text-[36px] font-extrabold tracking-[-0.055em] text-slate-900 sm:text-[46px]">
                         Simple, transparent pricing
                     </h1>
-                    <p className="mx-auto max-w-2xl text-lg leading-8 text-slate-600">
+                    <p className="mx-auto max-w-2xl text-base leading-7 text-slate-600">
                         Choose the perfect plan for your link management needs. No hidden fees.
                     </p>
                 </div>
@@ -338,17 +387,17 @@ export default function PricingPage() {
                                 : "border-slate-200 hover:border-slate-300"
                         )}
                     >
-                        <div className="mb-6">
-                            <h3 className="mb-1.5 text-[30px] font-bold tracking-[-0.04em] text-slate-900">Free</h3>
-                            <p className="text-[13px] leading-5 text-slate-500">Quick testing</p>
+                        <div className="mb-4">
+                            <h3 className="mb-1 text-[26px] font-bold tracking-[-0.04em] text-slate-900">Free</h3>
+                            <p className="text-[12px] leading-4 text-slate-500">Quick testing</p>
                         </div>
-                        <div className="mb-6">
-                            <span className="text-[50px] font-extrabold leading-none tracking-[-0.065em] text-slate-900">Free</span>
+                        <div className="mb-5">
+                            <span className="text-[42px] font-extrabold leading-none tracking-[-0.065em] text-slate-900">Free</span>
                         </div>
 
                         <div className="flex-1">
-                            <div className="flex h-full min-h-[252px] flex-col rounded-xl border border-slate-200/80 bg-slate-50/65 px-3.5 py-3.5">
-                                <div className="mb-3 flex items-start justify-between gap-3">
+                            <div className="flex h-full min-h-[220px] flex-col rounded-xl border border-slate-200/80 bg-slate-50/65 px-3 py-3">
+                                <div className="mb-2 flex items-start justify-between gap-3">
                                     <div className="min-w-0">
                                         <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-900">
                                             {activeFreeSlide.title}
@@ -429,14 +478,14 @@ export default function PricingPage() {
                             </div>
                         </div>
 
-                        <div className="mt-3 px-1">
+                        <div className="mt-2 px-1">
                             <div className="flex items-start gap-3">
-                                <Lock className="mt-0.5 h-[18px] w-[18px] shrink-0 text-slate-300" />
-                                <span className="text-[14px] leading-5 text-slate-400">Analytics Dashboard</span>
+                                <Lock className="mt-0.5 h-[16px] w-[16px] shrink-0 text-slate-300" />
+                                <span className="text-[13px] leading-5 text-slate-400">Analytics Dashboard</span>
                             </div>
                         </div>
 
-                        <div className="mt-8 border-t border-slate-100 pt-6">
+                        <div className="mt-5 border-t border-slate-100 pt-5">
                             <Button
                                 className={cn(
                                     ctaBase,
@@ -453,7 +502,7 @@ export default function PricingPage() {
                     </motion.div>
 
                     {/* Paid Plans */}
-                    {tiers.map((tier) => {
+                    {dynamicTiers.map((tier) => {
                         const isFocused = focusPlan === tier.planId;
 
                         return (
@@ -468,7 +517,9 @@ export default function PricingPage() {
                                         ? "border-amber-400 ring-2 ring-amber-400/45 shadow-[0_24px_56px_-32px_rgba(251,191,36,0.38)]"
                                         : tier.isPopular
                                             ? "border-primary/40 bg-slate-50/50 ring-1 ring-primary/12 shadow-[0_22px_52px_-30px_rgba(15,23,42,0.34)] hover:border-primary/55 hover:shadow-[0_30px_64px_-28px_rgba(15,23,42,0.38)]"
-                                            : "border-slate-200 hover:border-slate-300"
+                                            : tier.originalPriceINR !== undefined
+                                                ? "border-fuchsia-200 bg-white hover:border-fuchsia-400 shadow-[0_16px_40px_-30px_rgba(217,70,239,0.15)] hover:shadow-[0_26px_56px_-30px_rgba(217,70,239,0.3)]"
+                                                : "border-slate-200 hover:border-slate-300"
                                 )}
                             >
                                 {tier.isPopular && (
@@ -484,53 +535,70 @@ export default function PricingPage() {
                                     </motion.div>
                                 )}
 
-                                <div className="mb-7">
-                                    <h3 className="mb-2 flex items-center gap-2 text-[32px] font-bold tracking-[-0.04em] text-slate-900">
+                                <div className="mb-4">
+                                    {activeOffer && tier.originalPriceINR !== undefined && (
+                                        <div className="mb-2 inline-block rounded-full bg-gradient-to-r from-violet-600 via-fuchsia-600 to-orange-500 px-2.5 py-0.5 text-[10px] font-black tracking-wide text-white shadow-[0_0_15px_-3px_rgba(217,70,239,0.5)] animate-pulse">
+                                            🎪 {activeOffer.name} — {activeOffer.type === 'percentage' ? `${activeOffer.value}% OFF` : `₹${activeOffer.value} OFF`}
+                                        </div>
+                                    )}
+                                    <h3 className="mb-1 flex items-center gap-2 text-[26px] font-bold tracking-[-0.04em] text-slate-900">
                                         {tier.name}
                                         {tier.comparisonHint && (
-                                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+                                            <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-primary">
                                                 {tier.comparisonHint}
                                             </span>
                                         )}
                                     </h3>
-                                    <p className="min-h-[48px] text-sm leading-6 text-slate-500">{tier.description}</p>
+                                    <p className="min-h-[40px] text-[13px] leading-5 text-slate-500">{tier.description}</p>
                                 </div>
-
-                               <div className="mb-8 flex items-center gap-3">
-                                    <div className="flex items-end gap-1.5 text-slate-900">
-                                        <span className="pb-1 text-[26px] font-bold tracking-[-0.04em]">{currencySymbols[currency]}</span>
-                                        <motion.span
-                                            key={currency}
-                                            initial={{ opacity: 0, filter: "blur(4px)" }}
-                                            animate={{ opacity: 1, filter: "blur(0px)" }}
-                                            transition={{ duration: 0.4, ease: "easeOut" }}
-                                            className={priceValueBase}
-                                        >
-                                            {formatPrice(tier.priceINR)}
-                                        </motion.span>
-                                        <span className="pb-1.5 text-sm font-semibold text-slate-400">/mo</span>
-                                    </div>
-                                    <div className="ml-2 inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
-                                        {(["INR", "USD", "EUR"] as Currency[]).map((c) => (
-                                            <button
-                                                key={c}
-                                                onClick={() => setCurrency(c)}
-                                                aria-pressed={currency === c}
+                                <div className="mb-5 flex flex-col gap-1.5">
+                                    {tier.originalPriceINR !== undefined && (
+                                        <div className="inline-block">
+                                            <span className="text-2xl font-bold text-slate-400 line-through decoration-rose-500/80 decoration-[3px]">
+                                                {currencySymbols[currency]}{formatPrice(tier.originalPriceINR)}
+                                            </span>
+                                            <span className="ml-1 text-lg font-semibold text-slate-400 line-through decoration-rose-500/80 decoration-[3px]">/mo</span>
+                                        </div>
+                                    )}
+                                    <div className="flex flex-wrap items-center gap-4">
+                                        <div className="flex flex-wrap items-end gap-1.5 text-slate-900">
+                                            <span className="pb-1 text-[26px] font-bold tracking-[-0.04em]">{currencySymbols[currency]}</span>
+                                            <motion.span
+                                                key={currency + tier.priceINR}
+                                                initial={{ opacity: 0, filter: "blur(4px)" }}
+                                                animate={{ opacity: 1, filter: "blur(0px)" }}
+                                                transition={{ duration: 0.4, ease: "easeOut" }}
                                                 className={cn(
-                                                    "rounded-md px-2.5 py-1 text-xs font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300",
-                                                    currency === c
-                                                        ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200"
-                                                        : "text-slate-500 hover:text-slate-700"
+                                                    priceValueBase,
+                                                    tier.originalPriceINR !== undefined ? "bg-gradient-to-br from-violet-600 via-fuchsia-600 to-orange-500 bg-clip-text text-transparent drop-shadow-sm" : ""
                                                 )}
                                             >
-                                                {c}
-                                            </button>
-                                        ))}
+                                                {formatPrice(tier.priceINR)}
+                                            </motion.span>
+                                            <span className="pb-1.5 text-sm font-semibold text-slate-400">/mo</span>
+                                        </div>
+                                        <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                                            {(["INR", "USD", "EUR"] as Currency[]).map((c) => (
+                                                <button
+                                                    key={c}
+                                                    type="button"
+                                                    onClick={() => setCurrency(c)}
+                                                    className={cn(
+                                                        "rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all",
+                                                        currency === c
+                                                            ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200"
+                                                            : "text-slate-500 hover:bg-slate-200/50 hover:text-slate-900"
+                                                    )}
+                                                >
+                                                    {c}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
 
                                 <div className="flex-1">
-                                    <ul className="space-y-4">
+                                    <ul className="space-y-3">
                                         <li className={featureItemBase}>
                                             <Check className="mt-0.5 h-5 w-5 shrink-0 text-slate-900" />
                                             <span className="text-[15px] font-semibold leading-6 text-slate-900">{tier.links}</span>
@@ -548,7 +616,7 @@ export default function PricingPage() {
                                     </ul>
                                 </div>
 
-                                <div className="mt-8 border-t border-slate-100 pt-6">
+                                <div className="mt-5 border-t border-slate-100 pt-5">
                                     <Button
                                         className={cn(
                                             ctaBase,

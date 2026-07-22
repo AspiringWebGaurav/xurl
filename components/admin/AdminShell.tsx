@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { Sparkles, Percent, Gift, ClipboardList, ListChecks, Loader2, ShieldCheck, Link as LinkIcon, ShieldAlert, Ban } from "lucide-react";
+import { Sparkles, Percent, Gift, ClipboardList, ListChecks, Loader2, ShieldCheck, Link as LinkIcon, ShieldAlert, Ban, Settings, Tag } from "lucide-react";
 import { auth } from "@/lib/firebase/config";
 import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -14,6 +14,8 @@ import { getOrCreateGuestSessionId } from "@/lib/utils/fingerprint";
 
 const NAV_ITEMS = [
     { href: "/admin", label: "Dashboard", icon: Sparkles },
+    { href: "/admin/plans", label: "Plan Configuration", icon: Settings },
+    { href: "/admin/offers", label: "Global Offers", icon: Tag },
     { href: "/admin/promo-codes", label: "Promo Codes", icon: Percent },
     { href: "/admin/grant-plan", label: "Grant Plan", icon: Gift },
     { href: "/admin/bans", label: "Bans & Appeals", icon: ShieldCheck },
@@ -136,44 +138,46 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="pt-14">
-                <aside className="fixed left-0 top-14 z-40 hidden h-[calc(100vh-56px)] w-72 border-r border-slate-200 bg-white/85 backdrop-blur-xl lg:block">
+                <aside className="fixed left-0 top-14 z-40 hidden h-[calc(100vh-56px)] w-96 border-r border-slate-200 bg-white/85 backdrop-blur-xl lg:block">
                     <div className="flex h-full flex-col px-5 py-6">
-                        <div className="rounded-[24px] border border-slate-200 bg-white/90 p-4 shadow-sm">
+                        <div className="shrink-0 rounded-[24px] border border-slate-200 bg-white/90 p-4 shadow-sm">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Admin Console</p>
                             <h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-900">Operate XURL</h2>
                             <p className="mt-2 text-sm leading-6 text-slate-600">Manage promotions, grants, and billing from one calm workspace.</p>
                         </div>
 
-                        <nav className="mt-5 flex flex-col gap-2">
-                            {NAV_ITEMS.map((item) => {
-                                const Icon = item.icon;
-                                const active = pathname === item.href;
+                        <div className="flex-1 overflow-y-auto my-4 pr-1 scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                            <nav className="flex flex-col gap-2">
+                                {NAV_ITEMS.map((item) => {
+                                    const Icon = item.icon;
+                                    const active = pathname === item.href;
 
-                                return (
-                                    <Link
-                                        key={item.href}
-                                        href={item.href}
-                                        className={cn(
-                                            "group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all",
-                                            active
-                                                ? "bg-slate-100 text-slate-900 border border-slate-200 shadow-sm"
-                                                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                                        )}
-                                    >
-                                        <span className={cn(
-                                            "flex h-9 w-9 items-center justify-center rounded-xl border transition-all",
-                                            active ? "border-slate-300 bg-white" : "border-slate-200 bg-slate-50 group-hover:bg-white"
-                                        )}
+                                    return (
+                                        <Link
+                                            key={item.href}
+                                            href={item.href}
+                                            className={cn(
+                                                "group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all",
+                                                active
+                                                    ? "bg-slate-100 text-slate-900 border border-slate-200 shadow-sm"
+                                                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                            )}
                                         >
-                                            <Icon className="h-4 w-4" />
-                                        </span>
-                                        <span>{item.label}</span>
-                                    </Link>
-                                );
-                            })}
-                        </nav>
+                                            <span className={cn(
+                                                "flex h-9 w-9 items-center justify-center rounded-xl border transition-all shrink-0",
+                                                active ? "border-slate-300 bg-white" : "border-slate-200 bg-slate-50 group-hover:bg-white"
+                                            )}
+                                            >
+                                                <Icon className="h-4 w-4" />
+                                            </span>
+                                            <span>{item.label}</span>
+                                        </Link>
+                                    );
+                                })}
+                            </nav>
+                        </div>
 
-                        <div className="mt-auto rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+                        <div className="mt-auto shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Signed in</p>
                             <p className="mt-2 truncate text-sm font-medium text-slate-800">{user.email}</p>
                             <p className="mt-1 text-xs text-slate-500">Administrative access verified</p>
@@ -181,7 +185,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                     </div>
                 </aside>
 
-                <main className="lg:pl-72">
+                <main className="lg:pl-96">
                     <div className="sticky top-14 z-30 border-b border-slate-200 bg-[#f5f7fb]/90 px-4 py-4 backdrop-blur-xl lg:hidden">
                         <div className="flex flex-col gap-3">
                             <div>
