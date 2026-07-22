@@ -199,7 +199,7 @@ export default function MobilePlanClient() {
     };
 
     return (
-        <div className="flex flex-col h-[100dvh] overflow-hidden bg-slate-50 dark:bg-slate-950 relative">
+        <div className="flex flex-col flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950 relative">
             {/* Background glow effects */}
             <div className="absolute top-[-5%] right-[-10%] w-[50%] h-[30%] bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-[-5%] left-[-10%] w-[50%] h-[30%] bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />

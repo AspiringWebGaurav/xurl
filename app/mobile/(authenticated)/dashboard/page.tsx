@@ -38,7 +38,7 @@ export default function MobileDashboardPage() {
 
     if (loading) {
         return (
-            <div className="flex flex-col flex-1 min-h-[100dvh] bg-background">
+            <div className="flex flex-col flex-1 w-full bg-background">
                 <TopNavbar />
                 <div className="flex-1 flex items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
@@ -50,7 +50,7 @@ export default function MobileDashboardPage() {
 
     if (!user) {
         return (
-            <div className="flex flex-col flex-1 min-h-[100dvh] bg-background overflow-hidden">
+            <div className="flex flex-col flex-1 w-full bg-background overflow-hidden">
                 <TopNavbar />
                 
                 <div className="flex-1 px-6 py-6 pb-32 relative bg-background">
@@ -117,7 +117,7 @@ export default function MobileDashboardPage() {
     const topLinks = data?.summary?.topLinks || [];
 
     return (
-        <div className="flex flex-col flex-1 min-h-[100dvh] bg-background">
+        <div className="flex flex-col flex-1 w-full bg-background">
             <TopNavbar />
 
             <div className="flex-1 overflow-y-auto px-6 py-6 pb-32">

@@ -160,12 +160,12 @@ export function MobileFooter() {
                 {/* ── Expandable section ── */}
                 <div
                     className={cn(
-                        "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
-                        expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                        "transition-all duration-300 ease-out overflow-hidden",
+                        expanded ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
                     )}
                     aria-hidden={!expanded}
                 >
-                    <div className="overflow-hidden border-t border-border">
+                    <div className="border-t border-border">
                         <div className="w-full px-5 py-8">
                             <div className="grid grid-cols-2 gap-x-4 gap-y-8">
                                 {footerColumns.map((col) => (

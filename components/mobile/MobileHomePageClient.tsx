@@ -69,7 +69,7 @@ export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps
     const isOverQuota = isGuestLocked || (quota ? (quota.used !== undefined ? quota.used : quota.freeLinksCreated) >= quota.limit : false);
 
     return (
-        <div className="flex flex-col h-[100dvh] overflow-hidden bg-slate-50 dark:bg-slate-950 relative">
+        <div className="flex flex-col flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950 relative">
             {/* Subtle background glow */}
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[30%] bg-primary/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[30%] bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />

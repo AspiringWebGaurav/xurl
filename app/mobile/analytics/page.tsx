@@ -226,7 +226,7 @@ export default function MobileAnalyticsPage() {
     // ── Loading ──
     if (loading) {
         return (
-            <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-slate-50">
+            <div className="flex flex-col flex-1 w-full items-center justify-center bg-slate-50">
                 <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
             </div>
         );
@@ -253,7 +253,7 @@ export default function MobileAnalyticsPage() {
     const isPaid = data ? isPaidPlan(data.plan as PlanType) : false;
 
     return (
-        <div className="flex flex-col min-h-[100dvh] bg-background">
+        <div className="flex flex-col flex-1 w-full bg-background">
             <header className="px-6 py-6 border-b border-border flex justify-between items-center bg-background/80 backdrop-blur-md sticky top-0 z-10">
                 <h1 className="text-2xl font-bold tracking-tight text-foreground">Analytics</h1>
                 <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center border border-border">

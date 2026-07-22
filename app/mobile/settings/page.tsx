@@ -49,7 +49,7 @@ export default function MobileSettingsPage() {
 
     if (loading || dataLoading || (user && isPaid)) {
         return (
-            <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-slate-50">
+            <div className="flex flex-col flex-1 w-full items-center justify-center bg-slate-50">
                 <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
             </div>
         );
