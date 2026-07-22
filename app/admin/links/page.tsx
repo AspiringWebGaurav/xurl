@@ -14,6 +14,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { emitAdminRefresh } from "@/lib/admin/admin-events";
 import { Users, Ghost } from "lucide-react";
 
 type LinkUser = {
@@ -41,6 +43,7 @@ export default function AdminLinksPage() {
     const [users, setUsers] = useState<LinkUser[]>([]);
     const [isFetchingUsers, setIsFetchingUsers] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
+    const router = useRouter();
 
     // Modal state
     const [selectedUser, setSelectedUser] = useState<LinkUser | null>(null);
@@ -181,6 +184,7 @@ export default function AdminLinksPage() {
             if (res.ok) {
                 toast.success(data.message || "Link updated successfully");
                 if (selectedUser) loadUserLinks(selectedUser);
+                emitAdminRefresh(router);
             } else {
                 toast.error(data.message || "Failed to update link");
             }
@@ -207,6 +211,7 @@ export default function AdminLinksPage() {
                 toast.success("Guest device has been banned successfully.");
                 setGuestToBan(null);
                 if (selectedUser) loadUserLinks(selectedUser);
+                emitAdminRefresh(router);
             } else {
                 toast.error(data.error || "Failed to ban guest");
             }
@@ -236,6 +241,7 @@ export default function AdminLinksPage() {
                     // Also refresh users in background to update counts
                     loadUsers(user);
                 }
+                emitAdminRefresh(router);
             } else {
                 toast.error(data.message || "Failed to delete link");
             }
@@ -269,6 +275,7 @@ export default function AdminLinksPage() {
                 if (selectedUser) loadUserLinks(selectedUser);
                 setSelectedLinks(new Set());
                 if (action === "delete") loadUsers(user);
+                emitAdminRefresh(router);
             } else {
                 toast.error(data.message || "Failed to execute batch operation");
             }
@@ -297,6 +304,7 @@ export default function AdminLinksPage() {
                 setSelectedLinks(new Set());
                 loadUsers(user);
                 setConfirmDelete(null);
+                emitAdminRefresh(router);
             } else {
                 toast.error(data.message || "Failed to execute batch delete");
             }

@@ -5,6 +5,8 @@ import useSWR from "swr";
 import { Button } from "@/components/ui/button";
 import { Loader2, Plus, Save, Trash2, Tag, CalendarClock, PenTool } from "lucide-react";
 import { auth } from "@/lib/firebase/config";
+import { useRouter } from "next/navigation";
+import { emitAdminRefresh } from "@/lib/admin/admin-events";
 
 const fetcher = async (url: string) => {
     const user = auth.currentUser;
@@ -35,6 +37,7 @@ export default function OffersConfigPage() {
     const [localConfig, setLocalConfig] = useState<DynamicConfig | null>(null);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
+    const router = useRouter();
 
     // Sync remote data to local state when it loads
     if (remoteConfig && !localConfig) {
@@ -60,6 +63,7 @@ export default function OffersConfigPage() {
             if (res.ok) {
                 setMessage("Global offers published! Changes are now live across all APIs and the pricing page.");
                 mutate(localConfig || undefined);
+                emitAdminRefresh(router);
             } else {
                 setMessage("Failed to publish offers.");
             }

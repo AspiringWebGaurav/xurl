@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Save, IndianRupee, Link2, Clock } from "lucide-react";
 import { PLAN_CONFIGS, PAID_PLAN_ORDER, PlanType } from "@/lib/plans";
 import { auth } from "@/lib/firebase/config";
+import { useRouter } from "next/navigation";
+import { emitAdminRefresh } from "@/lib/admin/admin-events";
 
 const fetcher = async (url: string) => {
     const user = auth.currentUser;
@@ -30,6 +32,7 @@ export default function PlansConfigPage() {
     const [saving, setSaving] = useState(false);
     const [syncing, setSyncing] = useState(false);
     const [message, setMessage] = useState("");
+    const router = useRouter();
 
     // Sync remote data to local state when it loads
     if (remoteConfig && !localConfig) {
@@ -69,9 +72,11 @@ export default function PlansConfigPage() {
                     } else {
                         setMessage("Configuration saved, but TTL sync encountered an error.");
                     }
+                    emitAdminRefresh(router);
                 } catch (e) {
                     console.error(e);
                     setMessage("Configuration saved, but TTL sync failed.");
+                    emitAdminRefresh(router);
                 } finally {
                     setSyncing(false);
                 }

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, ShieldAlert, RefreshCw, UserCheck, Gift } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { emitAdminRefresh, useAdminLiveRefresh } from "@/lib/admin/admin-events";
 
 type SystemBannedUser = {
     id: string;
@@ -24,6 +25,12 @@ export default function AdminSystemBansPage() {
     const [bannedUsers, setBannedUsers] = useState<SystemBannedUser[]>([]);
     const [fetching, setFetching] = useState(false);
     const router = useRouter();
+
+    useAdminLiveRefresh(() => {
+        if (user && isAdminEmail(user.email)) {
+            loadSystemBans(user);
+        }
+    });
 
     useEffect(() => {
         const unsub = onAuthStateChanged(auth, async (u) => {
@@ -69,7 +76,7 @@ export default function AdminSystemBansPage() {
             });
             if (res.ok) {
                 toast.success(`Successfully applied: ${actionName}`);
-                loadSystemBans(user);
+                emitAdminRefresh(router);
             } else {
                 const data = await res.json();
                 toast.error(`Error: ${data.message}`);

@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, ShieldAlert, CheckCircle, AlertTriangle, Search, RefreshCw, Mail, CalendarClock, UserX, Ghost } from "lucide-react";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { emitAdminRefresh, useAdminLiveRefresh } from "@/lib/admin/admin-events";
 
 type SearchUser = {
     id: string;
@@ -56,6 +58,15 @@ export default function AdminBansPage() {
     // Banned Guests State
     const [bannedGuests, setBannedGuests] = useState<BannedGuest[]>([]);
     const [guestsLoading, setGuestsLoading] = useState(false);
+    const router = useRouter();
+
+    useAdminLiveRefresh(() => {
+        if (user && isAdminEmail(user.email)) {
+            loadLatestUsers(user);
+            loadAppeals(user);
+            loadBannedGuests(user);
+        }
+    });
 
     useEffect(() => {
         let mounted = true;
@@ -187,6 +198,7 @@ export default function AdminBansPage() {
                     setTargetReason("");
                 }
                 loadLatestUsers(user);
+                emitAdminRefresh(router);
             } else {
                 const data = await res.json();
                 toast.error(`Error: ${data.message}`);
@@ -214,6 +226,7 @@ export default function AdminBansPage() {
                 toast.success(`Appeal ${action}d successfully.`);
                 loadAppeals(user);
                 loadLatestUsers(user);
+                emitAdminRefresh(router);
             } else {
                 toast.error("Failed to process appeal.");
             }
@@ -238,6 +251,7 @@ export default function AdminBansPage() {
             if (res.ok) {
                 toast.success("Guest device has been unbanned.");
                 loadBannedGuests(user);
+                emitAdminRefresh(router);
             } else {
                 toast.error("Failed to unban guest.");
             }

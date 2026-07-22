@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Pencil, Plus, TicketPercent, Trash2, Eye, PauseCircle, PlayCircle, AlertTriangle } from "lucide-react";
 import { isAdminEmail } from "@/lib/admin-config";
 import { PLAN_CONFIGS } from "@/lib/plans";
+import { useRouter } from "next/navigation";
+import { emitAdminRefresh, useAdminLiveRefresh } from "@/lib/admin/admin-events";
 
 type PromoCodeItem = {
     id: string;
@@ -107,6 +109,7 @@ export default function AdminPromoCodesPage() {
     const [success, setSuccess] = useState("");
     const [editingId, setEditingId] = useState<string | null>(null);
     const [form, setForm] = useState<PromoFormState>(initialForm);
+    const router = useRouter();
 
     const canAccess = isAdminEmail(user?.email);
     const analyticsSummary = useMemo(() => {
@@ -161,6 +164,12 @@ export default function AdminPromoCodesPage() {
 
         return () => unsubscribe();
     }, [loadItems]);
+
+    useAdminLiveRefresh(() => {
+        if (user && isAdminEmail(user.email)) {
+            loadItems(user);
+        }
+    });
 
     const submitLabel = useMemo(() => (editingId ? "Save changes" : "Create promo code"), [editingId]);
 
@@ -233,6 +242,7 @@ export default function AdminPromoCodesPage() {
             setSuccess(editingId ? "Promo code updated." : "Promo code created.");
             resetForm();
             await loadItems(user);
+            emitAdminRefresh(router);
         } catch (saveError) {
             setError(saveError instanceof Error ? saveError.message : "Failed to save promo code.");
         } finally {
@@ -261,6 +271,7 @@ export default function AdminPromoCodesPage() {
             }
             setSuccess("Promo code disabled.");
             await loadItems(user);
+            emitAdminRefresh(router);
         } catch (disableError) {
             setError(disableError instanceof Error ? disableError.message : "Failed to disable promo code.");
         }
@@ -311,6 +322,7 @@ export default function AdminPromoCodesPage() {
                 throw new Error(data.message || "Failed to update promo status.");
             }
             await loadItems(user);
+            emitAdminRefresh(router);
         } catch (toggleError) {
             setError(toggleError instanceof Error ? toggleError.message : "Failed to update promo status.");
         }
@@ -335,6 +347,7 @@ export default function AdminPromoCodesPage() {
                 resetForm();
             }
             await loadItems(user);
+            emitAdminRefresh(router);
         } catch (deleteError) {
             setError(deleteError instanceof Error ? deleteError.message : "Failed to delete promo code.");
         }

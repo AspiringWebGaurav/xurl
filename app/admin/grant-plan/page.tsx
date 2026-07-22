@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ChevronDown, Loader2, ShieldCheck, Gift } from "lucide-react";
 import { ManageGiftsModal } from "./ManageGiftsModal";
+import { useRouter } from "next/navigation";
+import { emitAdminRefresh, useAdminLiveRefresh } from "@/lib/admin/admin-events";
 
 const PLAN_OPTIONS = ["starter", "pro", "business", "enterprise", "bigenterprise"] as const;
 const DURATION_PRESETS = [
@@ -115,6 +117,7 @@ export default function AdminGrantPlanPage() {
     const [revokeOpen, setRevokeOpen] = useState(false);
     const [revokeLoading, setRevokeLoading] = useState(false);
     const [revokeError, setRevokeError] = useState("");
+    const router = useRouter();
 
     const canAccess = isAdminEmail(user?.email);
     const normalizedQuery = form.email.trim().toLowerCase();
@@ -213,6 +216,13 @@ export default function AdminGrantPlanPage() {
         return () => unsub();
     }, []);
 
+    useAdminLiveRefresh(() => {
+        loadGrantHistory();
+        if (selectedUser) {
+            handleSelectUser(selectedUser);
+        }
+    });
+
     const handleOpenRevoke = (item: GrantHistoryItem) => {
         setRevokeTarget(item);
         setRevokeError("");
@@ -240,6 +250,7 @@ export default function AdminGrantPlanPage() {
             setRevokeOpen(false);
             setRevokeTarget(null);
             await loadGrantHistory();
+            emitAdminRefresh(router);
         } catch (error) {
             setRevokeError(error instanceof Error ? error.message : "Failed to revoke grant");
         } finally {
@@ -354,6 +365,8 @@ export default function AdminGrantPlanPage() {
             setSelectedUser(null);
             setSearchOpen(false);
             setSearchResults([]);
+            await loadGrantHistory();
+            emitAdminRefresh(router);
         } catch (err) {
             setError(err instanceof Error ? err.message : "Grant failed");
         } finally {

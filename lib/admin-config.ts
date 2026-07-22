@@ -14,7 +14,7 @@ const cyrb53 = (str: string, seed = 0): number => {
 };
 
 // Hashes of the admin emails (to avoid hardcoding the email in plaintext)
-export const ADMIN_HASHES = [7327953269839021];
+export const ADMIN_HASHES = [7327953269839021, 5930064445747368];
 
 export function isAdminEmail(email: string | null | undefined): boolean {
     if (!email) {

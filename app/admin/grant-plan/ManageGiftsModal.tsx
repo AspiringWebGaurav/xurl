@@ -6,6 +6,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Gift, Clock, Trash2, CalendarDays } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { emitAdminRefresh } from "@/lib/admin/admin-events";
 
 type GiftQuota = {
     id: string;
@@ -38,6 +40,7 @@ export function ManageGiftsModal({
         newExpiryMs?: number | null;
     } | null>(null);
     const [customDays, setCustomDays] = useState("30");
+    const router = useRouter();
 
     useEffect(() => {
         if (open && userId && adminUser) {
@@ -86,6 +89,7 @@ export function ManageGiftsModal({
                 throw new Error(data.message || "Failed to update gift");
             }
             await fetchGifts();
+            emitAdminRefresh(router);
         } catch (e: any) {
             setError(e.message);
         } finally {
