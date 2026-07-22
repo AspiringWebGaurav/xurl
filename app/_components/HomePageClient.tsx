@@ -95,14 +95,14 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
             </AnimatePresence>
 
             <main
-                className="flex-1 flex flex-col w-full px-6 md:px-8 overflow-x-hidden overflow-y-auto"
+                className="flex-1 flex flex-col w-full px-6 md:px-8 overflow-hidden justify-center"
 
             >
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, ease: "easeOut" }}
-                    className="w-full max-w-xl flex flex-col gap-6 mx-auto mt-12 mb-auto"
+                    className="w-full max-w-xl flex flex-col gap-6 mx-auto my-auto"
                 >
                     <div className="text-center">
                         <h1 className="text-[40px] font-semibold leading-[0.98] tracking-[-0.045em] text-foreground sm:text-[46px]">
