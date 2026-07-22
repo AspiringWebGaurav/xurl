@@ -124,7 +124,7 @@ export default function PlansConfigPage() {
             )}
 
             <div className="grid gap-6">
-                {["free", ...PAID_PLAN_ORDER].map(planKey => {
+                {["guest", "free", ...PAID_PLAN_ORDER].map(planKey => {
                     const defaultCfg = PLAN_CONFIGS[planKey as PlanType];
                     const override = localConfig.plans[planKey] || {};
                     

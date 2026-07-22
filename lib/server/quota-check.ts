@@ -12,6 +12,7 @@ export interface GuestQuotaResult {
   originalUrl?: string;
   createdAt?: number;
   isLifetimeLimitReached?: boolean;
+  guestTtlMs?: number;
 }
 
 /**

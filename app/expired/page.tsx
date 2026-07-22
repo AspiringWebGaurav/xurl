@@ -11,6 +11,7 @@ import { formatTTLToText } from "@/lib/utils/format-time";
 export default function ExpiredPage() {
     const { data: configData } = useSWR("/api/config/public", (url) => fetch(url).then(r => r.json()));
     const freeTTL = configData?.computedPlans?.free?.ttlMs ? formatTTLToText(configData.computedPlans.free.ttlMs) : "10 minutes";
+    const guestTTL = configData?.computedPlans?.guest?.ttlMs ? formatTTLToText(configData.computedPlans.guest.ttlMs) : "5 minutes";
     const proTTL = configData?.computedPlans?.pro?.ttlMs ? formatTTLToText(configData.computedPlans.pro.ttlMs) : "6 hours";
 
     return (
@@ -51,7 +52,7 @@ export default function ExpiredPage() {
                             <div className="mt-8 pt-8 border-t border-border/40 w-full">
                                 <h3 className="text-sm font-medium text-foreground mb-2">Expiration Policy</h3>
                                 <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-4 marker:text-muted-foreground/50">
-                                    <li>Guest links expire after 5 minutes.</li>
+                                    <li>Guest links expire after {guestTTL}.</li>
                                     <li>Free account links expire after {freeTTL}.</li>
                                     <li>Paid plan links expire between {proTTL} and 24 hours depending on your plan.</li>
                                     <li>Once a link expires, its destination cannot be recovered.</li>

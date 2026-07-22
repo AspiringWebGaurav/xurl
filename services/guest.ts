@@ -1,5 +1,6 @@
 import { adminDb } from "@/lib/firebase/admin";
 import crypto from "crypto";
+import { getComputedPlanConfig } from "@/lib/services/dynamic-config";
 
 const GUEST_USAGE_COLLECTION = "guest_usage";
 
@@ -28,10 +29,11 @@ function hashData(data: string, salt: string = ""): string {
 export async function checkGuestLimit(
     ip: string,
     fingerprint: string | undefined
-): Promise<{ allowed: boolean; expiresIn?: number; slug?: string; originalUrl?: string; createdAt?: number; isLifetimeLimitReached?: boolean }> {
+): Promise<{ allowed: boolean; expiresIn?: number; slug?: string; originalUrl?: string; createdAt?: number; isLifetimeLimitReached?: boolean; guestTtlMs?: number }> {
     const ipHash = hashData(ip);
     const fingerprintHash = fingerprint ? hashData(fingerprint) : null;
     const now = Date.now();
+    const guestConfig = await getComputedPlanConfig("guest");
 
     // Query 1: Check by IP - LIFETIME (no expiresAt filter)
     const ipQuery = adminDb
@@ -48,6 +50,7 @@ export async function checkGuestLimit(
         return {
             allowed: false,
             isLifetimeLimitReached: true,
+            guestTtlMs: guestConfig.ttlMs,
             expiresIn,
             slug: data.slug,
             originalUrl: data.originalUrl,
@@ -69,6 +72,7 @@ export async function checkGuestLimit(
             return {
                 allowed: false,
                 isLifetimeLimitReached: true,
+                guestTtlMs: guestConfig.ttlMs,
                 expiresIn,
                 slug: data.slug,
                 originalUrl: data.originalUrl,
@@ -77,6 +81,5 @@ export async function checkGuestLimit(
         }
     }
 
-    return { allowed: true };
+    return { allowed: true, guestTtlMs: guestConfig.ttlMs };
 }
-

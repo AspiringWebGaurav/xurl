@@ -71,6 +71,7 @@ export default function MobilePlanClient() {
     
     const computedPlans = configData?.computedPlans || PLAN_CONFIGS;
     const freeTTL = computedPlans.free?.ttlMs ? formatTTLToText(computedPlans.free.ttlMs) : "10 minutes";
+    const guestTTL = computedPlans.guest?.ttlMs ? formatTTLToText(computedPlans.guest.ttlMs) : "5 minutes";
     
     const PLAN_UI_META: Record<string, { description: string; features: string[]; ctaText: string; comparisonHint?: string }> = {
         starter: { description: "Personal use", features: ["Login required", "Custom aliases", "Analytics Dashboard"], ctaText: "Start" },
@@ -99,7 +100,7 @@ export default function MobilePlanClient() {
 
     const FREE_FEATURES = [
         "1 link for Guests",
-        "Expires in 5 minutes (Guest)",
+        `Expires in ${guestTTL} (Guest)`,
         `Login for ${freeTTL} expiry`,
         "Analytics Dashboard"
     ];

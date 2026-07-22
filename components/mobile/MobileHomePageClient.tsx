@@ -247,7 +247,7 @@ export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps
                                             <span className="hidden sm:inline-block text-amber-300/80 z-10">—</span>
                                             <div className="flex items-center whitespace-nowrap z-10">
                                                 <Clock className="w-3.5 h-3.5 mr-1.5 text-amber-500 group-hover:text-amber-600 transition-colors" />
-                                                <span>Expires in 5m</span>
+                                                <span>Expires in {initialGuestStatus.guestTtlMs ? Math.round(initialGuestStatus.guestTtlMs / 60000) + 'm' : '5m'}</span>
                                                 <ArrowRight className="w-3.5 h-3.5 ml-1 text-amber-400 group-hover:text-amber-600 group-hover:translate-x-1 transition-all" />
                                             </div>
                                         </Link>

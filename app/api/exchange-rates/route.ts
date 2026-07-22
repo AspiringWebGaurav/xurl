@@ -7,7 +7,14 @@ export async function GET() {
         const res = await fetch("https://api.frankfurter.app/latest?from=INR&to=USD,EUR");
 
         if (!res.ok) {
-            throw new Error(`Failed to fetch exchange rates: ${res.statusText}`);
+            // Silently fallback if API fails
+            return NextResponse.json({
+                rates: {
+                    INR: 1,
+                    USD: 0.012,
+                    EUR: 0.011,
+                }
+            });
         }
 
         const data = await res.json();
@@ -15,13 +22,12 @@ export async function GET() {
         return NextResponse.json({
             rates: {
                 INR: 1,
-                USD: data.rates.USD || 0.012,
-                EUR: data.rates.EUR || 0.011,
+                USD: data.rates?.USD || 0.012,
+                EUR: data.rates?.EUR || 0.011,
             }
         });
     } catch (error) {
-        console.error("Error fetching exchange rates:", error);
-        // Fallback to default rates if API fails
+        // Fallback to default rates if API fails completely (e.g. timeout)
         return NextResponse.json({
             rates: {
                 INR: 1,

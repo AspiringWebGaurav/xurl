@@ -33,9 +33,9 @@ const defaultExchangeRates: Record<Currency, number> = {
     EUR: 0.011,
 };
 
-const FREE_GUEST_FEATURES = [
+const getFreeGuestFeatures = (guestTtlMs?: number) => [
     "1 link",
-    "Expires in 5 minutes",
+    `Expires in ${guestTtlMs ? formatTTLToText(guestTtlMs) : "5 minutes"}`,
     "No login required",
     "Once per IP",
 ];
@@ -48,12 +48,12 @@ const getFreeAccountFeatures = (freeTtlMs?: number) => [
     "3 uses max",
 ];
 
-const getFreeFeatureSlides = (freeTtlMs?: number) => [
+const getFreeFeatureSlides = (freeTtlMs?: number, guestTtlMs?: number) => [
     {
         id: "guest",
         title: "Guest Access",
         description: "One quick short link without creating an account.",
-        features: FREE_GUEST_FEATURES,
+        features: getFreeGuestFeatures(guestTtlMs),
     },
     {
         id: "account",
@@ -182,6 +182,7 @@ export default function PricingPage() {
     const [freeSlideCycleKey, setFreeSlideCycleKey] = useState(0);
     const [dynamicTiers, setDynamicTiers] = useState<PricingTier[]>(generateTiers());
     const [freeTtlMs, setFreeTtlMs] = useState<number | undefined>(undefined);
+    const [guestTtlMs, setGuestTtlMs] = useState<number | undefined>(undefined);
     const [activeOffer, setActiveOffer] = useState<any>(null);
 
     const router = useRouter();
@@ -205,6 +206,7 @@ export default function PricingPage() {
                 }
                 setActiveOffer(best);
                 setFreeTtlMs(data.computedPlans?.free?.ttlMs);
+                setGuestTtlMs(data.computedPlans?.guest?.ttlMs);
                 setDynamicTiers(generateTiers(data.computedPlans, best));
             })
             .catch(console.error);
@@ -293,7 +295,7 @@ export default function PricingPage() {
     useEffect(() => {
         if (isFreeCardHovered) return;
 
-        const slides = getFreeFeatureSlides(freeTtlMs);
+        const slides = getFreeFeatureSlides(freeTtlMs, guestTtlMs);
         const intervalId = window.setInterval(() => {
             setFreeSlideIndex((prev) => (prev + 1) % slides.length);
         }, 3600);
@@ -309,7 +311,7 @@ export default function PricingPage() {
         return converted.toFixed(2);
     };
 
-    const slides = getFreeFeatureSlides(freeTtlMs);
+    const slides = getFreeFeatureSlides(freeTtlMs, guestTtlMs);
     const activeSlide = slides[freeSlideIndex];
 
     const resetFreeSlideTimer = useCallback(() => {

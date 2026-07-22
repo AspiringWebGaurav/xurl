@@ -234,7 +234,9 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                         <span className="relative z-10">1 free link for no login policy</span>
                                         <span className="mx-2 text-amber-300/80 relative z-10">—</span>
                                         <Clock className="w-3.5 h-3.5 mr-1.5 text-amber-500 group-hover:text-amber-600 transition-colors relative z-10" />
-                                        <span className="relative z-10">Expires in 5m</span>
+                                        <span className="relative z-10">
+                                            Expires in {initialGuestStatus.guestTtlMs ? Math.round(initialGuestStatus.guestTtlMs / 60000) + 'm' : '5m'}
+                                        </span>
                                         <ArrowRight className="w-3.5 h-3.5 ml-1.5 text-amber-400 group-hover:text-amber-600 group-hover:translate-x-1 transition-all relative z-10" />
                                     </Link>
                                 )}
