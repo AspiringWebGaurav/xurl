@@ -119,11 +119,16 @@ export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps
                     transition={{ duration: 0.3, ease: "easeOut" }}
                     className={`w-full max-w-sm flex flex-col gap-4 mx-auto mt-8 mb-auto py-6`}
                 >
-                    <div className="text-center mb-1">
-                            <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-slate-900 via-slate-800 to-slate-500 pb-1">
+                    <motion.div 
+                        initial={{ scale: 0.95, opacity: 0 }} 
+                        animate={{ scale: 1, opacity: 1 }} 
+                        transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
+                        className="text-center mb-1"
+                    >
+                            <h1 className="text-[38px] font-extrabold leading-[1.05] tracking-[-0.03em] bg-clip-text text-transparent bg-gradient-to-br from-slate-900 via-slate-800 to-slate-500 pb-1">
                                 Shorten your URL
                             </h1>
-                            <p className="mx-auto mt-1 text-xs font-medium text-slate-500 max-w-[260px]">
+                            <p className="mx-auto mt-1.5 text-[13px] font-medium text-slate-500 leading-relaxed max-w-[260px] text-balance">
                                 Clean, shareable links in a tap.
                             </p>
                             {!authLoading && (
@@ -243,19 +248,23 @@ export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps
                                             </>
                                         )
                                     ) : (
-                                        <Link href="/guest-policy" target="_blank" className="group relative overflow-hidden flex items-center px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 text-amber-700 hover:border-amber-300 hover:shadow-[0_8px_24px_-12px_rgba(217,119,6,0.5)] hover:-translate-y-0.5 transition-all duration-300 text-xs font-bold tracking-wide cursor-pointer">
+                                        <Link href="/guest-policy" target="_blank" className="group relative overflow-hidden flex flex-wrap justify-center items-center gap-x-2 gap-y-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 text-amber-700 hover:border-amber-300 hover:shadow-[0_8px_24px_-12px_rgba(217,119,6,0.5)] transition-all duration-300 text-[11px] font-bold tracking-wide cursor-pointer w-full max-w-[280px] mx-auto">
                                             <div className="absolute inset-0 bg-gradient-to-r from-amber-400/0 via-amber-400/10 to-orange-400/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-md"></div>
-                                            <Lock className="w-3.5 h-3.5 mr-1.5 text-amber-500 group-hover:text-amber-600 transition-colors relative z-10" />
-                                            <span className="relative z-10">1 free link for no login policy</span>
-                                            <span className="mx-2 text-amber-300/80 relative z-10">—</span>
-                                            <Clock className="w-3.5 h-3.5 mr-1.5 text-amber-500 group-hover:text-amber-600 transition-colors relative z-10" />
-                                            <span className="relative z-10">Expires in 5m</span>
-                                            <ArrowRight className="w-3.5 h-3.5 ml-1.5 text-amber-400 group-hover:text-amber-600 group-hover:translate-x-1 transition-all relative z-10" />
+                                            <div className="flex items-center whitespace-nowrap z-10">
+                                                <Lock className="w-3.5 h-3.5 mr-1.5 text-amber-500 group-hover:text-amber-600 transition-colors" />
+                                                <span>1 free link for no login policy</span>
+                                            </div>
+                                            <span className="hidden sm:inline-block text-amber-300/80 z-10">—</span>
+                                            <div className="flex items-center whitespace-nowrap z-10">
+                                                <Clock className="w-3.5 h-3.5 mr-1.5 text-amber-500 group-hover:text-amber-600 transition-colors" />
+                                                <span>Expires in 5m</span>
+                                                <ArrowRight className="w-3.5 h-3.5 ml-1 text-amber-400 group-hover:text-amber-600 group-hover:translate-x-1 transition-all" />
+                                            </div>
                                         </Link>
                                     )}
                                 </div>
                             )}
-                        </div>
+                    </motion.div>
 
                     <AnimatePresence mode="wait">
                         {isStrictlyLoading ? (
