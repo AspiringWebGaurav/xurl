@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
+import { useConfirmLink } from "@/components/providers/ConfirmLinkProvider";
 import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/utils";
 import { ChevronUp } from "lucide-react";
@@ -16,6 +17,8 @@ const footerColumns = [
         links: [
             { href: "/pricing", label: "Pricing" },
             { href: "/analytics", label: "Analytics" },
+            { href: "/features", label: "Features" },
+            { href: "/integrations", label: "Integrations" },
         ],
     },
     {
@@ -23,6 +26,17 @@ const footerColumns = [
         links: [
             { href: "/documentation/api", label: "API" },
             { href: "/documentation", label: "Documentation" },
+            { href: "/help-center", label: "Help Center" },
+            { href: "/community", label: "Community" },
+        ],
+    },
+    {
+        label: "Company",
+        links: [
+            { href: "/about", label: "About Us" },
+            { href: "/contact", label: "Contact" },
+            { href: "/blog", label: "Blog" },
+            { href: "/careers", label: "Careers" },
         ],
     },
     {
@@ -50,6 +64,7 @@ const minimalLegalLinks = [
 
 export function HomeFooter() {
     const [expanded, setExpanded] = useState(false);
+    const { handleLinkClick } = useConfirmLink();
     const footerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -114,9 +129,8 @@ export function HomeFooter() {
                             <Link
                                 key={link.href}
                                 href={link.href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="rounded-md px-2 py-1 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground"
+                                onClick={(e) => handleLinkClick(e, link.href)}
+                                className="rounded-md px-2 py-1 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground no-underline"
                             >
                                 {link.label}
                             </Link>
@@ -178,9 +192,8 @@ export function HomeFooter() {
                                                 <Link
                                                     key={link.href}
                                                     href={link.href}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium"
+                                                    onClick={(e) => handleLinkClick(e, link.href)}
+                                                    className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium no-underline"
                                                 >
                                                     {link.label}
                                                 </Link>

@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { seo } from "@/lib/seo";
 import { StructuredData } from "@/components/seo/StructuredData";
 import { headers, cookies } from "next/headers";
+import { ConfirmLinkProvider } from "@/components/providers/ConfirmLinkProvider";
 
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
@@ -77,9 +78,11 @@ export default async function RootLayout({
             </head>
             <body className={`${inter.className} bg-background text-foreground`} suppressHydrationWarning>
                 <StructuredData />
-                <BanGuard isMobileDevice={isMobileDevice} initiallyBanned={isKnownBanned}>
-                    {children}
-                </BanGuard>
+                <ConfirmLinkProvider>
+                    <BanGuard isMobileDevice={isMobileDevice} initiallyBanned={isKnownBanned}>
+                        {children}
+                    </BanGuard>
+                </ConfirmLinkProvider>
                 <Toaster />
             </body>
         </html>

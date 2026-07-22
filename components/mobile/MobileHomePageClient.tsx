@@ -21,9 +21,7 @@ import { HomePageSkeleton } from "@/app/_components/HomePageSkeleton";
 import type { GuestQuotaResult } from "@/lib/server/quota-check";
 import { formatCooldown } from "@/lib/utils/format-time";
 import { CustomAliasInput } from "@/components/home/CustomAliasInput";
-import { ConfirmLinkModal } from "@/components/ui/confirm-link-modal";
-
-
+import { useConfirmLink } from "@/components/providers/ConfirmLinkProvider";
 
 /** Reads ?focus=true from the URL — must be wrapped in <Suspense>. */
 function SearchParamsHandler({ onFocus }: { onFocus: () => void }) {
@@ -32,7 +30,7 @@ function SearchParamsHandler({ onFocus }: { onFocus: () => void }) {
         if (searchParams.get("focus") === "true") {
             onFocus();
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
     return null;
 }
@@ -58,17 +56,9 @@ export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps
     } = useUrlShortener(initialGuestStatus);
 
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-    const [confirmLink, setConfirmLink] = useState<string | null>(null);
+    const { handleLinkClick } = useConfirmLink();
     const resultRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-
-    const handleLegalLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-        e.preventDefault();
-        setConfirmLink(href);
-        if (typeof navigator !== "undefined" && navigator.vibrate) {
-            navigator.vibrate(50);
-        }
-    };
 
     if (isStrictlyLoading) {
         return <HomePageSkeleton />;
@@ -117,7 +107,7 @@ export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, ease: "easeOut" }}
-                    className={`w-full max-w-sm flex flex-col gap-4 mx-auto mt-8 mb-auto py-6`}
+                    className={`w-full max-w-sm flex flex-col gap-4 mx-auto my-auto py-2`}
                 >
                     <motion.div 
                         initial={{ scale: 0.95, opacity: 0 }} 
@@ -248,7 +238,7 @@ export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps
                                             </>
                                         )
                                     ) : (
-                                        <Link href="/guest-policy" target="_blank" className="group relative overflow-hidden flex flex-wrap justify-center items-center gap-x-2 gap-y-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 text-amber-700 hover:border-amber-300 hover:shadow-[0_8px_24px_-12px_rgba(217,119,6,0.5)] transition-all duration-300 text-[11px] font-bold tracking-wide cursor-pointer w-full max-w-[280px] mx-auto">
+                                        <Link href="/guest-policy" onClick={(e) => handleLinkClick(e, "/guest-policy")} className="group relative overflow-hidden flex flex-wrap justify-center items-center gap-x-2 gap-y-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 text-amber-700 hover:border-amber-300 hover:shadow-[0_8px_24px_-12px_rgba(217,119,6,0.5)] transition-all duration-300 text-[11px] font-bold tracking-wide cursor-pointer w-full max-w-[280px] mx-auto">
                                             <div className="absolute inset-0 bg-gradient-to-r from-amber-400/0 via-amber-400/10 to-orange-400/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-md"></div>
                                             <div className="flex items-center whitespace-nowrap z-10">
                                                 <Lock className="w-3.5 h-3.5 mr-1.5 text-amber-500 group-hover:text-amber-600 transition-colors" />
@@ -593,14 +583,12 @@ export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps
                                     </Button>
                                 )}
                                 <div className="mt-3 text-center text-[11px] text-muted-foreground/70 leading-relaxed px-4">
-                                    By shortening a URL, you agree to our <a href="/terms" onClick={(e) => handleLegalLinkClick(e, "/terms")} className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Terms of Service <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>, <a href="/acceptable-use" onClick={(e) => handleLegalLinkClick(e, "/acceptable-use")} className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Acceptable Use Policy <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>, and <a href="/code-of-conduct" onClick={(e) => handleLegalLinkClick(e, "/code-of-conduct")} className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Code of Conduct <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>.
+                                    By shortening a URL, you agree to our <a href="/terms" onClick={(e) => handleLinkClick(e, "/terms")} className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Terms of Service <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>, <a href="/acceptable-use" onClick={(e) => handleLinkClick(e, "/acceptable-use")} className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Acceptable Use Policy <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>, and <a href="/code-of-conduct" onClick={(e) => handleLinkClick(e, "/code-of-conduct")} className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Code of Conduct <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>.
                                 </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
                 </motion.div>
-                
-                <div className="pb-8" />
             </main>
             
             <div className="w-full z-10 shrink-0 hidden md:block">
@@ -621,7 +609,7 @@ export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps
                 userId={user?.uid || ""}
                 onLinksChange={() => {}}
             />
-            <ConfirmLinkModal confirmLink={confirmLink} setConfirmLink={setConfirmLink} />
         </div>
     );
 }
+ 

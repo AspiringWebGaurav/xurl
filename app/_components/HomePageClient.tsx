@@ -20,6 +20,7 @@ import { HomePageSkeleton } from "./HomePageSkeleton";
 import type { GuestQuotaResult } from "@/lib/server/quota-check";
 import { formatCooldown } from "@/lib/utils/format-time";
 import { CustomAliasInput } from "@/components/home/CustomAliasInput";
+import { useConfirmLink } from "@/components/providers/ConfirmLinkProvider";
 
 
 /** Reads ?focus=true from the URL — must be wrapped in <Suspense>. */
@@ -56,6 +57,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
 
     const resultRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const { handleLinkClick } = useConfirmLink();
 
     if (isStrictlyLoading) {
         return <HomePageSkeleton />;
@@ -226,7 +228,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                         </>
                                     )
                                 ) : (
-                                    <Link href="/guest-policy" target="_blank" className="group relative overflow-hidden flex items-center px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 text-amber-700 hover:border-amber-300 hover:shadow-[0_8px_24px_-12px_rgba(217,119,6,0.5)] hover:-translate-y-0.5 transition-all duration-300 text-xs font-bold tracking-wide cursor-pointer">
+                                    <Link href="/guest-policy" onClick={(e) => handleLinkClick(e, "/guest-policy")} className="group relative overflow-hidden flex items-center px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 text-amber-700 hover:border-amber-300 hover:shadow-[0_8px_24px_-12px_rgba(217,119,6,0.5)] hover:-translate-y-0.5 transition-all duration-300 text-xs font-bold tracking-wide cursor-pointer">
                                         <div className="absolute inset-0 bg-gradient-to-r from-amber-400/0 via-amber-400/10 to-orange-400/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-md"></div>
                                         <Lock className="w-3.5 h-3.5 mr-1.5 text-amber-500 group-hover:text-amber-600 transition-colors relative z-10" />
                                         <span className="relative z-10">1 free link for no login policy</span>
@@ -567,7 +569,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                     </Button>
                                 )}
                                 <div className="mt-3 text-center text-[11px] text-muted-foreground/70 leading-relaxed px-4">
-                                    By shortening a URL, you agree to our <a href="/terms" className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Terms of Service <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>, <a href="/acceptable-use" className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Acceptable Use Policy <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>, and <a href="/code-of-conduct" className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Code of Conduct <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>.
+                                    By shortening a URL, you agree to our <a href="/terms" onClick={(e) => handleLinkClick(e, "/terms")} className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Terms of Service <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>, <a href="/acceptable-use" onClick={(e) => handleLinkClick(e, "/acceptable-use")} className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Acceptable Use Policy <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>, and <a href="/code-of-conduct" onClick={(e) => handleLinkClick(e, "/code-of-conduct")} className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Code of Conduct <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>.
                                 </div>
                             </motion.div>
                         )}

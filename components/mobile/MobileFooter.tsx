@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Logo } from "@/components/ui/Logo";
-import { ConfirmLinkModal } from "@/components/ui/confirm-link-modal";
+import { useConfirmLink } from "@/components/providers/ConfirmLinkProvider";
 import { cn } from "@/lib/utils";
 import { ChevronUp, ExternalLink } from "lucide-react";
 
@@ -15,6 +15,8 @@ const footerColumns = [
         links: [
             { href: "/mobile/plan", label: "Pricing" },
             { href: "/analytics", label: "Analytics" },
+            { href: "/features", label: "Features" },
+            { href: "/integrations", label: "Integrations" },
         ],
     },
     {
@@ -22,6 +24,17 @@ const footerColumns = [
         links: [
             { href: "/documentation/api", label: "API" },
             { href: "/documentation", label: "Documentation" },
+            { href: "/help-center", label: "Help Center" },
+            { href: "/community", label: "Community" },
+        ],
+    },
+    {
+        label: "Company",
+        links: [
+            { href: "/about", label: "About Us" },
+            { href: "/contact", label: "Contact" },
+            { href: "/blog", label: "Blog" },
+            { href: "/careers", label: "Careers" },
         ],
     },
     {
@@ -46,24 +59,8 @@ const minimalLegalLinks = [
 export function MobileFooter() {
     const router = useRouter();
     const [expanded, setExpanded] = useState(false);
-    const [confirmLink, setConfirmLink] = useState<string | null>(null);
+    const { handleLinkClick } = useConfirmLink();
     const footerRef = useRef<HTMLDivElement>(null);
-
-    const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
-        const legalRoutes = [
-            "/terms", "/privacy", "/acceptable-use", 
-            "/code-of-conduct", "/guest-policy", "/refund", "/open-source"
-        ];
-        
-        if (legalRoutes.includes(href)) {
-            e.preventDefault();
-            setConfirmLink(href);
-            // Subtle vibration when popup opens
-            if (typeof navigator !== "undefined" && navigator.vibrate) {
-                navigator.vibrate(50);
-            }
-        }
-    };
 
     useEffect(() => {
         const handleMouseDown = (e: TouchEvent | MouseEvent) => {
@@ -128,7 +125,7 @@ export function MobileFooter() {
                                 key={link.href}
                                 href={link.href}
                                 onClick={(e) => handleLinkClick(e, link.href)}
-                                className="rounded-md px-1.5 py-1 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground"
+                                className="rounded-md px-1.5 py-1 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground no-underline"
                             >
                                 {link.label}
                             </Link>
@@ -189,7 +186,7 @@ export function MobileFooter() {
                                                     key={link.href}
                                                     href={link.href}
                                                     onClick={(e) => handleLinkClick(e, link.href)}
-                                                    className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium"
+                                                    className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium no-underline"
                                                 >
                                                     {link.label}
                                                 </Link>
@@ -206,8 +203,6 @@ export function MobileFooter() {
                     </div>
                 </div>
             </footer>
-
-            <ConfirmLinkModal confirmLink={confirmLink} setConfirmLink={setConfirmLink} />
         </>
     );
 }
