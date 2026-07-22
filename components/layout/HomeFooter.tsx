@@ -42,6 +42,7 @@ const footerColumns = [
     {
         label: "Legal",
         links: [
+            { href: "/policy", label: "All Policies" },
             { href: "/terms", label: "Terms of Service" },
             { href: "/privacy", label: "Privacy Policy" },
             { href: "/acceptable-use", label: "Acceptable Use" },
@@ -56,6 +57,7 @@ const footerColumns = [
 const minimalLegalLinks = [
     { href: "/terms", label: "Terms" },
     { href: "/privacy", label: "Privacy" },
+    { href: "/policy", label: "Policies" },
 ];
 
 /* ------------------------------------------------------------------ */
