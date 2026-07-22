@@ -113,6 +113,29 @@ export async function getComputedPlanConfig(planType: PlanType): Promise<Compute
 }
 
 /**
+ * Gets a full map of all computed plan configs.
+ */
+export async function getAllComputedPlanConfigs(): Promise<Record<PlanType, ComputedPlanConfig>> {
+    const config = await getDynamicConfig();
+    const result = {} as Record<PlanType, ComputedPlanConfig>;
+    
+    for (const [key, defaults] of Object.entries(PLAN_CONFIGS)) {
+        const planKey = key as PlanType;
+        const overrides = config.plans[planKey] || {};
+        
+        result[planKey] = {
+            ...defaults,
+            ...overrides,
+            priceINR: overrides.priceINR !== undefined ? overrides.priceINR : defaults.priceINR,
+            limit: overrides.limit !== undefined ? overrides.limit : defaults.limit,
+            ttlMs: overrides.ttlMs !== undefined ? overrides.ttlMs : defaults.ttlMs,
+        };
+    }
+    
+    return result;
+}
+
+/**
  * Gets all active global offers.
  */
 export async function getActiveOffers(): Promise<GlobalOffer[]> {

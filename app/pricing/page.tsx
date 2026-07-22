@@ -11,6 +11,7 @@ import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { AnimatePresence, motion, Variants } from "framer-motion";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { formatTTLToText } from "@/lib/utils/format-time";
 
 import { PLAN_CONFIGS, PAID_PLAN_ORDER } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
@@ -39,15 +40,15 @@ const FREE_GUEST_FEATURES = [
     "Once per IP",
 ];
 
-const FREE_ACCOUNT_FEATURES = [
+const getFreeAccountFeatures = (freeTtlMs?: number) => [
     "1 link",
-    "Expires in 10 minutes",
+    `Expires in ${freeTtlMs ? formatTTLToText(freeTtlMs) : "10 minutes"}`,
     "Login required",
     "24h cooldown",
     "3 uses max",
 ];
 
-const FREE_FEATURE_SLIDES = [
+const getFreeFeatureSlides = (freeTtlMs?: number) => [
     {
         id: "guest",
         title: "Guest Access",
@@ -58,7 +59,7 @@ const FREE_FEATURE_SLIDES = [
         id: "account",
         title: "Free Account Access",
         description: "Sign in for a slightly longer expiry with simple usage limits.",
-        features: FREE_ACCOUNT_FEATURES,
+        features: getFreeAccountFeatures(freeTtlMs),
     },
 ];
 
@@ -92,25 +93,23 @@ const PLAN_UI_META: Record<string, { description: string; features: string[]; ct
 
 function formatTtl(ttlMs: number): string {
     const hours = ttlMs / (60 * 60 * 1000);
-    if (hours < 1) return `Expires in ${Math.round(ttlMs / (60 * 1000))} minutes`;
+    if (hours < 1) return `Expires in ${formatTTLToText(ttlMs)}`;
     return `Expires in ${hours} hour${hours > 1 ? "s" : ""}`;
 }
 
-const generateTiers = (dynamicConfig?: any, bestOffer?: any): PricingTier[] => {
+const generateTiers = (computedPlans?: any, bestOffer?: any): PricingTier[] => {
     return PAID_PLAN_ORDER.map((planId: PlanType) => {
+        const cfg = computedPlans?.[planId] || PLAN_CONFIGS[planId];
         const defaultCfg = PLAN_CONFIGS[planId];
         const ui = PLAN_UI_META[planId] || { description: "", features: [], ctaText: defaultCfg.label };
-        const override = dynamicConfig?.plans?.[planId] || {};
-        const priceINR = override.priceINR !== undefined ? override.priceINR : defaultCfg.priceINR;
-        const limit = override.limit !== undefined ? override.limit : defaultCfg.limit;
-        const ttlMs = override.ttlMs !== undefined ? override.ttlMs : defaultCfg.ttlMs;
+        const activePrice = cfg.priceINR;
 
-        let finalPrice = priceINR;
+        let discountedPrice = activePrice;
         if (bestOffer) {
             if (bestOffer.type === "percentage") {
-                finalPrice = Math.max(0, priceINR * (1 - bestOffer.value / 100));
+                discountedPrice = Math.max(0, activePrice * (1 - bestOffer.value / 100));
             } else if (bestOffer.type === "flat") {
-                finalPrice = Math.max(0, priceINR - bestOffer.value);
+                discountedPrice = Math.max(0, activePrice - bestOffer.value);
             }
         }
 
@@ -118,10 +117,10 @@ const generateTiers = (dynamicConfig?: any, bestOffer?: any): PricingTier[] => {
             name: defaultCfg.label,
             planId,
             description: ui.description,
-            priceINR: finalPrice,
-            originalPriceINR: bestOffer ? priceINR : undefined,
-            links: `${limit} links`,
-            expiry: formatTtl(ttlMs),
+            priceINR: discountedPrice,
+            originalPriceINR: activePrice !== discountedPrice ? activePrice : undefined,
+            links: `${cfg.limit} links`,
+            expiry: formatTtl(cfg.ttlMs),
             isPopular: defaultCfg.badge === "MOST_POPULAR",
             features: ui.features,
             ctaText: ui.ctaText,
@@ -182,6 +181,7 @@ export default function PricingPage() {
     const [isFreeCardHovered, setIsFreeCardHovered] = useState(false);
     const [freeSlideCycleKey, setFreeSlideCycleKey] = useState(0);
     const [dynamicTiers, setDynamicTiers] = useState<PricingTier[]>(generateTiers());
+    const [freeTtlMs, setFreeTtlMs] = useState<number | undefined>(undefined);
     const [activeOffer, setActiveOffer] = useState<any>(null);
 
     const router = useRouter();
@@ -197,16 +197,15 @@ export default function PricingPage() {
                 const now = Date.now();
                 const validOffers = (config.offers || []).filter((o: any) => o.isActive && (!o.expiresAt || o.expiresAt > now));
                 let best = null;
-                // Simplified "Best Offer" logic for frontend display (assumes highest % or flat is best for average plan)
-                // For exact accuracy, backend evaluates per plan, but we'll take the max discount on the Business plan as a proxy
-                const proxyPrice = config.plans?.business?.priceINR ?? PLAN_CONFIGS.business.priceINR;
+                const proxyPrice = data.computedPlans?.business?.priceINR ?? PLAN_CONFIGS.business.priceINR;
                 let maxD = 0;
                 for (const o of validOffers) {
                     const d = o.type === "percentage" ? proxyPrice * (o.value/100) : o.value;
                     if (d > maxD) { maxD = d; best = o; }
                 }
                 setActiveOffer(best);
-                setDynamicTiers(generateTiers(config, best));
+                setFreeTtlMs(data.computedPlans?.free?.ttlMs);
+                setDynamicTiers(generateTiers(data.computedPlans, best));
             })
             .catch(console.error);
         return () => { mounted = false; };
@@ -294,24 +293,24 @@ export default function PricingPage() {
     useEffect(() => {
         if (isFreeCardHovered) return;
 
+        const slides = getFreeFeatureSlides(freeTtlMs);
         const intervalId = window.setInterval(() => {
-            setFreeSlideIndex((prev) => (prev + 1) % FREE_FEATURE_SLIDES.length);
+            setFreeSlideIndex((prev) => (prev + 1) % slides.length);
         }, 3600);
 
         return () => window.clearInterval(intervalId);
-    }, [freeSlideCycleKey, isFreeCardHovered]);
+    }, [freeSlideCycleKey, isFreeCardHovered, freeTtlMs]);
 
     const formatPrice = (priceINR: number) => {
         const converted = priceINR * rates[currency];
-        // If the calculated price is a clean integer, drop the decimals for a cleaner UI
         if (Number.isInteger(converted)) {
             return converted.toString();
         }
-        // Otherwise, enforce strict 2-decimal formatting (e.g. 19.60 instead of 19.6)
         return converted.toFixed(2);
     };
 
-    const activeFreeSlide = FREE_FEATURE_SLIDES[freeSlideIndex];
+    const slides = getFreeFeatureSlides(freeTtlMs);
+    const activeSlide = slides[freeSlideIndex];
 
     const resetFreeSlideTimer = useCallback(() => {
         setFreeSlideCycleKey((current) => current + 1);
@@ -329,13 +328,13 @@ export default function PricingPage() {
         (direction: "prev" | "next") => {
             setFreeSlideIndex((current) => {
                 if (direction === "prev") {
-                    return (current - 1 + FREE_FEATURE_SLIDES.length) % FREE_FEATURE_SLIDES.length;
+                    return (current - 1 + slides.length) % slides.length;
                 }
-                return (current + 1) % FREE_FEATURE_SLIDES.length;
+                return (current + 1) % slides.length;
             });
             resetFreeSlideTimer();
         },
-        [resetFreeSlideTimer]
+        [resetFreeSlideTimer, slides.length]
     );
 
     const handleUpgrade = (tierPlanId: string) => {
@@ -364,7 +363,6 @@ export default function PricingPage() {
                     </p>
                 </div>
 
-                {/* ↓ id added for intro scroll targeting */}
                 <motion.div
                     id="pricing-cards-grid"
                     variants={containerVariants}
@@ -372,7 +370,6 @@ export default function PricingPage() {
                     animate="visible"
                     className="max-w-7xl w-full grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3 group/cards"
                 >
-                    {/* Free Plan Card */}
                     <motion.div
                         id="plan-free"
                         variants={cardVariants}
@@ -400,21 +397,21 @@ export default function PricingPage() {
                                 <div className="mb-2 flex items-start justify-between gap-3">
                                     <div className="min-w-0">
                                         <h4 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-900">
-                                            {activeFreeSlide.title}
+                                            {activeSlide.title}
                                         </h4>
                                         <p className="mt-1 text-[13px] leading-5 text-slate-500">
-                                            {activeFreeSlide.description}
+                                            {activeSlide.description}
                                         </p>
                                     </div>
                                     <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500 shadow-sm ring-1 ring-slate-200">
-                                        {freeSlideIndex + 1}/{FREE_FEATURE_SLIDES.length}
+                                        {freeSlideIndex + 1}/{slides.length}
                                     </span>
                                 </div>
 
                                 <div className="relative min-h-[168px] flex-1 overflow-hidden">
                                     <AnimatePresence mode="wait" initial={false}>
                                         <motion.div
-                                            key={activeFreeSlide.id}
+                                            key={activeSlide.id}
                                             initial={{ opacity: 0, x: 18 }}
                                             animate={{ opacity: 1, x: 0 }}
                                             exit={{ opacity: 0, x: -18 }}
@@ -422,7 +419,7 @@ export default function PricingPage() {
                                             className="absolute inset-0"
                                         >
                                             <ul className="space-y-3">
-                                                {activeFreeSlide.features.map((feature, i) => (
+                                                {activeSlide.features.map((feature, i) => (
                                                     <li key={i} className="flex items-start gap-3">
                                                         <Check className="mt-0.5 h-[18px] w-[18px] shrink-0 text-emerald-500" />
                                                         <span className={i === 0 ? "text-[14px] font-semibold leading-5 text-slate-900" : "text-[14px] leading-5 text-slate-600"}>
@@ -449,7 +446,7 @@ export default function PricingPage() {
                                             <ChevronLeft className="h-3.5 w-3.5" />
                                         </button>
 
-                                        {FREE_FEATURE_SLIDES.map((slide, index) => (
+                                        {slides.map((slide, index) => (
                                             <button
                                                 key={slide.id}
                                                 type="button"

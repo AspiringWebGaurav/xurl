@@ -16,7 +16,7 @@ export const PLAN_DATA: Record<string, {
         title: "Create your account",
         description: "Sign in to instantly unlock:",
         linkCount: "1 Free Link",
-        expiryTime: "10-Minute Expiry",
+        expiryTime: "Limited Expiry",
         linkIconColor: "text-emerald-600",
         linkBgColor: "bg-emerald-100/50",
         clockIconColor: "text-amber-600",

@@ -13,6 +13,8 @@ import { MobileFooter } from "@/components/mobile/MobileFooter";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Check, ChevronLeft, ShieldCheck, Zap } from "lucide-react";
 import { PLAN_CONFIGS, PAID_PLAN_ORDER, PlanType } from "@/lib/plans";
+import useSWR from "swr";
+import { formatTTLToText } from "@/lib/utils/format-time";
 
 type Currency = "INR" | "USD" | "EUR";
 
@@ -28,44 +30,11 @@ const currencySymbols: Record<Currency, string> = {
     EUR: "€",
 };
 
-const FREE_FEATURES = [
-    "1 link for Guests",
-    "Expires in 5 minutes (Guest)",
-    "Login for 10-minute expiry",
-    "Analytics Dashboard"
-];
-
-const PLAN_UI_META: Record<string, { description: string; features: string[]; ctaText: string; comparisonHint?: string }> = {
-    starter: { description: "Personal use", features: ["Login required", "Custom aliases", "Analytics Dashboard"], ctaText: "Start" },
-    pro: { description: "For power users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Priority support"], ctaText: "Go Pro" },
-    business: { description: "Best value for heavy users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "4× more links than Pro"], ctaText: "Get Business", comparisonHint: "Most Popular" },
-    enterprise: { description: "Advanced link management", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "Custom domains integration"], ctaText: "Go Enterprise" },
-    bigenterprise: { description: "Maximum scale", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "Dedicated account manager"], ctaText: "Go Big" },
-};
-
 function formatTtl(ttlMs: number): string {
     const hours = ttlMs / (60 * 60 * 1000);
-    if (hours < 1) return `Expires in ${Math.round(ttlMs / (60 * 1000))} minutes`;
+    if (hours < 1) return `Expires in ${formatTTLToText(ttlMs)}`;
     return `Expires in ${hours} hour${hours > 1 ? "s" : ""}`;
 }
-
-const tiers = PAID_PLAN_ORDER.map((planId: PlanType) => {
-    const cfg = PLAN_CONFIGS[planId];
-    const ui = PLAN_UI_META[planId] || { description: "", features: [], ctaText: cfg.label };
-    return {
-        name: cfg.label,
-        planId,
-        description: ui.description,
-        priceINR: cfg.priceINR,
-        links: `${cfg.limit} links`,
-        expiry: formatTtl(cfg.ttlMs),
-        isPopular: cfg.badge === "MOST_POPULAR",
-        features: ui.features,
-        ctaText: ui.ctaText,
-        comparisonHint: ui.comparisonHint,
-    };
-});
-
 
 /* ── Cinematic scroll helper ── */
 function easeInOutCubic(t: number): number {
@@ -97,6 +66,43 @@ export default function MobilePlanClient() {
     const [rates, setRates] = useState<Record<Currency, number>>(defaultExchangeRates);
     const [user, setUser] = useState<User | null>(null);
     const [currentPlan, setCurrentPlan] = useState<string>("free");
+    
+    const { data: configData } = useSWR("/api/config/public", (url) => fetch(url).then(r => r.json()));
+    
+    const computedPlans = configData?.computedPlans || PLAN_CONFIGS;
+    const freeTTL = computedPlans.free?.ttlMs ? formatTTLToText(computedPlans.free.ttlMs) : "10 minutes";
+    
+    const PLAN_UI_META: Record<string, { description: string; features: string[]; ctaText: string; comparisonHint?: string }> = {
+        starter: { description: "Personal use", features: ["Login required", "Custom aliases", "Analytics Dashboard"], ctaText: "Start" },
+        pro: { description: "For power users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Priority support"], ctaText: "Go Pro" },
+        business: { description: "Best value for heavy users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "4× more links than Pro"], ctaText: "Get Business", comparisonHint: "Most Popular" },
+        enterprise: { description: "Advanced link management", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "Custom domains integration"], ctaText: "Go Enterprise" },
+        bigenterprise: { description: "Maximum scale", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "Dedicated account manager"], ctaText: "Go Big" },
+    };
+
+    const tiers = PAID_PLAN_ORDER.map((planId: PlanType) => {
+        const cfg = computedPlans[planId] || PLAN_CONFIGS[planId];
+        const ui = PLAN_UI_META[planId] || { description: "", features: [], ctaText: cfg.label };
+        return {
+            name: cfg.label,
+            planId,
+            description: ui.description,
+            priceINR: cfg.priceINR,
+            links: `${cfg.limit} links`,
+            expiry: formatTtl(cfg.ttlMs),
+            isPopular: cfg.badge === "MOST_POPULAR",
+            features: ui.features,
+            ctaText: ui.ctaText,
+            comparisonHint: ui.comparisonHint,
+        };
+    });
+
+    const FREE_FEATURES = [
+        "1 link for Guests",
+        "Expires in 5 minutes (Guest)",
+        `Login for ${freeTTL} expiry`,
+        "Analytics Dashboard"
+    ];
     
     const router = useRouter();
     const searchParams = useSearchParams();

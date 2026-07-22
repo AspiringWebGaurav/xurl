@@ -27,6 +27,7 @@ import crypto from "crypto";
 import { evaluateRequest } from "@/lib/redis/protection";
 import { getRedisClient, safeRedis } from "@/lib/redis/client";
 import { isUserBanned } from "@/lib/auth/ban-check";
+import { getComputedPlanConfig } from "@/lib/services/dynamic-config";
 
 // ─── Auth Helper ────────────────────────────────────────────────────────────
 
@@ -170,8 +171,9 @@ export async function POST(request: NextRequest) {
 
         // ── Enforce expiration policy (server is source of truth) ──
         const now = Date.now();
+        const freePlanConfig = await getComputedPlanConfig("free");
         const expiresAt = isGuest
-            ? now + GUEST_CONFIG.ttlMs
+            ? now + freePlanConfig.ttlMs
             : null; // Authenticated user TTL is calculated inside createLink based on their plan
 
         const ipHash = crypto.createHash("sha256").update(ip).digest("hex");

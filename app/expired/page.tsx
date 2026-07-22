@@ -5,8 +5,14 @@ import { Clock } from "lucide-react";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { HomeFooter } from "@/components/layout/HomeFooter";
 import { motion } from "framer-motion";
+import useSWR from "swr";
+import { formatTTLToText } from "@/lib/utils/format-time";
 
 export default function ExpiredPage() {
+    const { data: configData } = useSWR("/api/config/public", (url) => fetch(url).then(r => r.json()));
+    const freeTTL = configData?.computedPlans?.free?.ttlMs ? formatTTLToText(configData.computedPlans.free.ttlMs) : "10 minutes";
+    const proTTL = configData?.computedPlans?.pro?.ttlMs ? formatTTLToText(configData.computedPlans.pro.ttlMs) : "6 hours";
+
     return (
         <div className="flex flex-col min-h-screen bg-background text-foreground">
             <TopNavbar />
@@ -46,8 +52,8 @@ export default function ExpiredPage() {
                                 <h3 className="text-sm font-medium text-foreground mb-2">Expiration Policy</h3>
                                 <ul className="text-sm text-muted-foreground space-y-1.5 list-disc pl-4 marker:text-muted-foreground/50">
                                     <li>Guest links expire after 5 minutes.</li>
-                                    <li>Free account links expire after 10 minutes.</li>
-                                    <li>Paid plan links expire between 2–24 hours depending on your plan.</li>
+                                    <li>Free account links expire after {freeTTL}.</li>
+                                    <li>Paid plan links expire between {proTTL} and 24 hours depending on your plan.</li>
                                     <li>Once a link expires, its destination cannot be recovered.</li>
                                 </ul>
                             </div>

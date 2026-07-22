@@ -1,9 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { Loader2, Plus, Save, Trash2, Tag, CalendarClock, PenTool } from "lucide-react";
 import { auth } from "@/lib/firebase/config";
+
+const fetcher = async (url: string) => {
+    const user = auth.currentUser;
+    if (!user) throw new Error("Not authenticated");
+    const token = await user.getIdToken();
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error("Failed to fetch");
+    const data = await res.json();
+    return data.config;
+};
 
 interface GlobalOffer {
     id: string;
@@ -20,31 +31,15 @@ interface DynamicConfig {
 }
 
 export default function OffersConfigPage() {
-    const [config, setConfig] = useState<DynamicConfig | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { data: remoteConfig, error, isLoading, mutate } = useSWR<DynamicConfig>("/api/admin/config", fetcher);
+    const [localConfig, setLocalConfig] = useState<DynamicConfig | null>(null);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
 
-    useEffect(() => {
-        loadConfig();
-    }, []);
-
-    const loadConfig = async () => {
-        try {
-            const user = auth.currentUser;
-            if (!user) return;
-            const token = await user.getIdToken();
-            const res = await fetch("/api/admin/config", {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            const data = await res.json();
-            setConfig(data.config);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
-        }
-    };
+    // Sync remote data to local state when it loads
+    if (remoteConfig && !localConfig) {
+        setLocalConfig(remoteConfig);
+    }
 
     const handleSave = async () => {
         setSaving(true);
@@ -59,11 +54,12 @@ export default function OffersConfigPage() {
                     Authorization: `Bearer ${token}`,
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({ config })
+                body: JSON.stringify({ config: localConfig })
             });
             
             if (res.ok) {
                 setMessage("Global offers published! Changes are now live across all APIs and the pricing page.");
+                mutate(localConfig || undefined);
             } else {
                 setMessage("Failed to publish offers.");
             }
@@ -87,7 +83,7 @@ export default function OffersConfigPage() {
     };
 
     const addOffer = () => {
-        setConfig(prev => {
+        setLocalConfig(prev => {
             if (!prev) return prev;
             return {
                 ...prev,
@@ -107,7 +103,7 @@ export default function OffersConfigPage() {
     };
 
     const updateOffer = (index: number, field: keyof GlobalOffer, value: any) => {
-        setConfig(prev => {
+        setLocalConfig(prev => {
             if (!prev) return prev;
             const newOffers = [...prev.offers];
             newOffers[index] = { ...newOffers[index], [field]: value };
@@ -116,7 +112,7 @@ export default function OffersConfigPage() {
     };
 
     const removeOffer = (index: number) => {
-        setConfig(prev => {
+        setLocalConfig(prev => {
             if (!prev) return prev;
             const newOffers = [...prev.offers];
             newOffers.splice(index, 1);
@@ -124,7 +120,7 @@ export default function OffersConfigPage() {
         });
     };
 
-    if (loading || !config) {
+    if (isLoading || !localConfig) {
         return (
             <div className="flex h-64 items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
@@ -158,31 +154,36 @@ export default function OffersConfigPage() {
             )}
 
             <div className="grid gap-6">
-                {config.offers.map((offer, index) => (
-                    <div key={offer.id} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm relative">
+                {localConfig.offers.map((offer, index) => (
+                    <div key={offer.id} className="rounded-[24px] border border-slate-200 bg-white p-8 shadow-sm transition-all hover:shadow-md relative group">
                         <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="absolute top-4 right-4 text-slate-400 hover:text-red-600"
+                            className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:bg-red-50 hover:text-red-600 rounded-full h-10 w-10"
                             onClick={() => removeOffer(index)}
                         >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-5 w-5" />
                         </Button>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-slate-700">Campaign Name</label>
-                                <input 
-                                    type="text" 
-                                    value={offer.name}
-                                    onChange={(e) => updateOffer(index, "name", e.target.value)}
-                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                                />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
+                            <div className="space-y-3">
+                                <label className="text-sm font-bold text-slate-700">Campaign Name</label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
+                                        <PenTool className="h-4 w-4 text-slate-400" />
+                                    </div>
+                                    <input 
+                                        type="text" 
+                                        value={offer.name}
+                                        onChange={(e) => updateOffer(index, "name", e.target.value)}
+                                        className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-[15px] font-medium text-slate-900 transition-colors focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10"
+                                    />
+                                </div>
                             </div>
                             
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-slate-700">Campaign Status</label>
-                                <div className="flex items-center gap-3 mt-2">
+                            <div className="space-y-3">
+                                <label className="text-sm font-bold text-slate-700">Campaign Status</label>
+                                <div className="flex items-center gap-3 h-12">
                                     <label className="relative inline-flex items-center cursor-pointer">
                                         <input 
                                             type="checkbox" 
@@ -190,7 +191,7 @@ export default function OffersConfigPage() {
                                             onChange={(e) => updateOffer(index, "isActive", e.target.checked)}
                                             className="sr-only peer"
                                         />
-                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                                        <div className="w-12 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
                                     </label>
                                     <span className="text-sm font-medium text-slate-600">
                                         {offer.isActive ? "Live" : "Draft"}
@@ -198,54 +199,57 @@ export default function OffersConfigPage() {
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-slate-700">Discount Type</label>
+                            <div className="space-y-3">
+                                <label className="text-sm font-bold text-slate-700">Discount Type</label>
                                 <select 
                                     value={offer.type}
                                     onChange={(e) => updateOffer(index, "type", e.target.value)}
-                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                    className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-[15px] font-medium text-slate-900 transition-colors focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10"
                                 >
                                     <option value="percentage">Percentage (%)</option>
                                     <option value="flat">Flat Amount (₹)</option>
                                 </select>
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-slate-700">Discount Value</label>
+                            <div className="space-y-3">
+                                <label className="text-sm font-bold text-slate-700">Discount Value</label>
                                 <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                                        <span className="text-slate-500 text-sm font-medium">
-                                            {offer.type === "percentage" ? "%" : "₹"}
-                                        </span>
+                                    <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
+                                        <Tag className="h-4 w-4 text-slate-400" />
                                     </div>
                                     <input 
                                         type="number" 
                                         value={offer.value || ""}
                                         onChange={(e) => updateOffer(index, "value", e.target.value ? Number(e.target.value) : 0)}
-                                        className="w-full rounded-md border border-slate-300 pl-8 pr-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [appearance:textfield]"
+                                        className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-[15px] font-medium text-slate-900 transition-colors focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10 [&::-webkit-inner-spin-button]:appearance-none [appearance:textfield]"
                                         placeholder="e.g. 10"
                                     />
                                 </div>
                             </div>
                             
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium text-slate-700">Expiry Date (Optional)</label>
-                                <input 
-                                    type="datetime-local" 
-                                    value={formatDateForInput(offer.expiresAt)}
-                                    onChange={(e) => updateOffer(index, "expiresAt", handleDateChange(e.target.value))}
-                                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                                />
+                            <div className="space-y-3">
+                                <label className="text-sm font-bold text-slate-700">Expiry Date (Optional)</label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
+                                        <CalendarClock className="h-4 w-4 text-slate-400" />
+                                    </div>
+                                    <input 
+                                        type="datetime-local" 
+                                        value={formatDateForInput(offer.expiresAt)}
+                                        onChange={(e) => updateOffer(index, "expiresAt", handleDateChange(e.target.value))}
+                                        className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-[15px] font-medium text-slate-900 transition-colors focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
                 ))}
                 
-                {config.offers.length === 0 && (
-                    <div className="rounded-xl border border-dashed border-slate-300 p-12 text-center">
-                        <h3 className="text-sm font-medium text-slate-900">No active offers</h3>
-                        <p className="mt-1 text-sm text-slate-500">Create a global campaign to offer discounts across all plans.</p>
-                        <Button onClick={addOffer} variant="outline" className="mt-4 border-slate-300">
+                {localConfig.offers.length === 0 && (
+                    <div className="rounded-[24px] border border-dashed border-slate-300 p-16 text-center bg-slate-50/50">
+                        <h3 className="text-lg font-bold text-slate-900">No active offers</h3>
+                        <p className="mt-2 text-sm text-slate-500">Create a global campaign to offer discounts across all plans.</p>
+                        <Button onClick={addOffer} className="mt-6 bg-slate-900 text-white rounded-xl h-12 px-6">
                             <Plus className="mr-2 h-4 w-4" />
                             New Campaign
                         </Button>

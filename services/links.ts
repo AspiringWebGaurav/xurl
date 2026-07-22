@@ -22,6 +22,7 @@ import { writeActivityEvent } from "@/lib/admin/activity-events-writer";
 import type { LinkDocument, CreateLinkInput as OriginalCreateLinkInput, CreateLinkResponse, UserDocument } from "@/types";
 import type { PlanType } from "@/lib/plans";
 import { PLAN_CONFIGS, GUEST_CONFIG, resolvePlanType } from "@/lib/plans";
+import { getAllComputedPlanConfigs } from "@/lib/services/dynamic-config";
 import { buildShortUrl } from "@/lib/utils/url-builder";
 import { safeRedis } from "@/lib/redis/client";
 import { recordAbuseStrike } from "@/lib/auth/ban-check";
@@ -62,6 +63,8 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
     if (!urlCheck.valid) {
         throw new Error(urlCheck.error || "Invalid URL.");
     }
+
+    const computedPlans = await getAllComputedPlanConfigs();
 
     const now = Date.now();
 
@@ -174,7 +177,7 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
 
                 // ── Free Plan Cooldown & Usage Enforcement ──
                 if (currentPlan === "free") {
-                    const freeConfig = PLAN_CONFIGS.free;
+                    const freeConfig = computedPlans.free;
                     const usageCount = userData.free_usage_count || 0;
                     const lastUsed = userData.free_last_used_at || 0;
                     const giftUsageCount = userData.gift_usage_count || 0;
@@ -221,7 +224,7 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                     }
                 }
 
-                const config = PLAN_CONFIGS[currentPlan];
+                const config = computedPlans[currentPlan as keyof typeof computedPlans] || computedPlans.free;
 
                 let effectiveLimit: number;
                 if (currentPlan === "free") {
