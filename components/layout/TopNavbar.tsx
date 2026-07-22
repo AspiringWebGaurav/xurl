@@ -43,6 +43,7 @@ import { DeveloperModeToggle } from "@/components/dev/DeveloperModeToggle";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 import type { NotificationRecord } from "@/components/notifications/NotificationItem";
+import { UserAvatar } from "@/components/shared/UserAvatar";
 
 interface TopNavbarProps {
     isCreateDisabled?: boolean;
@@ -669,20 +670,35 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                         <span className="sm:hidden font-semibold">Home</span>
                     </Link>
                 )}
+
+                {/* Mobile Analytics Link */}
+                {pathname !== "/mobile/analytics" && pathname !== "/analytics" && (
+                    <Link
+                        href="/mobile/analytics"
+                        className={cn(
+                            navActionBase,
+                            secondaryAction,
+                            "sm:hidden gap-1.5 px-2"
+                        )}
+                    >
+                        <BarChart3 className="w-3.5 h-3.5" />
+                        <span className="text-[13px] font-medium hidden min-[360px]:inline">Stats</span>
+                    </Link>
+                )}
+
                 <div className="hidden sm:flex items-center gap-2">
-                    {user && (
-                        <Link
-                            href="/analytics"
-                            className={cn(
-                                navActionBase,
-                                secondaryAction,
-                                "gap-1.5"
-                            )}
-                        >
-                            <BarChart3 className="w-3.5 h-3.5" />
-                            Analytics
-                        </Link>
-                    )}
+                    {/* Desktop Analytics Link (Visible to all) */}
+                    <Link
+                        href="/analytics"
+                        className={cn(
+                            navActionBase,
+                            secondaryAction,
+                            "gap-1.5"
+                        )}
+                    >
+                        <BarChart3 className="w-3.5 h-3.5" />
+                        Analytics
+                    </Link>
                     {user && apiEnabledForPlan && (
                         <Link
                             href="/dashboard/api"
@@ -852,13 +868,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <button className="relative h-8 w-8 rounded-full overflow-hidden border border-slate-200 shadow-sm hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-1 transition-all">
-                                            {user.photoURL ? (
-                                                <img src={user.photoURL} alt="Avatar" className="h-full w-full object-cover" />
-                                            ) : (
-                                                <div className="h-full w-full bg-slate-100 flex items-center justify-center text-slate-600 font-medium text-xs">
-                                                    {user.displayName?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
-                                                </div>
-                                            )}
+                                            <UserAvatar user={user} className="h-full w-full object-cover text-xs" />
                                         </button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="w-56 mt-1.5" sideOffset={4}>

@@ -165,6 +165,7 @@ export interface AnalyticsDocument {
     countries: Record<string, number>;
     devices: Record<string, number>;
     browsers: Record<string, number>;
+    os: Record<string, number>;
 }
 
 /**

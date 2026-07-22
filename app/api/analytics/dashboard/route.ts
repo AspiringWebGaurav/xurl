@@ -62,6 +62,7 @@ export async function GET(request: NextRequest) {
                 countries: {},
                 devices: {},
                 browsers: {},
+                os: {},
             });
         }
 
@@ -80,6 +81,7 @@ export async function GET(request: NextRequest) {
         const countries: Record<string, number> = {};
         const devices: Record<string, number> = {};
         const browsers: Record<string, number> = {};
+        const os: Record<string, number> = {};
 
         for (const linkDocs of perLinkAnalytics) {
             for (const doc of linkDocs) {
@@ -100,6 +102,7 @@ export async function GET(request: NextRequest) {
                 mergeRecord(countries, (doc as AnalyticsDocument).countries);
                 mergeRecord(devices, (doc as AnalyticsDocument).devices);
                 mergeRecord(browsers, (doc as AnalyticsDocument).browsers);
+                mergeRecord(os, (doc as AnalyticsDocument).os);
             }
         }
 
@@ -114,6 +117,7 @@ export async function GET(request: NextRequest) {
             countries,
             devices,
             browsers,
+            os,
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to fetch analytics.";

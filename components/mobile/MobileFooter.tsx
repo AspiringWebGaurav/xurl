@@ -14,7 +14,7 @@ const footerColumns = [
         label: "Product",
         links: [
             { href: "/mobile/plan", label: "Pricing" },
-            { href: "/analytics", label: "Analytics" },
+            { href: "/mobile/analytics", label: "Analytics" },
             { href: "/features", label: "Features" },
             { href: "/integrations", label: "Integrations" },
         ],

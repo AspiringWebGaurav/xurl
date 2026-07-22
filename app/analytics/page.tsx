@@ -38,6 +38,7 @@ interface DashboardData {
     countries: Record<string, number>;
     devices: Record<string, number>;
     browsers: Record<string, number>;
+    os: Record<string, number>;
 }
 
 // ─── Animation Variants ─────────────────────────────────────────────────────
@@ -150,6 +151,26 @@ function OverviewSkeleton() {
         </div>
     );
 }
+function AnimatedDummyNumber({ target, format = true }: { target: number, format?: boolean }) {
+    const [count, setCount] = useState(0);
+    useEffect(() => {
+        let start = 0;
+        const duration = 2500;
+        const frames = 60;
+        const increment = target / (duration / (1000 / frames));
+        const timer = setInterval(() => {
+            start += increment;
+            if (start >= target) {
+                setCount(target);
+                clearInterval(timer);
+            } else {
+                setCount(Math.floor(start));
+            }
+        }, 1000 / frames);
+        return () => clearInterval(timer);
+    }, [target]);
+    return <span>{format ? count.toLocaleString() : count}</span>;
+}
 
 // ─── Locked Preview ─────────────────────────────────────────────────────────
 
@@ -157,26 +178,23 @@ function LockedPreview() {
     return (
         <div className="relative mt-4 max-h-[calc(100vh-280px)] overflow-hidden">
             <div className="pointer-events-none select-none blur-[6px] opacity-50">
-                <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-3 gap-8 mb-10 px-4">
                     {[
-                        { label: "Total Clicks", value: "1,284" },
-                        { label: "Active Links", value: "12" },
+                        { label: "Total Clicks", value: <AnimatedDummyNumber target={1284} /> },
+                        { label: "Active Links", value: <AnimatedDummyNumber target={12} /> },
                         { label: "Top Performer", value: "my-link" },
-                    ].map((card) => (
-                        <div
-                            key={card.label}
-                            className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6"
-                        >
-                            <span className="text-sm text-slate-500">
-                                {card.label}
+                    ].map((item, i) => (
+                        <div key={item.label} className="flex flex-col">
+                            <span className="text-sm font-medium text-slate-500 uppercase tracking-wider">
+                                {item.label}
                             </span>
-                            <p className="text-[42px] font-extrabold text-slate-900 mt-2">
-                                {card.value}
+                            <p className="text-[48px] font-extrabold text-slate-900 mt-1 leading-none tracking-tight">
+                                {item.value}
                             </p>
                         </div>
                     ))}
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 mb-6">
+                <div className="mb-10 px-4">
                     <div className="h-32 flex items-end gap-1">
                         {Array.from({ length: 30 }, (_, i) => (
                             <div
@@ -189,28 +207,29 @@ function LockedPreview() {
                         ))}
                     </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                    {["Devices", "Browsers"].map((label) => (
-                        <div
-                            key={label}
-                            className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 h-32"
-                        />
+                <div className="grid grid-cols-3 gap-8 px-4">
+                    {["Devices", "Browsers", "OS"].map((label) => (
+                        <div key={label} className="h-32 flex flex-col">
+                            <span className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-4">{label}</span>
+                            <div className="flex-1 bg-slate-200/50 rounded-lg" />
+                        </div>
                     ))}
                 </div>
             </div>
 
-            <div className="absolute inset-0 flex items-center justify-center">
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-xl p-8 max-w-md text-center">
-                    <Lock className="h-10 w-10 text-slate-400 mx-auto mb-4" />
-                    <h2 className="text-2xl font-bold text-slate-900 mb-2">
-                        Analytics is a Premium Feature
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-50/40 backdrop-blur-md z-10">
+                <div className="max-w-lg w-full mx-4 text-center flex flex-col items-center">
+                    <div className="mb-6">
+                        <Lock className="h-10 w-10 text-slate-700/80 drop-shadow-sm" />
+                    </div>
+                    <h2 className="text-4xl font-extrabold text-slate-900 mb-4 tracking-tight drop-shadow-sm">
+                        Unlock Deep Analytics
                     </h2>
-                    <p className="text-slate-500 mb-6">
-                        Upgrade to any paid plan to unlock detailed analytics,
-                        click tracking, device breakdowns, and more.
+                    <p className="text-slate-600 mb-8 text-base leading-relaxed max-w-sm mx-auto font-medium">
+                        Upgrade to any paid plan to access full click timelines, device breakdowns, OS tracking, and more. Stop guessing, start knowing.
                     </p>
                     <Link href="/pricing">
-                        <Button className="bg-slate-900 text-white hover:bg-slate-800 px-6 h-11 text-[15px] font-semibold rounded-xl shadow-sm">
+                        <Button className="bg-slate-900 hover:bg-slate-800 text-white h-12 px-8 text-base font-semibold rounded-full shadow-lg shadow-slate-900/20 transition-all active:scale-[0.98]">
                             View Plans & Upgrade
                         </Button>
                     </Link>
@@ -267,15 +286,22 @@ export default function AnalyticsPage() {
     // ── Not authenticated ──
     if (!user) {
         return (
-            <div className="min-h-screen flex flex-col bg-slate-50">
+            <div className="flex flex-col h-[100dvh] overflow-hidden bg-slate-50">
                 <TopNavbar />
-                <main className="flex-1 flex flex-col items-center justify-center max-w-5xl mx-auto w-full px-6 py-12">
-                    <h1 className="text-2xl font-bold text-slate-900 mb-2">
-                        Sign in Required
-                    </h1>
-                    <p className="text-slate-500">
-                        Please sign in to view analytics.
-                    </p>
+                <main className="flex-1 flex flex-col w-full overflow-y-auto overflow-x-hidden">
+                    <div className="w-full px-6 lg:px-12 py-12">
+                        <div className="flex items-center justify-between mb-8">
+                            <div>
+                                <h1 className="text-[32px] font-extrabold text-slate-900 tracking-tight">
+                                    Analytics
+                                </h1>
+                                <p className="text-slate-500 mt-2">
+                                    Track your link performance over the last 30 days.
+                                </p>
+                            </div>
+                        </div>
+                        <LockedPreview />
+                    </div>
                 </main>
             </div>
         );
@@ -287,7 +313,7 @@ export default function AnalyticsPage() {
         <div className="flex flex-col h-[100dvh] overflow-hidden bg-slate-50">
             <TopNavbar />
             <main className="flex-1 flex flex-col w-full overflow-y-auto overflow-x-hidden">
-                <div className="w-full max-w-7xl mx-auto px-6 py-12">
+                <div className="w-full px-6 lg:px-12 py-12">
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
                         Analytics
@@ -345,9 +371,10 @@ function FullDashboard({
             >
                 <motion.div
                     variants={cardVariants}
-                    className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6"
+                    className="relative group rounded-3xl border border-slate-200/60 bg-white/70 backdrop-blur-xl shadow-sm hover:shadow-xl transition-all duration-300 p-6 overflow-hidden"
                 >
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="relative z-10 flex items-center justify-between mb-4">
                         <span className="text-sm font-medium text-slate-500">
                             Total Clicks
                         </span>
@@ -360,9 +387,10 @@ function FullDashboard({
 
                 <motion.div
                     variants={cardVariants}
-                    className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6"
+                    className="relative group rounded-3xl border border-slate-200/60 bg-white/70 backdrop-blur-xl shadow-sm hover:shadow-xl transition-all duration-300 p-6 overflow-hidden"
                 >
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="relative z-10 flex items-center justify-between mb-4">
                         <span className="text-sm font-medium text-slate-500">
                             Active Links
                         </span>
@@ -375,9 +403,10 @@ function FullDashboard({
 
                 <motion.div
                     variants={cardVariants}
-                    className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6"
+                    className="relative group rounded-3xl border border-slate-200/60 bg-white/70 backdrop-blur-xl shadow-sm hover:shadow-xl transition-all duration-300 p-6 overflow-hidden"
                 >
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="absolute inset-0 bg-gradient-to-br from-amber-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="relative z-10 flex items-center justify-between mb-4">
                         <span className="text-sm font-medium text-slate-500">
                             Top Performer
                         </span>
@@ -403,7 +432,7 @@ function FullDashboard({
                 variants={cardVariants}
                 initial="hidden"
                 animate="visible"
-                className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 mb-8"
+                className="relative rounded-3xl border border-slate-200/60 bg-white/70 backdrop-blur-xl shadow-sm p-8 mb-8"
             >
                 <div className="flex items-center justify-between mb-6">
                     <h2 className="text-lg font-semibold text-slate-900">
@@ -441,10 +470,10 @@ function FullDashboard({
                                         )}
                                         <div
                                             className={cn(
-                                                "w-full rounded-t-sm transition-all duration-200",
+                                                "w-full rounded-t-sm transition-all duration-300 ease-out",
                                                 hoveredBar === i
-                                                    ? "bg-slate-700"
-                                                    : "bg-slate-900"
+                                                    ? "bg-gradient-to-t from-slate-600 to-slate-400 shadow-[0_0_15px_rgba(148,163,184,0.5)]"
+                                                    : "bg-gradient-to-t from-slate-800 to-slate-900"
                                             )}
                                             style={{
                                                 height: `${Math.max(heightPercent, day.clicks > 0 ? 4 : 1)}%`,
@@ -579,6 +608,19 @@ function FullDashboard({
                         </h3>
                     </div>
                     <BreakdownBars data={data.browsers} />
+                </motion.div>
+
+                <motion.div
+                    variants={cardVariants}
+                    className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6"
+                >
+                    <div className="flex items-center gap-2 mb-4">
+                        <Monitor className="h-4 w-4 text-slate-400" />
+                        <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
+                            Operating Systems
+                        </h3>
+                    </div>
+                    <BreakdownBars data={data.os} />
                 </motion.div>
 
                 <motion.div

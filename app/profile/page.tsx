@@ -10,6 +10,7 @@ import {
 } from "@/lib/firebase/user-profile";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Loader2 } from "lucide-react";
+import { UserAvatar } from "@/components/shared/UserAvatar";
 
 export default function ProfilePage() {
     const [user, setUser] = useState<User | null>(null);
@@ -122,13 +123,7 @@ export default function ProfilePage() {
                 <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6 sm:p-8">
                     <div className="flex items-center gap-6 mb-8 pb-8 border-b border-slate-100">
                         <div className="h-24 w-24 rounded-full overflow-hidden border border-slate-200 shadow-sm bg-slate-100 flex items-center justify-center">
-                            {user.photoURL ? (
-                                <img src={user.photoURL} alt="Avatar" className="h-full w-full object-cover" />
-                            ) : (
-                                <span className="text-3xl font-medium text-slate-400">
-                                    {displayName.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
-                                </span>
-                            )}
+                            <UserAvatar user={user} className="h-full w-full object-cover text-3xl font-medium" />
                         </div>
                         <div>
                             <p className="text-lg font-semibold text-slate-900">{displayName}</p>

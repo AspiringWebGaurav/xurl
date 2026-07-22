@@ -93,7 +93,7 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
             const requestHeaders = new Headers(request.headers);
             requestHeaders.set('x-is-mobile-device', 'true');
             
-            const hasMobileRoute = pathname === '/' || pathname === '/login' || pathname.startsWith('/dashboard') || pathname === '/pricing';
+            const hasMobileRoute = pathname === '/' || pathname === '/login' || pathname.startsWith('/dashboard') || pathname === '/pricing' || pathname === '/analytics';
             
             if (hasMobileRoute) {
                 let mobilePathname = pathname === '/' ? '' : pathname;

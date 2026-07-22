@@ -26,7 +26,7 @@ function getTodayDateString(): string {
     return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
 }
 
-function parseUserAgent(ua: string): { device: string; browser: string } {
+function parseUserAgent(ua: string): { device: string; browser: string; os: string } {
     // Lightweight parsing — avoids heavy dependencies
     let device = "desktop";
     if (/Mobile|Android/i.test(ua)) device = "mobile";
@@ -38,7 +38,14 @@ function parseUserAgent(ua: string): { device: string; browser: string } {
     else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = "safari";
     else if (/Edg/i.test(ua)) browser = "edge";
 
-    return { device, browser };
+    let os = "other";
+    if (/Windows NT/i.test(ua)) os = "windows";
+    else if (/Mac OS X/i.test(ua) && !/iPhone|iPad|iPod/i.test(ua)) os = "macos";
+    else if (/iPhone|iPad|iPod/i.test(ua)) os = "ios";
+    else if (/Android/i.test(ua)) os = "android";
+    else if (/Linux/i.test(ua) && !/Android/i.test(ua)) os = "linux";
+
+    return { device, browser, os };
 }
 
 // ─── Record Click ───────────────────────────────────────────────────────────
@@ -63,7 +70,7 @@ export async function recordClick(
         const today = getTodayDateString();
         const dailyDocId = `${slug}_${today}`;
         const dailyRef = adminDb.collection("analytics").doc(dailyDocId);
-        const { device, browser } = parseUserAgent(metadata.userAgent || "");
+        const { device, browser, os } = parseUserAgent(metadata.userAgent || "");
 
         // 1) Increment total clicks on the link document
         await adminDb.collection("links").doc(slug).update({
@@ -88,6 +95,7 @@ export async function recordClick(
         }
         updates[`devices.${device}`] = FieldValue.increment(1);
         updates[`browsers.${browser}`] = FieldValue.increment(1);
+        updates[`os.${os}`] = FieldValue.increment(1);
 
         await dailyRef.set(updates, { merge: true });
     } catch (error) {
