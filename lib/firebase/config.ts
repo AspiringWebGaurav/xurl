@@ -18,4 +18,9 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+if (typeof window !== "undefined") {
+    // @ts-ignore
+    window.__FIREBASE_AUTH = auth;
+}
+
 export { app, auth, db };
