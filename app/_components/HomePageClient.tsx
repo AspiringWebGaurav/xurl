@@ -108,7 +108,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                         <h1 className="text-[42px] font-extrabold leading-[1.1] tracking-[-0.05em] sm:text-[52px] bg-clip-text text-transparent bg-gradient-to-br from-slate-900 via-slate-800 to-slate-500 pb-1">
                             Shorten your URL
                         </h1>
-                        <p className="mx-auto mt-4 max-w-[34rem] text-[15px] leading-relaxed text-slate-500 font-medium sm:text-[17px]">
+                        <p className="mx-auto mt-3 max-w-[34rem] text-[15px] leading-6 text-slate-500 font-medium sm:text-[17px]">
                             Turn long URLs into clean, shareable links with optional custom aliases in a few quick steps.
                         </p>
                         {!authLoading && (
@@ -226,14 +226,14 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                         </>
                                     )
                                 ) : (
-                                    <Link href="/guest-policy" target="_blank" className="group relative overflow-hidden flex items-center px-5 py-2 rounded-full bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 text-amber-700 hover:border-amber-300 hover:shadow-[0_8px_24px_-12px_rgba(217,119,6,0.5)] hover:-translate-y-0.5 transition-all duration-300 text-[13px] font-bold tracking-wide cursor-pointer">
+                                    <Link href="/guest-policy" target="_blank" className="group relative overflow-hidden flex items-center px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 text-amber-700 hover:border-amber-300 hover:shadow-[0_8px_24px_-12px_rgba(217,119,6,0.5)] hover:-translate-y-0.5 transition-all duration-300 text-xs font-bold tracking-wide cursor-pointer">
                                         <div className="absolute inset-0 bg-gradient-to-r from-amber-400/0 via-amber-400/10 to-orange-400/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-md"></div>
-                                        <Lock className="w-4 h-4 mr-2 text-amber-500 group-hover:text-amber-600 transition-colors relative z-10" />
+                                        <Lock className="w-3.5 h-3.5 mr-1.5 text-amber-500 group-hover:text-amber-600 transition-colors relative z-10" />
                                         <span className="relative z-10">1 free link for no login policy</span>
-                                        <span className="mx-2 text-amber-300/80 relative z-10">|</span>
-                                        <Clock className="w-4 h-4 mr-1.5 text-amber-500 group-hover:text-amber-600 transition-colors relative z-10" />
+                                        <span className="mx-2 text-amber-300/80 relative z-10">—</span>
+                                        <Clock className="w-3.5 h-3.5 mr-1.5 text-amber-500 group-hover:text-amber-600 transition-colors relative z-10" />
                                         <span className="relative z-10">Expires in 5m</span>
-                                        <ArrowRight className="w-4 h-4 ml-2 text-amber-400 group-hover:text-amber-600 group-hover:translate-x-1 transition-all relative z-10" />
+                                        <ArrowRight className="w-3.5 h-3.5 ml-1.5 text-amber-400 group-hover:text-amber-600 group-hover:translate-x-1 transition-all relative z-10" />
                                     </Link>
                                 )}
                             </div>
