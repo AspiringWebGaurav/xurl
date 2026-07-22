@@ -108,9 +108,53 @@ export function MobileFooter() {
                 .footer-col:nth-child(3) { animation-delay: 0.16s; }
             `}</style>
 
-            <footer ref={footerRef} className="shrink-0 border-t border-border bg-background mt-auto pb-[env(safe-area-inset-bottom)]">
-                {/* ── Minimal row (always visible) ── */}
-                <div className="relative flex w-full items-center justify-center px-4 py-4 min-h-[56px] text-[11px] text-muted-foreground">
+            <footer ref={footerRef} className="shrink-0 border-t border-border bg-background mt-auto pb-[env(safe-area-inset-bottom)] relative z-50">
+                {/* ── Expandable section (Bottom Drawer) ── */}
+                <div
+                    className={cn(
+                        "absolute bottom-full left-0 w-full bg-background transition-all duration-300 ease-out overflow-y-auto rounded-t-3xl shadow-[0_-20px_50px_-15px_rgba(0,0,0,0.2)]",
+                        expanded ? "max-h-[75vh] opacity-100 border-t border-x border-border" : "max-h-0 opacity-0 border-transparent"
+                    )}
+                    aria-hidden={!expanded}
+                >
+                    <div className="w-full px-5 py-8">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-8">
+                            {footerColumns.map((col) => (
+                                <div
+                                    key={col.label}
+                                    className={cn(
+                                        "footer-col flex flex-col gap-3 text-xs",
+                                        !expanded && "animation-none"
+                                    )}
+                                >
+                                    <span className="text-[11px] font-bold uppercase tracking-widest text-foreground">
+                                        {col.label}
+                                    </span>
+                                    <span className="w-6 h-px bg-foreground/20 -mt-1 mb-0.5" aria-hidden="true" />
+                                    <div className="flex flex-col gap-2">
+                                        {col.links.map((link) => (
+                                            <Link
+                                                key={link.href}
+                                                href={link.href}
+                                                onClick={(e) => handleLinkClick(e, link.href)}
+                                                className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium no-underline"
+                                            >
+                                                {link.label}
+                                            </Link>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="mt-8 flex flex-col items-center border-t border-border pt-5 text-[10px] text-muted-foreground/50">
+                            <span>&copy; {new Date().getFullYear()} XURL. All rights reserved.</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── Minimal row (always visible at absolute bottom) ── */}
+                <div className="relative flex w-full items-center justify-center px-4 py-4 min-h-[56px] text-[11px] text-muted-foreground bg-background">
                     
                     {/* Left — logo */}
                     <div className="absolute left-2 flex items-center gap-2 opacity-80 transition-opacity hover:opacity-100">
@@ -156,52 +200,6 @@ export function MobileFooter() {
                                 <ChevronUp className="h-full w-full" />
                             </span>
                         </button>
-                    </div>
-                </div>
-
-                {/* ── Expandable section ── */}
-                <div
-                    className={cn(
-                        "transition-all duration-300 ease-out overflow-hidden",
-                        expanded ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
-                    )}
-                    aria-hidden={!expanded}
-                >
-                    <div className="border-t border-border">
-                        <div className="w-full px-5 py-8">
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-8">
-                                {footerColumns.map((col) => (
-                                    <div
-                                        key={col.label}
-                                        className={cn(
-                                            "footer-col flex flex-col gap-3 text-xs",
-                                            !expanded && "animation-none"
-                                        )}
-                                    >
-                                        <span className="text-[11px] font-bold uppercase tracking-widest text-foreground">
-                                            {col.label}
-                                        </span>
-                                        <span className="w-6 h-px bg-foreground/20 -mt-1 mb-0.5" aria-hidden="true" />
-                                        <div className="flex flex-col gap-2">
-                                            {col.links.map((link) => (
-                                                <Link
-                                                    key={link.href}
-                                                    href={link.href}
-                                                    onClick={(e) => handleLinkClick(e, link.href)}
-                                                    className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium no-underline"
-                                                >
-                                                    {link.label}
-                                                </Link>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="mt-8 flex flex-col items-center border-t border-border pt-5 text-[10px] text-muted-foreground/50">
-                                <span>&copy; {new Date().getFullYear()} XURL. All rights reserved.</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </footer>

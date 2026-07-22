@@ -139,13 +139,14 @@ const containerVariants: Variants = {
 };
 
 const cardVariants: Variants = {
-    hidden: { opacity: 0, y: 12 },
+    hidden: { opacity: 0, y: 20 },
     visible: {
         opacity: 1,
         y: 0,
         transition: {
-            duration: 0.42,
-            ease: "easeOut",
+            type: "spring",
+            stiffness: 280,
+            damping: 18,
         },
     },
 };
@@ -350,14 +351,19 @@ export default function PricingPage() {
 
     return (
         <div id="pricing-root" className="h-[100dvh] bg-slate-50 flex flex-col relative overflow-x-hidden overflow-y-auto">
+            {/* Background glow effects */}
+            <div className="absolute top-[-5%] right-[-10%] w-[60%] h-[40%] bg-fuchsia-500/20 rounded-full blur-[100px] pointer-events-none" />
+            <div className="absolute bottom-[20%] left-[-10%] w-[50%] h-[30%] bg-amber-500/20 rounded-full blur-[100px] pointer-events-none" />
+            <div className="absolute top-[40%] left-[20%] w-[40%] h-[40%] bg-cyan-500/15 rounded-full blur-[100px] pointer-events-none" />
+
             <Suspense fallback={null}>
                 <SearchParamsReader onPlan={setFocusPlan} />
             </Suspense>
             <TopNavbar />
 
             <main className="flex-1 py-10 px-6 lg:px-8 flex flex-col items-center z-10">
-                <div className="text-center max-w-3xl mb-8 relative">
-                    <h1 className="mb-3 text-[36px] font-extrabold tracking-[-0.055em] text-slate-900 sm:text-[46px]">
+                <div className="text-center max-w-3xl mb-8 relative z-10">
+                    <h1 className="mb-3 text-[36px] font-extrabold tracking-[-0.055em] sm:text-[46px] bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent pb-2">
                         Simple, transparent pricing
                     </h1>
                     <p className="mx-auto max-w-2xl text-base leading-7 text-slate-600">

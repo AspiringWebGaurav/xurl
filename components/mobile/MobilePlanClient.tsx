@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
@@ -13,7 +13,6 @@ import { MobileFooter } from "@/components/mobile/MobileFooter";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Check, ChevronLeft, ShieldCheck, Zap } from "lucide-react";
 import { PLAN_CONFIGS, PAID_PLAN_ORDER, PlanType } from "@/lib/plans";
-import useSWR from "swr";
 import { formatTTLToText } from "@/lib/utils/format-time";
 
 type Currency = "INR" | "USD" | "EUR";
@@ -36,43 +35,20 @@ function formatTtl(ttlMs: number): string {
     return `Expires in ${hours} hour${hours > 1 ? "s" : ""}`;
 }
 
-/* ── Cinematic scroll helper ── */
-function easeInOutCubic(t: number): number {
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
 
-function cinematicScroll(el: HTMLElement, targetValue: number, duration: number, isHorizontal: boolean) {
-    const startValue = isHorizontal ? el.scrollLeft : el.scrollTop;
-    const distance = targetValue - startValue;
-    let startTime: number | null = null;
-
-    function step(timestamp: number) {
-        if (!startTime) startTime = timestamp;
-        const elapsed = timestamp - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        const eased = easeInOutCubic(progress);
-        if (isHorizontal) {
-            el.scrollLeft = startValue + distance * eased;
-        } else {
-            el.scrollTop = startValue + distance * eased;
-        }
-        if (progress < 1) requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
-}
 
 export default function MobilePlanClient() {
     const [currency, setCurrency] = useState<Currency>("INR");
     const [rates, setRates] = useState<Record<Currency, number>>(defaultExchangeRates);
     const [user, setUser] = useState<User | null>(null);
     const [currentPlan, setCurrentPlan] = useState<string>("free");
+    const [isSnapping, setIsSnapping] = useState(true);
     
-    const { data: configData } = useSWR("/api/config/public", (url) => fetch(url).then(r => r.json()));
-    
-    const computedPlans = configData?.computedPlans || PLAN_CONFIGS;
-    const freeTTL = computedPlans.free?.ttlMs ? formatTTLToText(computedPlans.free.ttlMs) : "10 minutes";
-    const guestTTL = computedPlans.guest?.ttlMs ? formatTTLToText(computedPlans.guest.ttlMs) : "5 minutes";
-    
+    const [dynamicTiers, setDynamicTiers] = useState<any[]>([]);
+    const [freeTTL, setFreeTTL] = useState("10 minutes");
+    const [guestTTL, setGuestTTL] = useState("5 minutes");
+    const [activeOffer, setActiveOffer] = useState<any>(null);
+
     const PLAN_UI_META: Record<string, { description: string; features: string[]; ctaText: string; comparisonHint?: string }> = {
         starter: { description: "Personal use", features: ["Login required", "Custom aliases", "Analytics Dashboard"], ctaText: "Start" },
         pro: { description: "For power users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Priority support"], ctaText: "Go Pro" },
@@ -81,22 +57,63 @@ export default function MobilePlanClient() {
         bigenterprise: { description: "Maximum scale", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "Dedicated account manager"], ctaText: "Go Big" },
     };
 
-    const tiers = PAID_PLAN_ORDER.map((planId: PlanType) => {
-        const cfg = computedPlans[planId] || PLAN_CONFIGS[planId];
-        const ui = PLAN_UI_META[planId] || { description: "", features: [], ctaText: cfg.label };
-        return {
-            name: cfg.label,
-            planId,
-            description: ui.description,
-            priceINR: cfg.priceINR,
-            links: `${cfg.limit} links`,
-            expiry: formatTtl(cfg.ttlMs),
-            isPopular: cfg.badge === "MOST_POPULAR",
-            features: ui.features,
-            ctaText: ui.ctaText,
-            comparisonHint: ui.comparisonHint,
-        };
-    });
+    useEffect(() => {
+        let mounted = true;
+        // cache-busting to ensure we always get fresh config like desktop
+        fetch(`/api/config/public?_t=${Date.now()}`, { cache: 'no-store' })
+            .then(res => res.json())
+            .then(data => {
+                if (!mounted) return;
+                const config = data?.config;
+                const computedPlans = data?.computedPlans || PLAN_CONFIGS;
+                
+                if (computedPlans.free?.ttlMs) setFreeTTL(formatTTLToText(computedPlans.free.ttlMs));
+                if (computedPlans.guest?.ttlMs) setGuestTTL(formatTTLToText(computedPlans.guest.ttlMs));
+
+                let best = null;
+                if (config?.offers) {
+                    const now = Date.now();
+                    const validOffers = config.offers.filter((o: any) => o.isActive && (!o.expiresAt || o.expiresAt > now));
+                    const proxyPrice = computedPlans.business?.priceINR ?? PLAN_CONFIGS.business.priceINR;
+                    let maxD = 0;
+                    for (const o of validOffers) {
+                        const d = o.type === "percentage" ? proxyPrice * (o.value / 100) : o.value;
+                        if (d > maxD) { maxD = d; best = o; }
+                    }
+                }
+                setActiveOffer(best);
+
+                const generatedTiers = PAID_PLAN_ORDER.map((planId: PlanType) => {
+                    const cfg = computedPlans[planId] || PLAN_CONFIGS[planId];
+                    const ui = PLAN_UI_META[planId] || { description: "", features: [], ctaText: cfg.label };
+                    const activePrice = cfg.priceINR;
+                    let discountedPrice = activePrice;
+                    if (best) {
+                        if (best.type === "percentage") {
+                            discountedPrice = Math.max(0, activePrice * (1 - best.value / 100));
+                        } else if (best.type === "flat") {
+                            discountedPrice = Math.max(0, activePrice - best.value);
+                        }
+                    }
+                    return {
+                        name: cfg.label,
+                        planId,
+                        description: ui.description,
+                        priceINR: discountedPrice,
+                        originalPriceINR: activePrice !== discountedPrice ? activePrice : undefined,
+                        links: `${cfg.limit} links`,
+                        expiry: formatTtl(cfg.ttlMs),
+                        isPopular: cfg.badge === "MOST_POPULAR",
+                        features: ui.features,
+                        ctaText: ui.ctaText,
+                        comparisonHint: ui.comparisonHint,
+                    };
+                });
+                setDynamicTiers(generatedTiers);
+            })
+            .catch(console.error);
+        return () => { mounted = false; };
+    }, []);
 
     const FREE_FEATURES = [
         "1 link for Guests",
@@ -111,40 +128,45 @@ export default function MobilePlanClient() {
     const scrollRef = useRef<HTMLDivElement>(null);
     const horizontalScrollRef = useRef<HTMLDivElement>(null);
 
-    /* ── Cinematic intro scroll and swipe hint (every page visit) ── */
+    /* ── Native cinematic intro scroll and swipe hint ── */
     useEffect(() => {
-        const timer = setTimeout(() => {
+        if (dynamicTiers.length === 0) return; // Wait until plans are actually loaded
+
+        let active = true;
+        const sequence = async () => {
             if (!scrollRef.current || !horizontalScrollRef.current) return;
             
-            if (horizontalScrollRef.current) {
-                // Scroll down so the cards and currency selector are fully in view
-                cinematicScroll(scrollRef.current, horizontalScrollRef.current.offsetTop - 80, 1200, false);
-            }
+            // 1. Wait a moment for layout to settle
+            await new Promise(r => setTimeout(r, 600));
+            if (!active) return;
+            
+            // 2. Scroll down to focus on cards (scroll up effect so cards are at the top)
+            horizontalScrollRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            await new Promise(r => setTimeout(r, 800));
+            if (!active) return;
+            
+            // 3. Disable snapping so the horizontal scroll animation doesn't fight the snap points
+            setIsSnapping(false);
+            await new Promise(r => setTimeout(r, 100)); // wait for React render
+            if (!active || !horizontalScrollRef.current) return;
+            
+            // 4. Scroll right to show it's swipeable
+            horizontalScrollRef.current.scrollTo({ left: 120, behavior: 'smooth' });
+            await new Promise(r => setTimeout(r, 600));
+            if (!active || !horizontalScrollRef.current) return;
+            
+            // 5. Scroll back left
+            horizontalScrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+            await new Promise(r => setTimeout(r, 600));
+            if (!active) return;
+            
+            // 6. Re-enable snapping for the user
+            setIsSnapping(true);
+        };
 
-            setTimeout(() => {
-                if (!horizontalScrollRef.current) return;
-                
-                const originalClasses = horizontalScrollRef.current.className;
-                horizontalScrollRef.current.classList.remove('snap-mandatory');
-                horizontalScrollRef.current.classList.remove('snap-x');
-                
-                cinematicScroll(horizontalScrollRef.current, 80, 800, true);
-                
-                setTimeout(() => {
-                    if (!horizontalScrollRef.current) return;
-                    cinematicScroll(horizontalScrollRef.current, 0, 800, true);
-                    
-                    setTimeout(() => {
-                        if (horizontalScrollRef.current) {
-                            horizontalScrollRef.current.className = originalClasses;
-                        }
-                    }, 850);
-                }, 1000);
-            }, 800);
-        }, 700);
-
-        return () => clearTimeout(timer);
-    }, []);
+        sequence();
+        return () => { active = false; };
+    }, [dynamicTiers.length]);
 
 
     useEffect(() => {
@@ -197,8 +219,10 @@ export default function MobilePlanClient() {
 
     const formatPrice = (priceINR: number) => {
         const converted = priceINR * rates[currency];
-        if (currency === "INR") return converted.toString();
-        return Number(converted.toFixed(1)).toString();
+        if (Number.isInteger(converted)) {
+            return converted.toString();
+        }
+        return converted.toFixed(2);
     };
 
     const handleUpgrade = (tierPlanId: string) => {
@@ -208,14 +232,15 @@ export default function MobilePlanClient() {
     return (
         <div className="flex flex-col flex-1 overflow-hidden bg-slate-50 dark:bg-slate-950 relative">
             {/* Background glow effects */}
-            <div className="absolute top-[-5%] right-[-10%] w-[50%] h-[30%] bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute bottom-[-5%] left-[-10%] w-[50%] h-[30%] bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute top-[-5%] right-[-10%] w-[60%] h-[40%] bg-fuchsia-500/25 rounded-full blur-[100px] pointer-events-none" />
+            <div className="absolute bottom-[20%] left-[-10%] w-[50%] h-[30%] bg-amber-500/25 rounded-full blur-[100px] pointer-events-none" />
+            <div className="absolute top-[40%] left-[20%] w-[40%] h-[40%] bg-cyan-500/20 rounded-full blur-[100px] pointer-events-none" />
             
             <TopNavbar />
 
             <div className="flex-1 overflow-y-auto" ref={scrollRef}>
-                <div className="px-6 pt-8 pb-4 text-center">
-                    <h2 id="mobile-pricing-title" className="text-3xl font-extrabold tracking-tight text-foreground mb-2">
+                <div className="px-6 pt-8 pb-4 text-center relative z-10">
+                    <h2 id="mobile-pricing-title" className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent mb-2 pb-1">
                         Transparent Pricing
                     </h2>
                     <p className="text-sm text-muted-foreground">
@@ -240,7 +265,13 @@ export default function MobilePlanClient() {
                     </div>
                 </div>
 
-                <div ref={horizontalScrollRef} className="flex overflow-x-auto snap-x snap-mandatory px-6 pb-12 pt-4 gap-4 hide-scrollbar">
+                <div 
+                    ref={horizontalScrollRef} 
+                    className={cn(
+                        "flex overflow-x-auto px-6 pb-12 pt-4 gap-4 hide-scrollbar",
+                        isSnapping ? "snap-x snap-mandatory" : ""
+                    )}
+                >
                     {/* Free Plan */}
                     <div id="plan-free" className="snap-center shrink-0 w-[85vw] max-w-[320px] rounded-3xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl border border-white/20 p-6 shadow-xl flex flex-col relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-1 bg-slate-300" />
@@ -272,7 +303,7 @@ export default function MobilePlanClient() {
                     </div>
 
                     {/* Paid Plans */}
-                    {tiers.map(tier => {
+                    {dynamicTiers.map(tier => {
                         const isFocused = focusPlan === tier.planId;
                         return (
                             <div key={tier.planId} id={`plan-${tier.planId}`} className={cn(
@@ -292,13 +323,31 @@ export default function MobilePlanClient() {
                                 {!tier.isPopular && <div className="absolute top-0 left-0 w-full h-1 bg-slate-300" />}
 
                                 <div className={cn("mb-4", tier.isPopular ? "mt-4" : "")}>
+                                    {activeOffer && tier.originalPriceINR !== undefined && (
+                                        <div className="mb-2 inline-block rounded-full bg-gradient-to-r from-violet-600 via-fuchsia-600 to-orange-500 px-2.5 py-0.5 text-[10px] font-black tracking-wide text-white shadow-[0_0_15px_-3px_rgba(217,70,239,0.5)] animate-pulse">
+                                            🎪 {activeOffer.name} — {activeOffer.type === 'percentage' ? `${activeOffer.value}% OFF` : `₹${activeOffer.value} OFF`}
+                                        </div>
+                                    )}
                                     <h3 className="text-2xl font-bold mb-1">{tier.name}</h3>
                                     <p className="text-xs text-muted-foreground min-h-[32px]">{tier.description}</p>
                                 </div>
-                                <div className="mb-6 flex items-baseline gap-1">
-                                    <span className="text-xl font-bold">{currencySymbols[currency]}</span>
-                                    <span className="text-5xl font-extrabold tracking-tight">{formatPrice(tier.priceINR)}</span>
-                                    <span className="text-sm font-semibold text-muted-foreground ml-1">/mo</span>
+                                <div className="mb-6 flex flex-col gap-1.5">
+                                    {tier.originalPriceINR !== undefined && (
+                                        <div className="inline-block">
+                                            <span className="text-xl font-bold text-slate-400 line-through decoration-rose-500/80 decoration-[3px]">
+                                                {currencySymbols[currency]}{formatPrice(tier.originalPriceINR)}
+                                            </span>
+                                            <span className="ml-1 text-sm font-semibold text-slate-400 line-through decoration-rose-500/80 decoration-[3px]">/mo</span>
+                                        </div>
+                                    )}
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-xl font-bold">{currencySymbols[currency]}</span>
+                                        <span className={cn(
+                                            "text-5xl font-extrabold tracking-tight",
+                                            tier.originalPriceINR !== undefined ? "bg-gradient-to-br from-violet-600 via-fuchsia-600 to-orange-500 bg-clip-text text-transparent" : ""
+                                        )}>{formatPrice(tier.priceINR)}</span>
+                                        <span className="text-sm font-semibold text-muted-foreground ml-1">/mo</span>
+                                    </div>
                                 </div>
                                 <ul className="space-y-3 mb-6 flex-1">
                                     <li className="flex items-start gap-3">
@@ -309,7 +358,7 @@ export default function MobilePlanClient() {
                                         <Check className="mt-0.5 w-4 h-4 shrink-0 text-foreground" />
                                         <span className="text-sm font-medium">{tier.expiry}</span>
                                     </li>
-                                    {tier.features?.map((feat, idx) => (
+                                    {tier.features?.map((feat: string, idx: number) => (
                                         <li key={idx} className="flex items-start gap-3">
                                             <Check className="mt-0.5 w-4 h-4 shrink-0 text-emerald-500" />
                                             <span className="text-sm font-medium text-muted-foreground">{feat}</span>
@@ -344,7 +393,7 @@ export default function MobilePlanClient() {
 
             <MobileFooter />
             
-            <style jsx global>{`
+            <style dangerouslySetInnerHTML={{ __html: `
                 .hide-scrollbar::-webkit-scrollbar {
                     display: none;
                 }
@@ -352,7 +401,7 @@ export default function MobilePlanClient() {
                     -ms-overflow-style: none;
                     scrollbar-width: none;
                 }
-            `}</style>
+            `}} />
         </div>
     );
 }
