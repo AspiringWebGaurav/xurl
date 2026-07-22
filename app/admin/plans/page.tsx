@@ -28,6 +28,7 @@ export default function PlansConfigPage() {
     // We maintain a local copy of config for editing, which syncs with remote data when loaded
     const [localConfig, setLocalConfig] = useState<DynamicConfig | null>(null);
     const [saving, setSaving] = useState(false);
+    const [syncing, setSyncing] = useState(false);
     const [message, setMessage] = useState("");
 
     // Sync remote data to local state when it loads
@@ -52,8 +53,28 @@ export default function PlansConfigPage() {
             });
             
             if (res.ok) {
-                setMessage("Plans configuration saved successfully!");
+                setMessage("Plans configuration saved successfully! Synchronizing system TTLs...");
                 mutate(localConfig || undefined); // Update SWR cache locally
+                
+                // Trigger background TTL sync
+                setSyncing(true);
+                try {
+                    const syncRes = await fetch("/api/admin/sync-ttl", {
+                        method: "POST",
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    const syncData = await syncRes.json();
+                    if (syncRes.ok) {
+                        setMessage(`Plans configuration saved! ${syncData.message}`);
+                    } else {
+                        setMessage("Configuration saved, but TTL sync encountered an error.");
+                    }
+                } catch (e) {
+                    console.error(e);
+                    setMessage("Configuration saved, but TTL sync failed.");
+                } finally {
+                    setSyncing(false);
+                }
             } else {
                 setMessage("Failed to save configuration.");
             }
@@ -90,9 +111,9 @@ export default function PlansConfigPage() {
                     <h1 className="text-2xl font-bold tracking-tight text-slate-900">Plan Configuration</h1>
                     <p className="text-sm text-slate-500">Dynamically override base prices and limits for all plans.</p>
                 </div>
-                <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
-                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                    Save Changes
+                <Button onClick={handleSave} disabled={saving || syncing} className="bg-emerald-600 hover:bg-emerald-700">
+                    {(saving || syncing) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    {syncing ? "Syncing TTLs..." : saving ? "Saving..." : "Save Changes"}
                 </Button>
             </div>
 

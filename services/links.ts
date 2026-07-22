@@ -242,8 +242,17 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                 let paidActiveCount = 0;
                 linksSnap.forEach((doc) => {
                     const data = doc.data() as LinkDocument;
-                    // Simply verify the link hasn't implicitly passed its TTL yet
-                    if (!data.expiresAt || data.expiresAt > now) {
+                    let expiresAt = data.expiresAt;
+                    
+                    if (data.createdUnderPlan) {
+                        const planConfig = computedPlans[data.createdUnderPlan as keyof typeof computedPlans];
+                        if (planConfig && planConfig.ttlMs) {
+                            expiresAt = data.createdAt + planConfig.ttlMs;
+                        }
+                    }
+
+                    // Verify the link hasn't implicitly passed its dynamic TTL yet
+                    if (!expiresAt || expiresAt > now) {
                         if (data.createdUnderPlan === "free") freeActiveCount++;
                         else if (data.createdUnderPlan !== "guest") paidActiveCount++;
                     }

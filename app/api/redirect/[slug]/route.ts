@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { getRedirectCache, setRedirectCache, setNegCacheRedis } from "@/lib/redis/redirect-cache";
 import { evaluateRequest } from "@/lib/redis/protection";
 import crypto from "crypto";
+import { getAllComputedPlanConfigs } from "@/lib/services/dynamic-config";
 
 export const runtime = "nodejs";
 
@@ -68,8 +69,17 @@ export async function GET(
 
         const data = docSnap.data()!;
         const originalUrl = data.originalUrl;
-        const expiresAt = data.expiresAt || null;
+        let expiresAt = data.expiresAt || null;
         const isActive = data.isActive !== false;
+
+        // Dynamic TTL Read-Time Evaluation
+        if (data.createdUnderPlan) {
+            const computedConfigs = await getAllComputedPlanConfigs();
+            const planConfig = computedConfigs[data.createdUnderPlan as keyof typeof computedConfigs];
+            if (planConfig && planConfig.ttlMs) {
+                expiresAt = data.createdAt + planConfig.ttlMs;
+            }
+        }
 
         const isExpired = expiresAt && expiresAt < Date.now();
         if (isActive && !isExpired) {
