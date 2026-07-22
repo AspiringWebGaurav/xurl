@@ -65,6 +65,7 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
         pathname === '/r' ||
         pathname === '/terms' ||
         pathname === '/privacy' ||
+        pathname === '/policy' ||
         pathname === '/acceptable-use' ||
         pathname === '/profile' ||
         pathname === '/purchase-history' ||

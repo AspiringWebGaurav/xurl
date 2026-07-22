@@ -106,6 +106,12 @@ service cloud.firestore {
       allow read, write: if false; // Admin SDK only
     }
 
+    // ─── Policies ─────────────────────────────────────────────────────
+    match /policies/{docId} {
+      allow read: if true; // Public read for legal pages
+      allow write: if isAdmin();
+    }
+
     // ─── Default deny ─────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
