@@ -258,8 +258,8 @@ export async function POST(request: NextRequest) {
             notes: appliedPromoCode
                 ? {
                     promoCode: appliedPromoCode,
-                    promoDiscountType: appliedPromoType,
-                    promoDiscountValue: String(appliedPromoValue),
+                    promoDiscountType: appliedPromoType ?? "",
+                    promoDiscountValue: String(appliedPromoValue ?? ""),
                 }
                 : undefined,
         });

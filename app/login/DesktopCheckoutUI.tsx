@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { PromoCodeSection } from "@/components/payments/PromoCodeSection";
 import { getExpiryDisplay } from "./shared";
 import { PLAN_CONFIGS, resolvePlanType } from "@/lib/plans";
-import { type ReturnType } from "typescript";
+
 import { useCheckout } from "./useCheckout";
 import Link from "next/link";
 
