@@ -119,11 +119,11 @@ export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps
                     transition={{ duration: 0.3, ease: "easeOut" }}
                     className={`w-full max-w-sm flex flex-col gap-4 mx-auto mt-8 mb-auto py-6`}
                 >
-                    <div className="text-center mb-1">
-                            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                    <div className="text-center mb-2">
+                            <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-slate-900 via-slate-800 to-slate-500 pb-1">
                                 Shorten your URL
                             </h1>
-                            <p className="mx-auto mt-1 text-xs text-muted-foreground/90">
+                            <p className="mx-auto mt-1.5 text-[13px] font-medium text-slate-500 leading-relaxed max-w-[260px]">
                                 Clean, shareable links in a tap.
                             </p>
                             {!authLoading && (
@@ -243,13 +243,14 @@ export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps
                                             </>
                                         )
                                     ) : (
-                                        <Link href="/guest-policy" target="_blank" className="group flex items-center px-4 py-1.5 rounded-full bg-amber-50/85 border border-amber-300/40 text-amber-700 hover:bg-amber-100/80 hover:border-amber-400/50 shadow-[0_10px_24px_-18px_rgba(217,119,6,0.4)] hover:shadow-[0_14px_32px_-20px_rgba(217,119,6,0.45)] hover:-translate-y-0.5 transition-all duration-300 text-xs font-semibold tracking-wide cursor-pointer">
-                                            <Lock className="w-3.5 h-3.5 mr-1.5 text-amber-600/80 group-hover:text-amber-700 transition-colors" />
-                                            <span>1 free link for no login policy</span>
-                                            <span className="mx-2 text-amber-300">—</span>
-                                            <Clock className="w-3.5 h-3.5 mr-1.5 text-amber-600/80 group-hover:text-amber-700 transition-colors" />
-                                            <span>Expires in 5m</span>
-                                            <ArrowRight className="w-3.5 h-3.5 ml-1.5 text-amber-500/80 group-hover:text-amber-700 group-hover:translate-x-0.5 transition-all" />
+                                        <Link href="/guest-policy" target="_blank" className="group relative overflow-hidden flex items-center px-5 py-2 rounded-full bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/60 text-amber-700 hover:border-amber-300 hover:shadow-[0_8px_24px_-12px_rgba(217,119,6,0.5)] hover:-translate-y-0.5 transition-all duration-300 text-[13px] font-bold tracking-wide cursor-pointer">
+                                            <div className="absolute inset-0 bg-gradient-to-r from-amber-400/0 via-amber-400/10 to-orange-400/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-md"></div>
+                                            <Lock className="w-4 h-4 mr-2 text-amber-500 group-hover:text-amber-600 transition-colors relative z-10" />
+                                            <span className="relative z-10">1 free link for no login policy</span>
+                                            <span className="mx-2 text-amber-300/80 relative z-10">|</span>
+                                            <Clock className="w-4 h-4 mr-1.5 text-amber-500 group-hover:text-amber-600 transition-colors relative z-10" />
+                                            <span className="relative z-10">Expires in 5m</span>
+                                            <ArrowRight className="w-4 h-4 ml-2 text-amber-400 group-hover:text-amber-600 group-hover:translate-x-1 transition-all relative z-10" />
                                         </Link>
                                     )}
                                 </div>
