@@ -29,7 +29,7 @@ function hashData(data: string, salt: string = ""): string {
 export async function checkGuestLimit(
     ip: string,
     fingerprint: string | undefined
-): Promise<{ allowed: boolean; expiresIn?: number; slug?: string; originalUrl?: string; createdAt?: number; isLifetimeLimitReached?: boolean; guestTtlMs?: number }> {
+): Promise<{ allowed: boolean; expiresIn?: number; slug?: string; originalUrl?: string; createdAt?: number; isLifetimeLimitReached?: boolean; guestTtlMs?: number; expiresAt?: number }> {
     const ipHash = hashData(ip);
     const fingerprintHash = fingerprint ? hashData(fingerprint) : null;
     const now = Date.now();
@@ -54,7 +54,8 @@ export async function checkGuestLimit(
             expiresIn,
             slug: data.slug,
             originalUrl: data.originalUrl,
-            createdAt: data.createdAt
+            createdAt: data.createdAt,
+            expiresAt: data.expiresAt
         };
     }
 
@@ -76,7 +77,8 @@ export async function checkGuestLimit(
                 expiresIn,
                 slug: data.slug,
                 originalUrl: data.originalUrl,
-                createdAt: data.createdAt
+                createdAt: data.createdAt,
+                expiresAt: data.expiresAt
             };
         }
     }

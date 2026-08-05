@@ -13,6 +13,7 @@ export interface GuestQuotaResult {
   createdAt?: number;
   isLifetimeLimitReached?: boolean;
   guestTtlMs?: number;
+  expiresAt?: number;
 }
 
 /**

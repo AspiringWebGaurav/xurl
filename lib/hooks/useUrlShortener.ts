@@ -412,13 +412,20 @@ export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
         if (!initialGuestStatus.allowed && initialGuestStatus.slug) {
             // Guest has already used their link
             setGuestUsed(true);
+
+            // ALWAYS update localStorage with the latest known state from the server check
+            // to ensure history is populated even if it's expired
+            const historyItem = {
+                slug: initialGuestStatus.slug,
+                originalUrl: initialGuestStatus.originalUrl || "",
+                createdAt: initialGuestStatus.createdAt || Date.now(),
+                expiresAt: initialGuestStatus.expiresAt || (Date.now() + (initialGuestStatus.expiresIn ? initialGuestStatus.expiresIn * 1000 : 0))
+            };
+            localStorage.setItem("xurl_guest_link_history_v2", JSON.stringify([historyItem]));
+
             if (initialGuestStatus.expiresIn && initialGuestStatus.expiresIn > 0) {
                 const expiresAt = Date.now() + (initialGuestStatus.expiresIn * 1000);
                 setGuestExpiresAt(expiresAt);
-                localStorage.setItem("xurl_guest_link_history", JSON.stringify({
-                    slug: initialGuestStatus.slug,
-                    expiresAt
-                }));
 
                 // Restore the success card data
                 setShortUrl(buildShortUrl(initialGuestStatus.slug));
@@ -647,6 +654,13 @@ export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
                 const newGuestExpiresAt = Date.now() + (5 * 60 * 1000);
                 setGuestUsed(true);
                 setGuestExpiresAt(newGuestExpiresAt);
+                
+                localStorage.setItem("xurl_guest_link_history_v2", JSON.stringify([{
+                    slug: data.slug,
+                    originalUrl: url.trim(),
+                    createdAt: Date.now(),
+                    expiresAt: newGuestExpiresAt
+                }]));
             } else {
                 // Refresh quota automatically with ALL fields including free plan counters
                 user.getIdToken().then(token => {

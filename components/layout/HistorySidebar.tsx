@@ -96,35 +96,29 @@ export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: Histo
                     });
                 } else {
                     setUserPlan("guest");
-                    const sessionId = await getOrCreateGuestSessionId();
-                    if (sessionId) {
-                        const q = query(
-                            collection(db, "links"),
-                            where("guestSessionId", "==", sessionId),
-                            where("userId", "==", "anonymous")
-                        );
-                        
-                        unsub = onSnapshot(q, (snapshot) => {
-                            const newLinks = snapshot.docs.map(doc => ({
-                                slug: doc.id,
-                                originalUrl: doc.data().originalUrl,
-                                createdAt: doc.data().createdAt,
-                                expiresAt: doc.data().expiresAt
-                            }));
-                            // Sort locally since we don't have a composite index for guestSessionId + createdAt
-                            newLinks.sort((a, b) => b.createdAt - a.createdAt);
-                            setLinks(newLinks);
-                            onLinksChange?.(newLinks.length);
-                            setLoading(false);
-                        }, (err) => {
-                            console.error("Guest history sync error:", err);
-                            setLoading(false);
-                        });
-                    } else {
+                    
+                    // Use localStorage for guest history to avoid Firebase reads
+                    try {
+                        const rawHistory = localStorage.getItem("xurl_guest_link_history_v2");
+                        if (rawHistory) {
+                            const parsed = JSON.parse(rawHistory);
+                            if (Array.isArray(parsed) && parsed.length > 0) {
+                                setLinks(parsed);
+                                onLinksChange?.(parsed.length);
+                            } else {
+                                setLinks([]);
+                                onLinksChange?.(0);
+                            }
+                        } else {
+                            setLinks([]);
+                            onLinksChange?.(0);
+                        }
+                    } catch (e) {
+                        console.error("Guest history parse error:", e);
                         setLinks([]);
                         onLinksChange?.(0);
-                        setLoading(false);
                     }
+                    setLoading(false);
                 }
             } catch (e) {
                 console.error("Failed to setup history sync:", e);

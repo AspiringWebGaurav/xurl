@@ -10,25 +10,16 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
-
 # next.js
 /.next/
 /out/
+next-env.d.ts
 
 # production
 /build
 
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
+# typescript
+*.tsbuildinfo
 
 # local env files
 .env*.local
@@ -41,25 +32,23 @@ yarn-error.log*
 # vercel
 .vercel
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
 # IDEs
 .idea
 .vscode/
 *.swp
 *.swo
 
-# MacOS
+# OS metadata
 .DS_Store
+Thumbs.db
 
-# Logs
+# Logs & Debug
 logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
 lerna-debug.log*
 
 # Runtime data
@@ -83,6 +72,7 @@ ui-debug.log
 tmp/
 temp/
 *~
+*.pem
 
 # Project Specific
 scripts/
@@ -96,15 +86,18 @@ screenshot/
 db-backup-pre-purge.json
 *.json.backup
 
-# Testing
-test-results/
-playwright-report/
-blob-report/
-playwright/.cache/
 # Scratch scripts
 fix_*.js
 master_refactor*.js
 generate_hook.js
 rebuild_*.js
 inject_*.js
+
+# Testing
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+
 
