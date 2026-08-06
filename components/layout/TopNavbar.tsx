@@ -668,17 +668,30 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                         </span>
                     </Link>
                 ) : (
-                    <Link
-                        href="/app"
-                        className={cn(
-                            navActionBase,
-                            "gap-1.5 border border-emerald-400 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 shadow-[0_0_12px_rgba(16,185,129,0.35)] whitespace-nowrap transition-all active:scale-95"
+                    <>
+                        {pathname === "/pricing" && (
+                            <button
+                                onClick={() => window.dispatchEvent(new Event('replay-pricing-tour'))}
+                                className={cn(
+                                    navActionBase,
+                                    "hidden sm:flex gap-1.5 border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800 shadow-[0_0_12px_rgba(99,102,241,0.25)] whitespace-nowrap transition-all active:scale-95"
+                                )}
+                            >
+                                <span className="font-bold">▶ Play Tour</span>
+                            </button>
                         )}
-                    >
-                        <ArrowLeft className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline font-medium">Back to shortener</span>
-                        <span className="sm:hidden font-semibold">Home</span>
-                    </Link>
+                        <Link
+                            href="/app"
+                            className={cn(
+                                navActionBase,
+                                "gap-1.5 border border-emerald-400 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 shadow-[0_0_12px_rgba(16,185,129,0.35)] whitespace-nowrap transition-all active:scale-95"
+                            )}
+                        >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline font-medium">Back to shortener</span>
+                            <span className="sm:hidden font-semibold">Home</span>
+                        </Link>
+                    </>
                 )}
 
                 {/* Mobile Analytics Link */}

@@ -6,9 +6,10 @@ import { TopNavbar } from "@/components/layout/TopNavbar";
 import { TiltedCarousel } from "@/components/content/tilted-carousel";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ArrowRight, Link2, Loader2, Check } from "lucide-react";
+import { ArrowRight, Link2, Check } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PLAN_CONFIGS, PlanConfig } from "@/lib/plans";
+import { Logo } from "@/components/ui/Logo";
 
 // Hook to detect low-end devices and mobile screens
 function useDeviceCapabilities() {
@@ -145,11 +146,21 @@ export default function LandingPage() {
                         exit={{ opacity: 0 }}
                         className="fixed inset-0 z-[200] flex items-center justify-center bg-white/80 backdrop-blur-sm"
                     >
-                        <div className="flex flex-col items-center gap-4">
-                            <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
-                            <p className="text-sm font-medium text-slate-600 animate-pulse">
-                                Loading application...
-                            </p>
+                        <div className="flex flex-col items-center justify-center h-full">
+                            <motion.div
+                                animate={{ 
+                                    scale: [1, 1.05, 1],
+                                    opacity: [0.8, 1, 0.8]
+                                }}
+                                transition={{
+                                    duration: 1.5,
+                                    repeat: Infinity,
+                                    ease: "easeInOut"
+                                }}
+                                className="drop-shadow-lg"
+                            >
+                                <Logo size="lg" />
+                            </motion.div>
                         </div>
                     </motion.div>
                 )}

@@ -185,6 +185,7 @@ export default function PricingPage() {
     const [freeTtlMs, setFreeTtlMs] = useState<number | undefined>(undefined);
     const [guestTtlMs, setGuestTtlMs] = useState<number | undefined>(undefined);
     const [activeOffer, setActiveOffer] = useState<any>(null);
+    const [isTourRunning, setIsTourRunning] = useState(false);
 
     const router = useRouter();
     const [focusPlan, setFocusPlan] = useState<string | null>(null);
@@ -214,19 +215,102 @@ export default function PricingPage() {
         return () => { mounted = false; };
     }, []);
 
-    /* ── Cinematic intro scroll (every page visit) ── */
+    /* ── Automated Guided Tour ── */
     useEffect(() => {
-        const timer = setTimeout(() => {
+        if (typeof window === "undefined") return;
+
+        // Mobile Safe Guard
+        if (window.innerWidth <= 768) {
+            // Basic scroll intro for mobile
+            const timer = setTimeout(() => {
+                const root = document.getElementById("pricing-root");
+                const cardsEl = document.getElementById("pricing-cards-grid");
+                if (root && cardsEl) {
+                    const target = cardsEl.offsetTop - 9.5;
+                    if (target > 0) smoothScrollTo(root, target, 1400);
+                }
+            }, 700);
+            return () => clearTimeout(timer);
+        }
+
+        let tourAborted = false;
+        
+        const abortTour = () => {
+            if (tourAborted) return;
+            tourAborted = true;
+            setIsTourRunning(false);
+        };
+
+        const handleInteraction = () => {
+            abortTour();
+        };
+
+        window.addEventListener("wheel", handleInteraction, { passive: true });
+        window.addEventListener("touchmove", handleInteraction, { passive: true });
+        window.addEventListener("keydown", handleInteraction, { passive: true });
+
+        const runSequence = async () => {
+            if (tourAborted) return;
             const root = document.getElementById("pricing-root");
             const cardsEl = document.getElementById("pricing-cards-grid");
             if (!root || !cardsEl) return;
 
-            const target = cardsEl.offsetTop - 9.5;
-            if (target <= 0) return;
-            smoothScrollTo(root, target, 1400);
-        }, 700);
+            const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-        return () => clearTimeout(timer);
+            setIsTourRunning(true);
+
+            // 1. Scroll to Top Row
+            const targetRow1 = cardsEl.offsetTop - 30;
+            smoothScrollTo(root, targetRow1, 1000);
+            await sleep(1800);
+            if (tourAborted) return;
+
+            // 2. Scroll to Bottom Row
+            const entCard = document.getElementById("plan-business") || document.getElementById("plan-enterprise");
+            if (entCard) {
+                const targetRow2 = entCard.offsetTop - 30;
+                smoothScrollTo(root, targetRow2, 1000);
+                await sleep(1800);
+            }
+            if (tourAborted) return;
+
+            // 3. Scroll to Feature Comparison
+            const featureComp = document.getElementById("feature-comparison");
+            if (featureComp) {
+                const targetRow3 = featureComp.offsetTop - 30;
+                smoothScrollTo(root, targetRow3, 1000);
+                await sleep(1800);
+            }
+            if (tourAborted) return;
+
+            // 4. Scroll back to top
+            smoothScrollTo(root, 0, 1400);
+            await sleep(1400);
+
+            abortTour();
+        };
+
+        const handleManualReplay = () => {
+            tourAborted = false;
+            runSequence();
+        };
+
+        window.addEventListener("replay-pricing-tour", handleManualReplay);
+
+        // Auto-play on first load
+        const hasShownTour = sessionStorage.getItem('pricingTourShown');
+        if (!hasShownTour) {
+            sessionStorage.setItem('pricingTourShown', 'true');
+            setTimeout(runSequence, 1000);
+        }
+
+        return () => {
+            tourAborted = true;
+            window.removeEventListener("wheel", handleInteraction);
+            window.removeEventListener("touchmove", handleInteraction);
+            window.removeEventListener("keydown", handleInteraction);
+            window.removeEventListener("replay-pricing-tour", handleManualReplay);
+        };
     }, []);
 
     /* ── focusPlan scroll ── */
@@ -356,6 +440,29 @@ export default function PricingPage() {
             <div className="absolute bottom-[20%] left-[-10%] w-[50%] h-[30%] bg-amber-500/20 rounded-full blur-[100px] pointer-events-none" />
             <div className="absolute top-[40%] left-[20%] w-[40%] h-[40%] bg-cyan-500/15 rounded-full blur-[100px] pointer-events-none" />
 
+            {/* Automated Tour Indicator */}
+            <AnimatePresence>
+                {isTourRunning && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                        className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] pointer-events-none"
+                    >
+                        <div className="flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-slate-900/90 px-6 py-3 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.6)] backdrop-blur-xl border border-slate-700/60 ring-1 ring-white/10">
+                            <div className="flex items-center gap-3">
+                                <div className="relative flex h-3 w-3">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></span>
+                                </div>
+                                <span className="text-base font-bold tracking-tight text-white drop-shadow-md">Showing you our plans</span>
+                            </div>
+                            <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-300">Scroll to take control</span>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             <Suspense fallback={null}>
                 <SearchParamsReader onPlan={setFocusPlan} />
             </Suspense>
@@ -381,12 +488,15 @@ export default function PricingPage() {
                     <motion.div
                         id="plan-free"
                         variants={cardVariants}
-                        onMouseEnter={() => setIsFreeCardHovered(true)}
+                        onMouseEnter={() => {
+                            setIsFreeCardHovered(true);
+                            if (isTourRunning) setIsTourRunning(false);
+                        }}
                         onMouseLeave={() => setIsFreeCardHovered(false)}
                         className={cn(
                             cardBase,
                             "p-7 lg:p-6",
-                            "group-hover/cards:[&:not(:hover)]:opacity-95",
+                            "group-hover/cards:[&:not(:hover)]:opacity-95 transition-all duration-300",
                             focusPlan === "free"
                                 ? "border-amber-400 ring-2 ring-amber-400/45 shadow-[0_24px_56px_-32px_rgba(251,191,36,0.38)]"
                                 : "border-slate-200 hover:border-slate-300"
@@ -515,15 +625,16 @@ export default function PricingPage() {
                                 key={tier.planId}
                                 id={`plan-${tier.planId}`}
                                 variants={cardVariants}
+                                onMouseEnter={() => { if (isTourRunning) setIsTourRunning(false); }}
                                 className={cn(
                                     cardBase,
-                                    "group-hover/cards:[&:not(:hover)]:opacity-95",
+                                    "group-hover/cards:[&:not(:hover)]:opacity-95 transition-all duration-300",
                                     isFocused
                                         ? "border-amber-400 ring-2 ring-amber-400/45 shadow-[0_24px_56px_-32px_rgba(251,191,36,0.38)]"
                                         : tier.isPopular
                                             ? "border-primary/40 bg-slate-50/50 ring-1 ring-primary/12 shadow-[0_22px_52px_-30px_rgba(15,23,42,0.34)] hover:border-primary/55 hover:shadow-[0_30px_64px_-28px_rgba(15,23,42,0.38)]"
                                             : tier.originalPriceINR !== undefined
-                                                ? "border-fuchsia-200 bg-white hover:border-fuchsia-400 shadow-[0_16px_40px_-30px_rgba(217,70,239,0.15)] hover:shadow-[0_26px_56px_-30px_rgba(217,70,239,0.3)]"
+                                                ? "border-fuchsia-400 bg-white ring-2 ring-fuchsia-300/40 shadow-[0_0_35px_-5px_rgba(217,70,239,0.35)] hover:border-fuchsia-500 hover:shadow-[0_0_40px_-5px_rgba(217,70,239,0.5)]"
                                                 : "border-slate-200 hover:border-slate-300"
                                 )}
                             >
@@ -645,7 +756,7 @@ export default function PricingPage() {
                     })}
                 </motion.div>
 
-                <div className="mt-12 w-full max-w-7xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+                <div id="feature-comparison" className="mt-12 w-full max-w-7xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
                     <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                         <div>
                             <h2 className="text-xl font-bold tracking-tight text-slate-900">Feature comparison</h2>
