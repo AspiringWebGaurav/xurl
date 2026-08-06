@@ -562,17 +562,29 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
 
     const navActionBase =
         "inline-flex h-9 items-center justify-center rounded-lg px-4 text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.98]";
-    const primaryAction =
-        "bg-slate-900 text-slate-50 shadow-sm hover:bg-slate-800 hover:shadow-md";
-    const secondaryAction =
-        "border border-slate-200 bg-slate-50 text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900";
+    
+    const isLanding = pathname === "/";
+    const primaryAction = isLanding
+        ? "bg-white text-slate-900 shadow-sm hover:bg-slate-100 hover:shadow-md"
+        : "bg-slate-900 text-slate-50 shadow-sm hover:bg-slate-800 hover:shadow-md";
+    const secondaryAction = isLanding
+        ? "border border-white/10 bg-white/5 text-slate-200 shadow-sm hover:border-white/20 hover:bg-white/10 hover:text-white"
+        : "border border-slate-200 bg-slate-50 text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900";
+    
     const apiEnabledForPlan = Boolean(PLAN_CONFIGS[resolvePlanType(plan)].apiAccess);
     const canAccessAdmin = isAdminEmail(user?.email);
 
     return (
-        <header className="flex h-14 shrink-0 items-center border-b border-border bg-background px-2 sm:px-6">
+        <header className={cn(
+            "flex h-14 shrink-0 items-center px-2 sm:px-6 transition-colors duration-300 relative z-[100]",
+            isLanding 
+                ? "bg-transparent border-transparent" 
+                : "border-b border-border bg-background"
+        )}>
             <div className="flex flex-1 items-center gap-3">
-                <Logo size="md" />
+                <div className={cn("transition-all duration-300", isLanding && "invert brightness-200 contrast-150")}>
+                    <Logo size="md" />
+                </div>
                 {user && canAccessAdmin && (
                     <span
                         className="relative inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-800 shadow-[0_8px_24px_-12px_rgba(16,185,129,0.45)] ring-1 ring-emerald-100/80 transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_10px_32px_-12px_rgba(16,185,129,0.55)] hover:ring-2 hover:ring-emerald-200/90 hover:bg-gradient-to-r hover:from-emerald-50 hover:via-emerald-100/70 hover:to-white"
@@ -662,7 +674,9 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                         href="/app"
                         className={cn(
                             navActionBase,
-                            "gap-1.5 border border-emerald-400 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 shadow-[0_0_12px_rgba(16,185,129,0.35)] whitespace-nowrap transition-all active:scale-95"
+                            isLanding 
+                                ? "gap-1.5 border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200 shadow-[0_0_12px_rgba(16,185,129,0.15)] whitespace-nowrap transition-all active:scale-95"
+                                : "gap-1.5 border border-emerald-400 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 shadow-[0_0_12px_rgba(16,185,129,0.35)] whitespace-nowrap transition-all active:scale-95"
                         )}
                     >
                         <ArrowLeft className="w-3.5 h-3.5" />
@@ -786,7 +800,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                                     }
                                 }}>
                                     <DropdownMenuTrigger asChild>
-                                        <div className="flex items-center">
+                                        <div className={cn("flex items-center", isLanding && "invert brightness-200")}>
                                             <NotificationBell
                                                 unreadCount={notificationCount}
                                                 isShaking={isBellShaking}
@@ -925,8 +939,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => { setIsHistoryOpen(true); setHasNewHistory(false); }}
-                                    className={`relative text-[13px] font-medium h-8 px-2.5 rounded-md border transition-all ${linkCount !== null && linkCount > 0 ? "border-emerald-200/80 shadow-sm text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/80 hover:border-emerald-300" : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/50 hover:border-slate-200"
-                                        } transition-transform duration-150`}
+                                    className={`relative text-[13px] font-medium h-8 px-2.5 rounded-md border transition-all duration-150 ${linkCount !== null && linkCount > 0 ? "border-emerald-200/80 shadow-sm text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/80 hover:border-emerald-300" : (isLanding ? "border-transparent text-slate-300 hover:text-white hover:bg-white/10 hover:border-white/20" : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/50 hover:border-slate-200")}`}
                                 >
                                     <History className="h-3.5 w-3.5 mr-1.5" />
                                     History

@@ -17,14 +17,14 @@ export default function LandingPage() {
     ];
 
     return (
-        <div className="flex flex-col h-[100dvh] w-full overflow-hidden bg-slate-950">
+        <div className="relative flex flex-col h-[100dvh] w-full overflow-hidden bg-slate-950">
             {/* Top Navbar */}
-            <div className="bg-white z-50 shrink-0">
+            <div className="absolute top-0 inset-x-0 z-50">
                 <TopNavbar />
             </div>
 
             {/* Main Hero Area */}
-            <main className="flex-1 relative overflow-hidden flex flex-col items-center justify-center">
+            <main className="w-full h-full pt-14 relative overflow-hidden flex flex-col items-center justify-center">
                 {/* Background 3D Carousel */}
                 <div className="absolute inset-0 z-0 flex items-center justify-center">
                     <TiltedCarousel 
