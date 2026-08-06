@@ -172,9 +172,37 @@ export default function LandingPage() {
             </div>
 
             {/* Main Hero Area */}
-            <main className="w-full h-full pt-14 relative overflow-hidden flex flex-col items-center justify-center">
-                {/* Background 3D Carousel (Only renders once capability check is mounted to prevent hydration mismatch) */}
-                <div className="absolute inset-0 z-0 flex items-center justify-center opacity-70">
+            <main className="w-full h-[100dvh] pt-14 pb-8 sm:pb-0 relative overflow-hidden flex flex-col items-center justify-between sm:justify-center">
+                {/* Silent Drifting Animated Background Orbs */}
+                <motion.div
+                    animate={{
+                        x: [0, 40, -30, 0],
+                        y: [0, -35, 30, 0],
+                        scale: [1, 1.15, 0.9, 1],
+                    }}
+                    transition={{
+                        repeat: Infinity,
+                        duration: 16,
+                        ease: "easeInOut",
+                    }}
+                    className="absolute top-1/4 -left-24 w-[350px] sm:w-[450px] h-[350px] sm:h-[450px] bg-gradient-to-br from-emerald-400/20 via-teal-400/15 to-cyan-400/15 rounded-full blur-[90px] sm:blur-[100px] pointer-events-none z-0"
+                />
+                <motion.div
+                    animate={{
+                        x: [0, -45, 35, 0],
+                        y: [0, 40, -30, 0],
+                        scale: [1, 0.85, 1.1, 1],
+                    }}
+                    transition={{
+                        repeat: Infinity,
+                        duration: 20,
+                        ease: "easeInOut",
+                    }}
+                    className="absolute bottom-1/4 -right-24 w-[380px] sm:w-[480px] h-[380px] sm:h-[480px] bg-gradient-to-tr from-indigo-400/20 via-purple-400/15 to-emerald-400/15 rounded-full blur-[100px] sm:blur-[110px] pointer-events-none z-0"
+                />
+
+                {/* Background 3D Carousel */}
+                <div className="absolute inset-0 z-0 flex items-center justify-center opacity-60 sm:opacity-65">
                     {isMounted && (
                         <TiltedCarousel 
                             className="bg-slate-50" 
@@ -186,58 +214,136 @@ export default function LandingPage() {
                             rows={isMobile ? 3 : 4}                       // Less rows on mobile
                         />
                     )}
-                    {/* Gradient Overlay for readability and premium feel (Light mode version) */}
+                    {/* Gradient Overlay for readability and premium feel */}
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-slate-50/80 to-slate-50/40 z-10 pointer-events-none" />
                     {/* Radial gradient to focus on the center */}
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0)_0%,rgba(248,250,252,0.95)_100%)] z-10" />
                 </div>
 
-                {/* Hero Content */}
-                <div className="relative z-20 flex flex-col items-center text-center px-4 sm:px-6 max-w-5xl mx-auto -mt-12 sm:-mt-10">
-                    
-                    {/* Unique Magic Badge (Light Mode) */}
-                    <div className="relative inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 border border-slate-200/60 text-emerald-600 text-sm font-medium mb-8 overflow-hidden shadow-lg group">
-                        <div className="absolute inset-0 backdrop-blur-md" />
-                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-cyan-500/10 opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
-                        <Link2 className="w-4 h-4 relative z-10 text-emerald-500 group-hover:rotate-12 transition-transform duration-300" />
-                        <span className="relative z-10 tracking-wide text-slate-700">The Ultimate URL Shortener</span>
-                        <div className="absolute inset-x-0 -bottom-px h-[1px] bg-gradient-to-r from-transparent via-emerald-400/50 to-transparent" />
+                {/* Desktop Hero Content */}
+                <div className="hidden sm:flex relative z-20 flex-col items-center text-center px-6 max-w-5xl mx-auto my-auto w-full">
+                    {/* Unique Magic Badge with Pulsing Live Status */}
+                    <div className="relative inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-white/90 backdrop-blur-md border border-emerald-500/30 text-emerald-700 text-xs font-semibold mb-6 shadow-[0_0_20px_rgba(16,185,129,0.2)] group transition-all duration-300 hover:scale-105 cursor-default">
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-cyan-500/10 opacity-70 group-hover:opacity-100 transition-opacity duration-500" />
+                        <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        <span className="relative z-10 tracking-wide">The Ultimate URL Shortener</span>
+                        <ArrowRight className="w-3.5 h-3.5 relative z-10 text-emerald-600 group-hover:translate-x-1 transition-transform" />
                     </div>
                     
-                    <h1 className="text-[2.5rem] leading-[1.1] min-[375px]:text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black text-slate-900 tracking-tighter mb-6 drop-shadow-xl">
-                        Shorten your URL, <br className="hidden sm:block" />
+                    <h1 className="text-6xl md:text-7xl lg:text-8xl font-black text-slate-900 tracking-tighter mb-4 drop-shadow-xl leading-[1.1]">
+                        Shorten your URL, <br />
                         <span className="text-transparent bg-clip-text bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600">
                             Expand your reach.
                         </span>
                     </h1>
                     
-                    <p className="text-lg md:text-xl text-slate-600 mb-10 max-w-2xl leading-relaxed drop-shadow-sm font-medium">
-                        Turn long URLs into clean, shareable links with powerful analytics and optional custom aliases in a few quick steps.
+                    <p className="text-lg md:text-xl text-slate-600 mb-8 max-w-2xl leading-relaxed drop-shadow-sm font-medium">
+                        Turn long URLs into clean, shareable links with custom aliases and analytics.
                     </p>
-                    
-                    <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-                        <Link href="/app" onClick={(e) => handleNavigation(e, '/app')} className="w-full sm:w-auto">
-                            <Button size="lg" className="w-full sm:w-auto h-14 px-8 text-lg font-semibold bg-emerald-600 text-white rounded-full shadow-[0_4px_14px_0_rgba(5,150,105,0.39)] hover:shadow-[0_6px_20px_rgba(5,150,105,0.23)] hover:bg-emerald-700 hover:-translate-y-0.5 transition-all duration-200 active:scale-95 group flex items-center justify-center gap-1.5">
-                                <span>Create Free Link Now</span>
-                                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-200" />
+
+                    {/* Glowing High-Impact Desktop Action Button Row */}
+                    <div className="flex flex-row items-center gap-4 w-auto justify-center mb-8">
+                        <Link href="/app" onClick={(e) => handleNavigation(e, '/app')}>
+                            <Button
+                                size="lg"
+                                className="relative h-14 px-9 text-base font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 text-white rounded-full shadow-[0_0_35px_rgba(16,185,129,0.5)] hover:shadow-[0_0_50px_rgba(16,185,129,0.75)] hover:scale-105 active:scale-95 transition-all duration-300 group flex items-center justify-center gap-2 overflow-hidden border border-emerald-400/40"
+                            >
+                                <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+                                <span className="relative z-10 flex items-center gap-2">
+                                    <span className="relative flex h-2.5 w-2.5">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+                                    </span>
+                                    <span>Shorten URL Free</span>
+                                </span>
+                                <ArrowRight className="w-5 h-5 relative z-10 group-hover:translate-x-1.5 transition-transform duration-200" />
                             </Button>
                         </Link>
-                        <Link href="/pricing" onClick={(e) => handleNavigation(e, '/pricing')} className="w-full sm:w-auto">
-                            <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 text-lg font-semibold bg-white text-slate-700 border-slate-200 rounded-full shadow-[0_4px_14px_0_rgba(0,0,0,0.05)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.08)] hover:text-slate-900 hover:bg-slate-50 hover:-translate-y-0.5 transition-all duration-200 active:scale-95">
+                        <Link href="/pricing" onClick={(e) => handleNavigation(e, '/pricing')}>
+                            <Button
+                                size="lg"
+                                variant="outline"
+                                className="h-14 px-9 text-base font-semibold bg-white/90 text-slate-700 border-slate-200/80 rounded-full shadow-sm hover:shadow-md hover:text-slate-900 hover:bg-white hover:scale-102 transition-all duration-200 active:scale-95"
+                            >
                                 View Pricing
                             </Button>
                         </Link>
                     </div>
+
+                    {/* Live Trust & Performance Stats */}
+                    <div className="mt-8 flex flex-wrap items-center justify-center gap-5 text-xs font-semibold text-slate-600 bg-white/70 backdrop-blur-md px-5 py-2 rounded-full border border-slate-200/70 shadow-sm">
+                        <span className="flex items-center gap-1.5"><span className="text-amber-500">⚡</span> 5M+ Shortened</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1.5"><span className="text-emerald-500">🔒</span> 99.99% Uptime</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1.5"><span className="text-indigo-500">🚀</span> Instant Redirects</span>
+                    </div>
+                </div>
+
+                {/* Dedicated Mobile Hero Content */}
+                <div className="flex sm:hidden relative z-20 flex-col items-center justify-center text-center px-4 pt-14 pb-12 w-full h-[calc(100dvh-3.5rem)] gap-4 mx-auto my-auto overflow-hidden">
+                    {/* Unique Magic Badge */}
+                    <div className="relative inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md border border-emerald-500/30 text-emerald-700 text-[10px] font-semibold shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                        <span className="relative flex h-1.5 w-1.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                        </span>
+                        <span className="relative z-10 tracking-wide">The Ultimate URL Shortener</span>
+                        <ArrowRight className="w-3 h-3 text-emerald-600" />
+                    </div>
+                    
+                    <h1 className="text-2xl min-[375px]:text-3xl font-black text-slate-900 tracking-tighter leading-[1.15]">
+                        Shorten your URL, <br />
+                        <span className="text-transparent bg-clip-text bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600">
+                            Expand your reach.
+                        </span>
+                    </h1>
+                    
+                    <p className="text-xs text-slate-600 font-medium max-w-[270px] leading-relaxed">
+                        Turn long URLs into clean, shareable links with custom aliases and analytics.
+                    </p>
+
+                    {/* Mobile Action Button Row */}
+                    <div className="flex flex-row items-center gap-2 w-full max-w-[320px] justify-center mt-1">
+                        <Link href="/app" onClick={(e) => handleNavigation(e, '/app')} className="flex-1">
+                            <Button
+                                size="sm"
+                                className="w-full h-10 px-3 text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-full shadow-[0_0_20px_rgba(16,185,129,0.4)] active:scale-95 flex items-center justify-center gap-1"
+                            >
+                                <span>Shorten Free</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                            </Button>
+                        </Link>
+                        <Link href="/pricing" onClick={(e) => handleNavigation(e, '/pricing')} className="flex-1">
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full h-10 px-3 text-xs font-semibold bg-white/90 text-slate-700 border-slate-200/80 rounded-full shadow-sm active:scale-95"
+                            >
+                                View Pricing
+                            </Button>
+                        </Link>
+                    </div>
+
+                    {/* Mobile Live Trust Stats */}
+                    <div className="flex items-center justify-center gap-2 text-[10px] font-semibold text-slate-600 bg-white/80 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-slate-200/70 shadow-sm mt-1">
+                        <span className="flex items-center gap-1"><span className="text-amber-500">⚡</span> 5M+ Shortened</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="flex items-center gap-1"><span className="text-emerald-500">🔒</span> 99.99% Uptime</span>
+                    </div>
                 </div>
             </main>
 
-            {/* Blended Footer (Light Mode) */}
-            <footer className="absolute bottom-0 inset-x-0 z-50 px-4 py-4 sm:px-6 sm:py-6 bg-transparent pointer-events-none">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 w-full">
-                    <div className="text-[11px] sm:text-xs font-medium text-slate-900/30 hidden sm:block pointer-events-auto">
+            {/* Blended Footer */}
+            <footer className="absolute bottom-0 inset-x-0 z-50 px-4 py-2 sm:px-6 sm:py-6 bg-transparent">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-1 sm:gap-3 w-full">
+                    <div className="text-[11px] sm:text-xs font-medium text-slate-900/40 hidden sm:block">
                         &copy; {new Date().getFullYear()} XURL. All rights reserved.
                     </div>
-                    <div className="flex items-center justify-center gap-6 text-[11px] sm:text-xs font-medium text-slate-900/40 w-full sm:w-auto pointer-events-auto">
+                    <div className="flex items-center justify-center gap-6 text-[10px] sm:text-xs font-medium text-slate-900/50 w-full sm:w-auto">
                         <Link href="/terms" target="_blank" className="hover:text-slate-900/80 transition-colors duration-300">Terms</Link>
                         <Link href="/privacy" target="_blank" className="hover:text-slate-900/80 transition-colors duration-300">Privacy</Link>
                     </div>

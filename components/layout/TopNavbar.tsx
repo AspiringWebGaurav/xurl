@@ -574,14 +574,22 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
 
     return (
         <header className={cn(
-            "flex h-14 shrink-0 items-center px-2 sm:px-6 transition-colors duration-300 relative z-[100]",
+            "flex h-14 shrink-0 items-center px-2 sm:px-6 transition-all duration-300 relative z-[100]",
             isLanding 
                 ? "bg-transparent border-transparent" 
-                : "border-b border-border bg-background"
+                : "border-b border-border/40 bg-background/40 backdrop-blur-xl dark:bg-slate-950/40 dark:border-white/10"
         )}>
             <div className="flex flex-1 items-center gap-3">
                 <div className="transition-all duration-300">
-                    <Logo size="md" />
+                    <Logo 
+                        size="md" 
+                        href="/" 
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            window.location.href = "/";
+                        }}
+                    />
                 </div>
                 {user && canAccessAdmin && (
                     <span

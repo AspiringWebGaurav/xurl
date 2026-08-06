@@ -428,17 +428,40 @@ export default function PricingPage() {
         router.push(`/login?plan=${tierPlanId}`);
     };
 
-    const cardBase = "relative flex h-full flex-col rounded-2xl border bg-white p-6 shadow-[0_16px_40px_-30px_rgba(15,23,42,0.22)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[0_26px_56px_-30px_rgba(15,23,42,0.3)]";
-    const priceValueBase = "text-[42px] leading-none font-extrabold tracking-[-0.06em] text-slate-900 pr-1 -mr-1";
-    const featureItemBase = "flex items-start gap-3.5";
-    const ctaBase = "mt-0 h-10 w-full rounded-xl text-[14px] font-semibold transition-all duration-200 ease-out active:scale-[0.99]";
+    const cardBase = "relative flex h-full flex-col rounded-3xl border bg-white/90 backdrop-blur-xl p-7 lg:p-6 shadow-[0_16px_40px_-30px_rgba(15,23,42,0.15)] transition-all duration-300 ease-out hover:shadow-[0_30px_60px_-20px_rgba(16,185,129,0.25)] hover:border-emerald-500/40 group/card";
+    const priceValueBase = "text-[44px] leading-none font-black tracking-[-0.06em] text-slate-900 pr-1 -mr-1";
+    const featureItemBase = "flex items-start gap-3.5 group-hover/card:translate-x-0.5 transition-transform duration-200";
+    const ctaBase = "mt-0 h-11 w-full rounded-2xl text-[14px] font-bold transition-all duration-200 ease-out active:scale-[0.98]";
 
     return (
         <div id="pricing-root" className="h-[100dvh] bg-slate-50 flex flex-col relative overflow-x-hidden overflow-y-auto">
-            {/* Background glow effects */}
-            <div className="absolute top-[-5%] right-[-10%] w-[60%] h-[40%] bg-fuchsia-500/20 rounded-full blur-[100px] pointer-events-none" />
-            <div className="absolute bottom-[20%] left-[-10%] w-[50%] h-[30%] bg-amber-500/20 rounded-full blur-[100px] pointer-events-none" />
-            <div className="absolute top-[40%] left-[20%] w-[40%] h-[40%] bg-cyan-500/15 rounded-full blur-[100px] pointer-events-none" />
+            {/* Silent Drifting Animated Background Orbs */}
+            <motion.div
+                animate={{
+                    x: [0, 50, -40, 0],
+                    y: [0, -40, 40, 0],
+                    scale: [1, 1.15, 0.9, 1],
+                }}
+                transition={{
+                    repeat: Infinity,
+                    duration: 18,
+                    ease: "easeInOut",
+                }}
+                className="absolute top-[-5%] right-[-5%] w-[550px] h-[550px] bg-gradient-to-br from-fuchsia-500/15 via-purple-500/10 to-emerald-500/15 rounded-full blur-[110px] pointer-events-none z-0"
+            />
+            <motion.div
+                animate={{
+                    x: [0, -45, 45, 0],
+                    y: [0, 45, -35, 0],
+                    scale: [1, 0.85, 1.1, 1],
+                }}
+                transition={{
+                    repeat: Infinity,
+                    duration: 22,
+                    ease: "easeInOut",
+                }}
+                className="absolute bottom-[10%] left-[-5%] w-[500px] h-[500px] bg-gradient-to-tr from-amber-500/15 via-teal-500/15 to-indigo-500/15 rounded-full blur-[110px] pointer-events-none z-0"
+            />
 
             {/* Automated Tour Indicator */}
             <AnimatePresence>
@@ -469,11 +492,18 @@ export default function PricingPage() {
             <TopNavbar />
 
             <main className="flex-1 py-10 px-6 lg:px-8 flex flex-col items-center z-10">
-                <div className="text-center max-w-3xl mb-8 relative z-10">
-                    <h1 className="mb-3 text-[36px] font-extrabold tracking-[-0.055em] sm:text-[46px] bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent pb-2">
+                <div className="text-center max-w-3xl mb-10 relative z-10">
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 text-xs font-bold mb-4 shadow-sm">
+                        <span className="flex h-2 w-2 relative">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        <span>Transparent & Flexible Plans</span>
+                    </div>
+                    <h1 className="mb-3 text-[38px] font-black tracking-[-0.055em] sm:text-[50px] bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 bg-clip-text text-transparent pb-1 drop-shadow-sm">
                         Simple, transparent pricing
                     </h1>
-                    <p className="mx-auto max-w-2xl text-base leading-7 text-slate-600">
+                    <p className="mx-auto max-w-2xl text-base sm:text-lg leading-7 text-slate-600 font-medium">
                         Choose the perfect plan for your link management needs. No hidden fees.
                     </p>
                 </div>

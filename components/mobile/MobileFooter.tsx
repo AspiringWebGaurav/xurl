@@ -108,11 +108,11 @@ export function MobileFooter() {
                 .footer-col:nth-child(3) { animation-delay: 0.16s; }
             `}</style>
 
-            <footer ref={footerRef} className="shrink-0 border-t border-border bg-background mt-auto pb-[env(safe-area-inset-bottom)] relative z-50">
+            <footer ref={footerRef} className="shrink-0 border-t border-border/40 bg-background/40 backdrop-blur-xl dark:bg-slate-950/40 dark:border-white/10 mt-auto pb-[env(safe-area-inset-bottom)] relative z-50 transition-colors">
                 {/* ── Expandable section (Bottom Drawer) ── */}
                 <div
                     className={cn(
-                        "absolute bottom-full left-0 w-full bg-background transition-all duration-300 ease-out overflow-y-auto rounded-t-3xl shadow-[0_-20px_50px_-15px_rgba(0,0,0,0.2)]",
+                        "absolute bottom-full left-0 w-full bg-card dark:bg-slate-900 transition-all duration-300 ease-out overflow-y-auto rounded-t-3xl shadow-[0_-25px_60px_-15px_rgba(0,0,0,0.35)]",
                         expanded ? "max-h-[75vh] opacity-100 border-t border-x border-border" : "max-h-0 opacity-0 border-transparent"
                     )}
                     aria-hidden={!expanded}

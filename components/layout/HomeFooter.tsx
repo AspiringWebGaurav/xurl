@@ -6,6 +6,7 @@ import { useConfirmLink } from "@/components/providers/ConfirmLinkProvider";
 import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/utils";
 import { ChevronUp } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 /* ------------------------------------------------------------------ */
 /*  Link data                                                           */
@@ -98,22 +99,11 @@ export function HomeFooter() {
                 .footer-chevron-idle:hover {
                     animation: none;
                 }
-                @keyframes footer-fadein {
-                    from { opacity: 0; transform: translateY(6px); }
-                    to   { opacity: 1; transform: translateY(0); }
-                }
-                .footer-col {
-                    animation: footer-fadein 0.35s ease both;
-                }
-                .footer-col:nth-child(1) { animation-delay: 0.04s; }
-                .footer-col:nth-child(2) { animation-delay: 0.10s; }
-                .footer-col:nth-child(3) { animation-delay: 0.16s; }
-                .footer-col:nth-child(4) { animation-delay: 0.22s; }
             `}</style>
 
-            <footer ref={footerRef} className="shrink-0 border-t border-border bg-background">
+            <footer ref={footerRef} className="relative shrink-0 border-t border-border/40 bg-background/30 backdrop-blur-xl dark:bg-slate-950/30 dark:border-white/10 transition-colors">
                 {/* ── Minimal row (always visible) ── */}
-                <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3 px-6 py-5 text-xs text-muted-foreground">
+                <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3 px-6 py-4 text-xs text-muted-foreground relative z-10">
                     {/* Left — tagline */}
                     <p className="opacity-70 whitespace-nowrap">Minimal URL Shortener</p>
 
@@ -153,7 +143,7 @@ export function HomeFooter() {
                         <button
                             type="button"
                             onClick={() => setExpanded((prev) => !prev)}
-                            className="group ml-0.5 flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground/70 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground"
+                            className="group ml-0.5 flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground/70 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground cursor-pointer"
                             aria-expanded={expanded}
                             aria-label={expanded ? "Collapse footer" : "Expand footer"}
                         >
@@ -173,66 +163,65 @@ export function HomeFooter() {
                     </nav>
                 </div>
 
-                {/* ── Expandable section ── */}
-                <div
-                    className={cn(
-                        "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
-                        expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-                    )}
-                    aria-hidden={!expanded}
-                >
-                    <div className="overflow-hidden border-t border-border">
-                        <div className="w-full px-10 xl:px-20 pt-10 pb-8">
-                            {/* Link columns — 4-equal grid on desktop */}
-                            <div className="grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-4">
-                                {footerColumns.map((col) => (
-                                    <div
-                                        key={col.label}
-                                        className={cn(
-                                            "footer-col flex flex-col gap-3 text-xs",
-                                            !expanded && "animation-none"
-                                        )}
-                                    >
-                                        <span className="text-[11px] font-bold uppercase tracking-widest text-foreground">
-                                            {col.label}
-                                        </span>
-                                        <span className="w-6 h-px bg-foreground/20 -mt-1 mb-0.5" aria-hidden="true" />
-                                        <div className="flex flex-col gap-2">
-                                            {col.links.map((link) => {
-                                                const isLegal = link.href === "/terms" || link.href === "/privacy";
-                                                return (
-                                                    <Link
-                                                        key={link.href}
-                                                        href={link.href}
-                                                        target={isLegal ? "_blank" : undefined}
-                                                        onClick={(e) => {
-                                                            if (!isLegal) {
-                                                                handleLinkClick(e, link.href);
-                                                            }
-                                                        }}
-                                                        className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium no-underline"
-                                                    >
-                                                        {link.label}
-                                                    </Link>
-                                                );
-                                            })}
+                {/* ── Slide-Up Overlay Drawer (Does NOT push middle UI) ── */}
+                <AnimatePresence>
+                    {expanded && (
+                        <motion.div
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: 20, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                            className="absolute bottom-full left-0 right-0 z-50 bg-card dark:bg-slate-900 border-t border-x border-border/80 shadow-[0_-25px_60px_-15px_rgba(0,0,0,0.35)] rounded-t-3xl overflow-hidden"
+                        >
+                            <div className="w-full px-10 xl:px-20 pt-8 pb-6">
+                                {/* Link columns — 4-equal grid on desktop */}
+                                <div className="grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-4">
+                                    {footerColumns.map((col) => (
+                                        <div
+                                            key={col.label}
+                                            className="flex flex-col gap-3 text-xs"
+                                        >
+                                            <span className="text-[11px] font-bold uppercase tracking-widest text-foreground">
+                                                {col.label}
+                                            </span>
+                                            <span className="w-6 h-px bg-foreground/20 -mt-1 mb-0.5" aria-hidden="true" />
+                                            <div className="flex flex-col gap-2">
+                                                {col.links.map((link) => {
+                                                    const isLegal = link.href === "/terms" || link.href === "/privacy";
+                                                    return (
+                                                        <Link
+                                                            key={link.href}
+                                                            href={link.href}
+                                                            target={isLegal ? "_blank" : undefined}
+                                                            onClick={(e) => {
+                                                                if (!isLegal) {
+                                                                    handleLinkClick(e, link.href);
+                                                                }
+                                                            }}
+                                                            className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium no-underline"
+                                                        >
+                                                            {link.label}
+                                                        </Link>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
 
-                            {/* Copyright row */}
-                            <div className="mt-10 flex items-center justify-between border-t border-border pt-5 text-[11px] text-muted-foreground/50">
-                                <span>
-                                    &copy; {new Date().getFullYear()} XURL. All rights reserved.
-                                </span>
-                                <span className="hidden sm:block opacity-60 tracking-wide">
-                                    Built for speed.
-                                </span>
+                                {/* Copyright row */}
+                                <div className="mt-8 flex items-center justify-between border-t border-border/60 pt-4 text-[11px] text-muted-foreground/60">
+                                    <span>
+                                        &copy; {new Date().getFullYear()} XURL. All rights reserved.
+                                    </span>
+                                    <span className="hidden sm:block opacity-70 tracking-wide">
+                                        Built for speed.
+                                    </span>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </footer>
         </>
     );

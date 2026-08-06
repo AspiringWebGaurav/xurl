@@ -247,16 +247,19 @@ export default function MobilePlanClient() {
                         Unlock premium features tailored for mobile power users.
                     </p>
 
-                    <div className="mt-6 mx-auto inline-flex items-center gap-1 p-1 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl backdrop-blur-md border border-white/20">
+                    <div className="mt-6 mx-auto inline-flex items-center gap-1 p-1 bg-white/80 dark:bg-slate-900/80 rounded-2xl backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
                         {(["INR", "USD", "EUR"] as Currency[]).map((c) => (
                             <button
                                 key={c}
-                                onClick={() => setCurrency(c)}
+                                onClick={() => {
+                                    triggerHaptic(20);
+                                    setCurrency(c);
+                                }}
                                 className={cn(
-                                    "px-4 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200",
+                                    "px-4 py-1.5 text-xs font-bold rounded-xl transition-all duration-200 active:scale-95",
                                     currency === c 
-                                        ? "bg-white dark:bg-slate-900 text-foreground shadow-sm" 
-                                        : "text-muted-foreground"
+                                        ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md" 
+                                        : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
                                 )}
                             >
                                 {c}
