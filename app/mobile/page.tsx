@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { headers } from "next/headers";
 import { checkGuestQuota } from "@/lib/server/quota-check";
 import { MobileHomePageClient } from "@/components/mobile/MobileHomePageClient";
-import { HomePageSkeleton } from "@/app/_components/HomePageSkeleton"; // We can reuse the skeleton for initial load since it's just basic shapes, or build a mobile skeleton.
+import { HomePageSkeleton } from "@/app/app/_components/HomePageSkeleton"; // We can reuse the skeleton for initial load since it's just basic shapes, or build a mobile skeleton.
 
 export default async function MobileLandingPage() {
     // Get IP and fingerprint from headers

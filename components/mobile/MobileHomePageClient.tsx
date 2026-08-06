@@ -17,7 +17,7 @@ import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { RateLimitModal } from "@/components/ui/rate-limit-modal";
-import { HomePageSkeleton } from "@/app/_components/HomePageSkeleton";
+import { HomePageSkeleton } from "@/app/app/_components/HomePageSkeleton";
 import type { GuestQuotaResult } from "@/lib/server/quota-check";
 import { formatCooldown } from "@/lib/utils/format-time";
 import { CustomAliasInput } from "@/components/home/CustomAliasInput";
