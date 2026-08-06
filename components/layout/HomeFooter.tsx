@@ -127,16 +127,24 @@ export function HomeFooter() {
                         aria-label="Footer navigation"
                         className="flex items-center justify-end gap-1 flex-wrap"
                     >
-                        {minimalLegalLinks.map((link) => (
-                            <Link
-                                key={link.href}
-                                href={link.href}
-                                onClick={(e) => handleLinkClick(e, link.href)}
-                                className="rounded-md px-2 py-1 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground no-underline"
-                            >
-                                {link.label}
-                            </Link>
-                        ))}
+                        {minimalLegalLinks.map((link) => {
+                            const isLegal = link.href === "/terms" || link.href === "/privacy";
+                            return (
+                                <Link
+                                    key={link.href}
+                                    href={link.href}
+                                    target={isLegal ? "_blank" : undefined}
+                                    onClick={(e) => {
+                                        if (!isLegal) {
+                                            handleLinkClick(e, link.href);
+                                        }
+                                    }}
+                                    className="rounded-md px-2 py-1 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground no-underline"
+                                >
+                                    {link.label}
+                                </Link>
+                            );
+                        })}
 
                         {/* Divider */}
                         <span className="mx-1 h-3 w-px bg-border" aria-hidden="true" />
@@ -190,16 +198,24 @@ export function HomeFooter() {
                                         </span>
                                         <span className="w-6 h-px bg-foreground/20 -mt-1 mb-0.5" aria-hidden="true" />
                                         <div className="flex flex-col gap-2">
-                                            {col.links.map((link) => (
-                                                <Link
-                                                    key={link.href}
-                                                    href={link.href}
-                                                    onClick={(e) => handleLinkClick(e, link.href)}
-                                                    className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium no-underline"
-                                                >
-                                                    {link.label}
-                                                </Link>
-                                            ))}
+                                            {col.links.map((link) => {
+                                                const isLegal = link.href === "/terms" || link.href === "/privacy";
+                                                return (
+                                                    <Link
+                                                        key={link.href}
+                                                        href={link.href}
+                                                        target={isLegal ? "_blank" : undefined}
+                                                        onClick={(e) => {
+                                                            if (!isLegal) {
+                                                                handleLinkClick(e, link.href);
+                                                            }
+                                                        }}
+                                                        className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium no-underline"
+                                                    >
+                                                        {link.label}
+                                                    </Link>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 ))}

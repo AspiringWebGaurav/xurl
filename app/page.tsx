@@ -238,8 +238,8 @@ export default function LandingPage() {
                         &copy; {new Date().getFullYear()} XURL. All rights reserved.
                     </div>
                     <div className="flex items-center justify-center gap-6 text-[11px] sm:text-xs font-medium text-slate-900/40 w-full sm:w-auto pointer-events-auto">
-                        <Link href="/terms" className="hover:text-slate-900/80 transition-colors duration-300">Terms</Link>
-                        <Link href="/privacy" className="hover:text-slate-900/80 transition-colors duration-300">Privacy</Link>
+                        <Link href="/terms" target="_blank" className="hover:text-slate-900/80 transition-colors duration-300">Terms</Link>
+                        <Link href="/privacy" target="_blank" className="hover:text-slate-900/80 transition-colors duration-300">Privacy</Link>
                     </div>
                 </div>
             </footer>
