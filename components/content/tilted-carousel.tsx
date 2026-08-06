@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { motion, useInView } from "framer-motion";
+import { useState, useRef, useEffect } from "react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface TiltedCarouselProps {
-    images?: string[];
+    images?: string[]; // Deprecated: Use items instead
+    items?: React.ReactNode[];
     className?: string;
     rowClassName?: string;
-    imageClassName?: string;
+    itemClassName?: string;
     speed?: number;
     rows?: number;
     multiplier?: number;
@@ -40,9 +41,10 @@ const PRESETS = {
 
 export function TiltedCarousel({
     images = [],
+    items = [],
     className,
     rowClassName,
-    imageClassName,
+    itemClassName,
     speed = 50,
     rows = 4,
     multiplier = 6,
@@ -51,19 +53,33 @@ export function TiltedCarousel({
     preset = "default",
 }: TiltedCarouselProps) {
     const containerRef = useRef<HTMLDivElement>(null);
-    const isInView = useInView(containerRef, { once: false, margin: "200px" });
     const config = PRESETS[preset] || PRESETS.default;
     
-    // Duplicate images to create infinite effect
-    const extendedImages = Array.from({ length: multiplier }).flatMap(() => images);
+    // Fallback to images if items not provided
+    const displayItems: React.ReactNode[] = items.length > 0 
+        ? items 
+        : images.map((src, i) => (
+            <img key={i} src={src} alt="Carousel image" className="w-full h-full object-cover" loading="lazy" />
+        ));
+
+    // Duplicate items to create infinite effect
+    const extendedItems = Array.from({ length: multiplier }).flatMap(() => displayItems);
 
     // Split into rows
-    const imagesPerRow = Math.ceil(extendedImages.length / rows);
+    const itemsPerRow = Math.ceil(extendedItems.length / rows);
     const rowData = Array.from({ length: rows }).map((_, i) => {
-        return extendedImages.slice(i * imagesPerRow, (i + 1) * imagesPerRow);
+        return extendedItems.slice(i * itemsPerRow, (i + 1) * itemsPerRow);
     });
 
+    const [isMounted, setIsMounted] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    // SSR fallback to prevent hydration mismatch
+    if (!isMounted) return null;
 
     return (
         <div 
@@ -92,7 +108,7 @@ export function TiltedCarousel({
                             <motion.div
                                 className="flex gap-4"
                                 animate={{
-                                    x: isInView && !isHovered ? [rowDirection === -1 ? 0 : -1000, rowDirection === -1 ? -1000 : 0] : undefined,
+                                    x: !isHovered ? [rowDirection === -1 ? 0 : -1000, rowDirection === -1 ? -1000 : 0] : undefined,
                                 }}
                                 transition={{
                                     repeat: Infinity,
@@ -101,21 +117,15 @@ export function TiltedCarousel({
                                     ease: "linear",
                                 }}
                             >
-                                {rowImages.map((src, imgIndex) => (
+                                {rowImages.map((node, imgIndex) => (
                                     <div 
                                         key={`${rowIndex}-${imgIndex}`}
                                         className={cn(
-                                            "relative flex-shrink-0 w-[280px] h-[200px] md:w-[400px] md:h-[280px] rounded-2xl overflow-hidden shadow-2xl",
-                                            imageClassName
+                                            "relative flex-shrink-0 w-[280px] h-[200px] md:w-[400px] md:h-[280px] rounded-2xl overflow-hidden shadow-2xl bg-white",
+                                            itemClassName
                                         )}
                                     >
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img 
-                                            src={src} 
-                                            alt="Carousel image" 
-                                            className="w-full h-full object-cover"
-                                            loading="lazy"
-                                        />
+                                        {node}
                                     </div>
                                 ))}
                             </motion.div>
