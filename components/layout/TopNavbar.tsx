@@ -632,7 +632,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
             </div>
 
             <div className="flex flex-1 items-center justify-end gap-1.5 sm:gap-2.5">
-                {pathname === "/" ? (
+                {pathname === "/" || pathname === "/app" ? (
                     <Link
                         href="/pricing"
                         className={cn(
@@ -659,7 +659,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                     </Link>
                 ) : (
                     <Link
-                        href="/"
+                        href="/app"
                         className={cn(
                             navActionBase,
                             "gap-1.5 border border-emerald-400 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 shadow-[0_0_12px_rgba(16,185,129,0.35)] whitespace-nowrap transition-all active:scale-95"
@@ -725,8 +725,8 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                     )}
                     <button
                         onClick={() => {
-                            if (pathname !== "/") {
-                                router.push("/?focus=true");
+                            if (pathname !== "/app") {
+                                router.push("/app?focus=true");
                             } else {
                                 window.dispatchEvent(new Event("focusUrlInput"));
                             }
