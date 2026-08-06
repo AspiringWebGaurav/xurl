@@ -8,6 +8,7 @@ import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { useSearchParams } from "next/navigation";
+import { DesktopGuestLocked } from "@/components/layout/DesktopGuestLocked";
 
 type Transaction = {
     id: string;
@@ -95,9 +96,44 @@ function PurchaseHistoryContent() {
         return (
             <div className="min-h-screen flex flex-col bg-slate-50">
                 <TopNavbar />
-                <main className="flex-1 flex flex-col items-center justify-center max-w-5xl mx-auto w-full px-6 py-12">
-                    <h1 className="text-2xl font-bold text-slate-900 mb-2">Sign in Required</h1>
-                    <p className="text-slate-500">Please sign in to view your purchase history.</p>
+                <main className="flex-1 w-full px-4 py-12">
+                    <div className="mb-8">
+                        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Purchase History</h1>
+                        <p className="text-slate-500 mt-2">View your past transactions and plan usage over time.</p>
+                    </div>
+                    <DesktopGuestLocked
+                        title="Sign in Required"
+                        message="Please sign in to view your purchase history."
+                    >
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-medium">
+                                    <tr>
+                                        <th className="px-6 py-4">Date</th>
+                                        <th className="px-6 py-4">Action</th>
+                                        <th className="px-6 py-4">Plan</th>
+                                        <th className="px-6 py-4">Duration</th>
+                                        <th className="px-6 py-4">Links Granted</th>
+                                        <th className="px-6 py-4">Source</th>
+                                        <th className="px-6 py-4 text-right">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {Array.from({ length: 5 }).map((_, i) => (
+                                        <tr key={i}>
+                                            <td className="px-6 py-4"><div className="h-4 w-24 bg-slate-200 rounded animate-pulse" /></td>
+                                            <td className="px-6 py-4"><div className="h-6 w-16 bg-slate-200 rounded animate-pulse" /></td>
+                                            <td className="px-6 py-4"><div className="h-4 w-16 bg-slate-200 rounded animate-pulse" /></td>
+                                            <td className="px-6 py-4"><div className="h-4 w-12 bg-slate-200 rounded animate-pulse" /></td>
+                                            <td className="px-6 py-4"><div className="h-4 w-8 bg-slate-200 rounded animate-pulse" /></td>
+                                            <td className="px-6 py-4"><div className="h-4 w-16 bg-slate-200 rounded animate-pulse" /></td>
+                                            <td className="px-6 py-4 text-right"><div className="h-4 w-12 bg-slate-200 rounded animate-pulse ml-auto" /></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </DesktopGuestLocked>
                 </main>
             </div>
         );

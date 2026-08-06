@@ -23,13 +23,13 @@ export function LegalPageShell({ title, lastUpdated, sections, isMobileDevice = 
             <TopNavbar isCreateDisabled={false} />
             <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-8 lg:px-16 xl:px-28 py-6 md:py-8">
                 {/* Header */}
-                <div className="mb-5 flex items-baseline justify-between border-b border-border pb-4">
+                <div className="mb-5 flex flex-col md:flex-row md:items-baseline md:justify-between gap-2 md:gap-0 border-b border-border pb-4">
                     <h1 className="text-xl md:text-2xl font-semibold tracking-tight text-foreground">
                         {title}
                     </h1>
                     {lastUpdated && (
                         <span className="text-xs text-muted-foreground/60">
-                            Last updated: {lastUpdated}
+                            {lastUpdated}
                         </span>
                     )}
                 </div>

@@ -23,6 +23,7 @@ import { buildShortUrl } from "@/lib/utils/url-builder";
 import Link from "next/link";
 import { isPaidPlan } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
+import { DesktopGuestLocked } from "@/components/layout/DesktopGuestLocked";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -172,72 +173,7 @@ function AnimatedDummyNumber({ target, format = true }: { target: number, format
     return <span>{format ? count.toLocaleString() : count}</span>;
 }
 
-// ─── Locked Preview ─────────────────────────────────────────────────────────
-
-function LockedPreview() {
-    return (
-        <div className="relative mt-4 max-h-[calc(100vh-280px)] overflow-hidden">
-            <div className="pointer-events-none select-none blur-[6px] opacity-50">
-                <div className="grid grid-cols-3 gap-8 mb-10 px-4">
-                    {[
-                        { label: "Total Clicks", value: <AnimatedDummyNumber target={1284} /> },
-                        { label: "Active Links", value: <AnimatedDummyNumber target={12} /> },
-                        { label: "Top Performer", value: "my-link" },
-                    ].map((item, i) => (
-                        <div key={item.label} className="flex flex-col">
-                            <span className="text-sm font-medium text-slate-500 uppercase tracking-wider">
-                                {item.label}
-                            </span>
-                            <p className="text-[48px] font-extrabold text-slate-900 mt-1 leading-none tracking-tight">
-                                {item.value}
-                            </p>
-                        </div>
-                    ))}
-                </div>
-                <div className="mb-10 px-4">
-                    <div className="h-32 flex items-end gap-1">
-                        {Array.from({ length: 30 }, (_, i) => (
-                            <div
-                                key={i}
-                                className="flex-1 bg-slate-200 rounded-t-sm"
-                                style={{
-                                    height: `${20 + Math.sin(i * 0.5) * 30 + ((i * 7 + 13) % 41)}%`,
-                                }}
-                            />
-                        ))}
-                    </div>
-                </div>
-                <div className="grid grid-cols-3 gap-8 px-4">
-                    {["Devices", "Browsers", "OS"].map((label) => (
-                        <div key={label} className="h-32 flex flex-col">
-                            <span className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-4">{label}</span>
-                            <div className="flex-1 bg-slate-200/50 rounded-lg" />
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-50/40 backdrop-blur-md z-10">
-                <div className="max-w-lg w-full mx-4 text-center flex flex-col items-center">
-                    <div className="mb-6">
-                        <Lock className="h-10 w-10 text-slate-700/80 drop-shadow-sm" />
-                    </div>
-                    <h2 className="text-4xl font-extrabold text-slate-900 mb-4 tracking-tight drop-shadow-sm">
-                        Unlock Deep Analytics
-                    </h2>
-                    <p className="text-slate-600 mb-8 text-base leading-relaxed max-w-sm mx-auto font-medium">
-                        Upgrade to any paid plan to access full click timelines, device breakdowns, OS tracking, and more. Stop guessing, start knowing.
-                    </p>
-                    <Link href="/pricing">
-                        <Button className="bg-slate-900 hover:bg-slate-800 text-white h-12 px-8 text-base font-semibold rounded-full shadow-lg shadow-slate-900/20 transition-all active:scale-[0.98]">
-                            View Plans & Upgrade
-                        </Button>
-                    </Link>
-                </div>
-            </div>
-        </div>
-    );
-}
+// ─── Removed LockedPreview ─────────────────────────────────────────────────────────
 
 // ─── Main Page Component ────────────────────────────────────────────────────
 
@@ -300,7 +236,27 @@ export default function AnalyticsPage() {
                                 </p>
                             </div>
                         </div>
-                        <LockedPreview />
+                        <DesktopGuestLocked 
+                            title="Sign in Required"
+                            message="Sign in to track your links and see real-time performance."
+                        >
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10 px-4 mt-8">
+                                {[
+                                    { label: "Total Clicks", value: "1,284" },
+                                    { label: "Active Links", value: "12" },
+                                    { label: "Top Performer", value: "my-link" },
+                                ].map((item) => (
+                                    <div key={item.label} className="flex flex-col">
+                                        <span className="text-sm font-medium text-slate-500 uppercase tracking-wider">
+                                            {item.label}
+                                        </span>
+                                        <p className="text-4xl md:text-[48px] font-extrabold text-slate-900 mt-1 leading-none tracking-tight">
+                                            {item.value}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </DesktopGuestLocked>
                     </div>
                 </main>
             </div>
@@ -331,7 +287,7 @@ export default function AnalyticsPage() {
 
                 {dataLoading && <OverviewSkeleton />}
 
-                {!dataLoading && data && !isPaid && <LockedPreview />}
+                {!dataLoading && data && !isPaid && <FreemiumDashboard data={data} />}
 
                 {!dataLoading && data && isPaid && (
                     <FullDashboard
@@ -343,6 +299,125 @@ export default function AnalyticsPage() {
                 </div>
             </main>
         </div>
+    );
+}
+
+// ─── Freemium Dashboard ───────────────────────────────────────────────────────
+
+function FreemiumDashboard({ data }: { data: DashboardData }) {
+    const topLink = data.summary.topLinks[0];
+
+    return (
+        <>
+            <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
+            >
+                <motion.div
+                    variants={cardVariants}
+                    className="relative group rounded-3xl border border-slate-200/60 bg-white/70 backdrop-blur-xl shadow-sm hover:shadow-xl transition-all duration-300 p-6 overflow-hidden"
+                >
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="relative z-10 flex items-center justify-between mb-4">
+                        <span className="text-sm font-medium text-slate-500">
+                            Total Clicks
+                        </span>
+                        <MousePointerClick className="h-5 w-5 text-slate-400" />
+                    </div>
+                    <p className="text-[42px] font-extrabold text-slate-900 tracking-tight leading-none">
+                        {data.summary.totalClicks.toLocaleString()}
+                    </p>
+                </motion.div>
+
+                <motion.div
+                    variants={cardVariants}
+                    className="relative group rounded-3xl border border-slate-200/60 bg-white/70 backdrop-blur-xl shadow-sm hover:shadow-xl transition-all duration-300 p-6 overflow-hidden"
+                >
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="relative z-10 flex items-center justify-between mb-4">
+                        <span className="text-sm font-medium text-slate-500">
+                            Active Links
+                        </span>
+                        <Link2 className="h-5 w-5 text-slate-400" />
+                    </div>
+                    <p className="text-[42px] font-extrabold text-slate-900 tracking-tight leading-none">
+                        {data.summary.activeLinks}
+                    </p>
+                </motion.div>
+
+                <motion.div
+                    variants={cardVariants}
+                    className="relative group rounded-3xl border border-slate-200/60 bg-white/70 backdrop-blur-xl shadow-sm hover:shadow-xl transition-all duration-300 p-6 overflow-hidden"
+                >
+                    <div className="absolute inset-0 bg-gradient-to-br from-amber-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="relative z-10 flex items-center justify-between mb-4">
+                        <span className="text-sm font-medium text-slate-500">
+                            Top Performer
+                        </span>
+                        <Trophy className="h-5 w-5 text-amber-400" />
+                    </div>
+                    {topLink ? (
+                        <>
+                            <p className="text-lg font-bold text-slate-900 truncate">
+                                {topLink.title || topLink.slug}
+                            </p>
+                            <p className="text-sm text-slate-500 mt-1">
+                                {topLink.clicks.toLocaleString()} clicks
+                            </p>
+                        </>
+                    ) : (
+                        <p className="text-sm text-slate-400">No links yet</p>
+                    )}
+                </motion.div>
+            </motion.div>
+
+            <div className="relative mt-4 max-h-[calc(100vh-280px)] overflow-hidden">
+                <div className="pointer-events-none select-none blur-[6px] opacity-50">
+                    <div className="mb-10 px-4">
+                        <div className="h-32 flex items-end gap-1">
+                            {Array.from({ length: 30 }, (_, i) => (
+                                <div
+                                    key={i}
+                                    className="flex-1 bg-slate-200 rounded-t-sm"
+                                    style={{
+                                        height: `${20 + Math.sin(i * 0.5) * 30 + ((i * 7 + 13) % 41)}%`,
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 px-4">
+                        {["Devices", "Browsers", "OS"].map((label) => (
+                            <div key={label} className="h-32 flex flex-col">
+                                <span className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-4">{label}</span>
+                                <div className="flex-1 bg-slate-200/50 rounded-lg" />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="absolute inset-0 flex items-center justify-center bg-slate-50/40 backdrop-blur-md z-10">
+                    <div className="max-w-lg w-full mx-4 text-center flex flex-col items-center">
+                        <div className="mb-6">
+                            <Lock className="h-10 w-10 text-slate-700/80 drop-shadow-sm" />
+                        </div>
+                        <h2 className="text-4xl font-extrabold text-slate-900 mb-4 tracking-tight drop-shadow-sm">
+                            Unlock Deep Analytics
+                        </h2>
+                        <p className="text-slate-600 mb-8 text-base leading-relaxed max-w-sm mx-auto font-medium">
+                            Upgrade to any paid plan to access full click timelines, device breakdowns, OS tracking, and more. Stop guessing, start knowing.
+                        </p>
+                        <Link href="/pricing">
+                            <Button className="bg-slate-900 hover:bg-slate-800 text-white h-12 px-8 text-base font-semibold rounded-full shadow-lg shadow-slate-900/20 transition-all active:scale-[0.98]">
+                                View Plans & Upgrade
+                            </Button>
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        </>
     );
 }
 

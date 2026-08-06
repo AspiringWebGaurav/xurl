@@ -38,26 +38,54 @@ export const defaultPolicies: Record<string, Policy> = {
     terms: {
         id: "terms",
         title: "Terms of Service",
-        lastUpdated: "July 22, 2026",
+        lastUpdated: "August 6, 2026 (Previously updated: July 22, 2026)",
         sections: [
             {
                 title: "Acceptance of Terms",
-                content: "By accessing XURL, you agree to be bound by these Terms of Service and all applicable laws and regulations. If you do not agree with any of these terms, you are prohibited from using this site."
+                content: "By accessing and using XURL (the \"Service\"), you agree to be bound by these Terms of Service, all applicable laws and regulations, and agree that you are responsible for compliance with any applicable local laws. If you do not agree with any of these terms, you are explicitly prohibited from using or accessing this site. The materials contained in this website are protected by applicable copyright and trademark law."
+            },
+            {
+                title: "User Accounts and Responsibilities",
+                content: "To access certain advanced features of the Service, you may be required to register for an account. You are solely responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account. You agree to notify us immediately of any unauthorized use of your account or any other breach of security. XURL cannot and will not be liable for any loss or damage arising from your failure to comply with this security obligation."
             },
             {
                 title: "Enterprise Use & E-Policies",
-                content: "Corporate users are bound by strict 'E-Policies' governing data scraping, API limits, and fair usage. Automated creation of links outside the provided API interfaces is strictly prohibited. Engaging in any form of distributed denial-of-service, or bypassing our ratelimits using proxy networks, will result in immediate termination of the service."
+                content: "Corporate and enterprise users are bound by strict 'E-Policies' governing data scraping, API usage limits, and fair usage parameters. Automated creation of links outside the officially provided and authenticated API interfaces is strictly prohibited. Engaging in any form of distributed denial-of-service (DDoS), or attempting to bypass our rate limits using proxy networks or malicious botnets, will result in immediate termination of service and potential legal action."
+            },
+            {
+                title: "Prohibited Conduct",
+                content: "You agree not to use the Service to: (a) distribute malware, phishing campaigns, or illegal content; (b) violate the intellectual property rights of others; (c) impersonate any person or entity; (d) harvest or collect email addresses or other contact information of other users from the Service by electronic or other means. We employ advanced algorithmic scanning to detect such violations and will immediately terminate links and accounts found in breach of these conditions."
+            },
+            {
+                title: "Termination and Suspension",
+                content: "We reserve the right to suspend or terminate your account and your access to the Service at any time, for any reason, and without notice or liability, including but not limited to if you breach any representation, warranty, or covenant contained in these Terms of Service. Upon termination of your access, your right to use the Service will immediately cease."
+            },
+            {
+                title: "Limitation of Liability",
+                content: "In no event shall XURL, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from (i) your access to or use of or inability to access or use the Service; (ii) any conduct or content of any third party on the Service; (iii) any content obtained from the Service; and (iv) unauthorized access, use or alteration of your transmissions or content, whether based on warranty, contract, tort (including negligence) or any other legal theory."
             }
         ]
     },
     "guest-policy": {
         id: "guest-policy",
         title: "Guest Usage Policy",
-        lastUpdated: "July 22, 2026",
+        lastUpdated: "August 6, 2026 (Previously updated: July 22, 2026)",
         sections: [
             {
+                title: "Scope of Guest Access",
+                content: "XURL provides limited, unauthenticated access to the Service for \"Guest Users.\" This access is provided strictly as a convenience for temporary or trial use. By utilizing the Service as a Guest User, you acknowledge and agree that your access is subordinate to the rights of registered users and is governed by all applicable provisions of our broader Terms of Service."
+            },
+            {
                 title: "Unregistered Limitations",
-                content: "Guest users (unregistered) are subject to highly restrictive rate limits and an ephemeral data model. We reserve the right to prune or modify guest-generated links at our discretion to maintain service stability."
+                content: "Guest users (unregistered) are subject to highly restrictive rate limits and an ephemeral data model. Specifically, Guest Users are permanently limited to the creation of a single (1) shortened URL per physical user identity. We enforce this limitation using advanced device fingerprinting and IP address hashing. Attempts to bypass this limit via VPNs or Tor nodes are strictly prohibited."
+            },
+            {
+                title: "Data Ephemerality and Privacy",
+                content: "Data generated by Guest Users is considered highly ephemeral. Links created by Guest Users are strictly time-bound and will automatically expire and permanently deactivate according to our dynamic platform TTL (Time-To-Live) settings. XURL makes no guarantees regarding the persistence, reliability, or availability of links created without a registered account. We reserve the right to aggressively prune, modify, or delete guest-generated links at our sole discretion to maintain service stability."
+            },
+            {
+                title: "Abuse Prevention and Tracking",
+                content: "To maintain platform integrity and prevent malicious spam, we actively monitor guest usage patterns. While we prioritize anonymity, we utilize non-reversible cryptographic hashes of your IP address and device fingerprint solely for the purpose of quota enforcement and abuse prevention. Engaging in abusive behavior as a Guest User will result in permanent network-level blocks."
             }
         ]
     },

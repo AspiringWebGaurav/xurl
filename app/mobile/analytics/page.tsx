@@ -22,6 +22,7 @@ import { motion, type Variants } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { buildShortUrl } from "@/lib/utils/url-builder";
 import { MobileBottomNav } from "@/components/mobile/MobileBottomNav";
+import { MobileGuestLocked } from "@/components/mobile/MobileGuestLocked";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -121,72 +122,7 @@ function AnimatedDummyNumber({ target, format = true }: { target: number, format
     return <span>{format ? count.toLocaleString() : count}</span>;
 }
 
-// ─── Mobile Locked Preview ─────────────────────────────────────────────────────────
-
-function MobileLockedPreview() {
-    return (
-        <div className="relative mt-2 flex-1 overflow-hidden pb-12">
-            <div className="pointer-events-none select-none blur-[5px] opacity-40">
-                <div className="grid grid-cols-2 gap-x-4 gap-y-6 mb-8 px-2">
-                    {[
-                        { label: "Total Clicks", value: <AnimatedDummyNumber target={1284} /> },
-                        { label: "Active Links", value: <AnimatedDummyNumber target={12} /> },
-                        { label: "Top Performer", value: "my-link", className: "col-span-2" },
-                    ].map((item, i) => (
-                        <div key={item.label} className={cn("flex flex-col", item.className)}>
-                            <span className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
-                                {item.label}
-                            </span>
-                            <p className="text-4xl font-extrabold text-slate-900 mt-1 tracking-tight">
-                                {item.value}
-                            </p>
-                        </div>
-                    ))}
-                </div>
-                <div className="mb-8 px-2">
-                    <div className="h-20 flex items-end gap-[2px]">
-                        {Array.from({ length: 30 }, (_, i) => (
-                            <div
-                                key={i}
-                                className="flex-1 bg-slate-300 rounded-t-sm"
-                                style={{
-                                    height: `${20 + Math.sin(i * 0.5) * 30 + ((i * 7 + 13) % 41)}%`,
-                                }}
-                            />
-                        ))}
-                    </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 px-2">
-                    {["Devices", "Browsers"].map((label) => (
-                        <div key={label} className="h-24 flex flex-col">
-                            <span className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">{label}</span>
-                            <div className="flex-1 bg-slate-300/50 rounded-lg" />
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            <div className="absolute inset-0 flex items-center justify-center p-6 bg-background/50 backdrop-blur-md z-10">
-                <div className="w-full max-w-sm text-center flex flex-col items-center">
-                    <div className="mb-6">
-                        <Lock className="h-10 w-10 text-primary drop-shadow-sm" />
-                    </div>
-                    <h2 className="text-3xl font-extrabold text-foreground mb-4 tracking-tight drop-shadow-sm">
-                        Unlock Deep Analytics
-                    </h2>
-                    <p className="text-muted-foreground mb-8 text-[15px] leading-relaxed font-medium">
-                        Upgrade to any paid plan to access full click timelines, device breakdowns, OS tracking, and more.
-                    </p>
-                    <Link href="/pricing" className="w-full">
-                        <div className="w-full py-4 bg-primary text-primary-foreground text-sm font-bold rounded-full shadow-lg shadow-primary/20 active:scale-[0.98] transition-all">
-                            View Plans & Upgrade
-                        </div>
-                    </Link>
-                </div>
-            </div>
-        </div>
-    );
-}
+// ─── Removed MobileLockedPreview ─────────────────────────────────────────────────────────
 
 // ─── Main Page Component ────────────────────────────────────────────────────
 
@@ -237,14 +173,30 @@ export default function MobileAnalyticsPage() {
         return (
             <div className="flex flex-col h-[100dvh] overflow-hidden bg-background">
                 <TopNavbar />
-                <main className="flex-1 flex flex-col overflow-hidden px-4 pt-4 relative">
-                    <div className="mb-4">
+                <MobileGuestLocked 
+                    title="Sign in Required"
+                    message="Sign in to track your links and see real-time performance."
+                >
+                    <div className="px-4 pt-4 mb-4">
                         <h1 className="text-2xl font-extrabold tracking-tight text-foreground">Analytics</h1>
-                        <p className="text-sm text-muted-foreground mt-1">Unlock premium insights.</p>
                     </div>
-                    <MobileLockedPreview />
-                </main>
-                
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-6 mb-8 px-2 mt-8">
+                        {[
+                            { label: "Total Clicks", value: "1,284" },
+                            { label: "Active Links", value: "12" },
+                            { label: "Top Performer", value: "my-link", className: "col-span-2" },
+                        ].map((item) => (
+                            <div key={item.label} className={cn("flex flex-col", item.className)}>
+                                <span className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+                                    {item.label}
+                                </span>
+                                <p className="text-4xl font-extrabold text-slate-900 mt-1 tracking-tight">
+                                    {item.value}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </MobileGuestLocked>
                 <MobileBottomNav hidePlus={true} />
             </div>
         );
@@ -273,7 +225,7 @@ export default function MobileAnalyticsPage() {
                     </div>
                 )}
 
-                {!dataLoading && data && !isPaid && <MobileLockedPreview />}
+                {!dataLoading && data && !isPaid && <MobileFreemiumDashboard data={data} />}
 
                 {!dataLoading && data && isPaid && (
                     <MobileDashboard
@@ -286,6 +238,122 @@ export default function MobileAnalyticsPage() {
             
             <MobileBottomNav hidePlus={!!(!dataLoading && data && !isPaid)} />
         </div>
+    );
+}
+
+// ─── Mobile Freemium Dashboard ────────────────────────────────────────────
+
+function MobileFreemiumDashboard({ data }: { data: DashboardData }) {
+    const topLink = data.summary.topLinks[0];
+
+    return (
+        <>
+            <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                className="flex flex-col gap-4 mb-8"
+            >
+                <motion.div
+                    variants={cardVariants}
+                    className="rounded-2xl border border-slate-200 bg-primary/10 shadow-sm p-6 relative overflow-hidden"
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none" />
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-semibold text-primary uppercase tracking-wider">
+                            Total Clicks
+                        </span>
+                        <MousePointerClick className="h-5 w-5 text-primary" />
+                    </div>
+                    <p className="text-4xl font-black text-slate-900 tracking-tight leading-none">
+                        {data.summary.totalClicks.toLocaleString()}
+                    </p>
+                </motion.div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <motion.div
+                        variants={cardVariants}
+                        className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5"
+                    >
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                Links
+                            </span>
+                            <Link2 className="h-4 w-4 text-slate-400" />
+                        </div>
+                        <p className="text-2xl font-extrabold text-slate-900 tracking-tight">
+                            {data.summary.activeLinks}
+                        </p>
+                    </motion.div>
+
+                    <motion.div
+                        variants={cardVariants}
+                        className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5"
+                    >
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                Top
+                            </span>
+                            <Trophy className="h-4 w-4 text-amber-400" />
+                        </div>
+                        {topLink ? (
+                            <>
+                                <p className="text-base font-bold text-slate-900 truncate">
+                                    {topLink.title || topLink.slug}
+                                </p>
+                            </>
+                        ) : (
+                            <p className="text-xs text-slate-400">No links</p>
+                        )}
+                    </motion.div>
+                </div>
+            </motion.div>
+
+            <div className="relative mt-2 flex-1 overflow-hidden pb-12">
+                <div className="pointer-events-none select-none blur-[5px] opacity-40">
+                    <div className="mb-8">
+                        <div className="h-32 flex items-end gap-[2px]">
+                            {Array.from({ length: 30 }, (_, i) => (
+                                <div
+                                    key={i}
+                                    className="flex-1 bg-slate-300 rounded-t-sm"
+                                    style={{
+                                        height: `${20 + Math.sin(i * 0.5) * 30 + ((i * 7 + 13) % 41)}%`,
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        {["Devices", "Browsers"].map((label) => (
+                            <div key={label} className="h-24 flex flex-col">
+                                <span className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">{label}</span>
+                                <div className="flex-1 bg-slate-300/50 rounded-lg" />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="absolute inset-0 flex items-center justify-center p-6 z-10 -mt-16">
+                    <div className="w-full max-w-sm text-center flex flex-col items-center">
+                        <div className="mb-6">
+                            <Lock className="h-10 w-10 text-primary drop-shadow-sm" />
+                        </div>
+                        <h2 className="text-3xl font-extrabold text-foreground mb-4 tracking-tight drop-shadow-sm">
+                            Unlock Deep Analytics
+                        </h2>
+                        <p className="text-muted-foreground mb-8 text-[15px] leading-relaxed font-medium">
+                            Upgrade to any paid plan to access full click timelines, device breakdowns, OS tracking, and more.
+                        </p>
+                        <Link href="/pricing" className="w-full">
+                            <div className="w-full py-4 bg-primary text-primary-foreground text-sm font-bold rounded-full shadow-lg shadow-primary/20 active:scale-[0.98] transition-all">
+                                View Plans & Upgrade
+                            </div>
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        </>
     );
 }
 

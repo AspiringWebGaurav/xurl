@@ -11,6 +11,7 @@ import {
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Loader2 } from "lucide-react";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import { DesktopGuestLocked } from "@/components/layout/DesktopGuestLocked";
 
 export default function ProfilePage() {
     const [user, setUser] = useState<User | null>(null);
@@ -103,9 +104,32 @@ export default function ProfilePage() {
         return (
             <div className="min-h-screen flex flex-col bg-slate-50">
                 <TopNavbar />
-                <main className="flex-1 flex flex-col items-center justify-center max-w-5xl mx-auto w-full px-6 py-12">
-                    <h1 className="text-2xl font-bold text-slate-900 mb-2">Sign in Required</h1>
-                    <p className="text-slate-500">Please sign in to view your profile.</p>
+                <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-12">
+                    <div className="mb-8">
+                        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Profile Settings</h1>
+                        <p className="text-slate-500 mt-2">Manage your account details and display name.</p>
+                    </div>
+                    <DesktopGuestLocked
+                        title="Sign in Required"
+                        message="Please sign in to view and manage your profile."
+                    >
+                        <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6 sm:p-8">
+                            <div className="flex items-center gap-6 mb-8 pb-8 border-b border-slate-100">
+                                <div className="h-24 w-24 rounded-full bg-slate-200 animate-pulse" />
+                                <div className="space-y-3">
+                                    <div className="h-6 w-48 bg-slate-200 rounded animate-pulse" />
+                                    <div className="h-4 w-32 bg-slate-200 rounded animate-pulse" />
+                                </div>
+                            </div>
+                            <div className="space-y-6 max-w-md">
+                                <div className="space-y-3">
+                                    <div className="h-4 w-24 bg-slate-200 rounded animate-pulse" />
+                                    <div className="h-10 w-full bg-slate-200 rounded animate-pulse" />
+                                </div>
+                                <div className="h-10 w-32 bg-slate-200 rounded animate-pulse mt-6" />
+                            </div>
+                        </div>
+                    </DesktopGuestLocked>
                 </main>
             </div>
         );
