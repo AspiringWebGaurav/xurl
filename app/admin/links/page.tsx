@@ -322,11 +322,12 @@ export default function AdminLinksPage() {
     if (!user || !isAdminEmail(user.email)) return null;
 
     return (
-        <div className="mx-auto w-full px-4 py-4 pb-24 lg:px-8 lg:py-6">
-            <div className="mb-6">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Admin Console</p>
-                <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Link Management</h1>
-                <p className="mt-2 text-base text-slate-600">God Mode: Oversee and manage all system-generated short links.</p>
+        <div className="mx-auto max-w-7xl space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/90 backdrop-blur-xl p-6 rounded-[28px] border border-slate-200/80 shadow-sm">
+                <div>
+                    <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Link Management</h1>
+                    <p className="text-sm font-medium text-slate-500">God Mode: Oversee and manage all system-generated short links.</p>
+                </div>
             </div>
 
             <Tabs defaultValue="users" className="w-full">

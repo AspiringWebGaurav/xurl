@@ -10,7 +10,7 @@ export type TransactionAction =
     | "expire"
     | "admin_grant"
     | "admin_revoke";
-export type TransactionSource = "system" | "razorpay" | "developer_mode" | "admin_grant" | "promo_free";
+export type TransactionSource = "system" | "razorpay" | "developer_mode" | "admin_grant" | "promo_free" | "partial_offer";
 
 export interface PlanTransaction {
     id?: string;

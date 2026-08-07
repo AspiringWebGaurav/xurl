@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { BanGuard } from "@/components/layout/BanGuard";
+import { KillSwitchGuard } from "@/components/layout/KillSwitchGuard";
+import { PartialOfferNotificationBanner } from "@/components/layout/PartialOfferNotificationBanner";
+import { getKillSwitchState } from "@/lib/services/kill-switch";
 import { Toaster } from "@/components/ui/sonner";
 import { seo } from "@/lib/seo";
 import { StructuredData } from "@/components/seo/StructuredData";
@@ -71,6 +74,9 @@ export default async function RootLayout({
     const cookieStore = await cookies();
     const isKnownBanned = cookieStore.get("xurl_known_banned")?.value === "true";
 
+    const killSwitchState = await getKillSwitchState();
+    const initialKillSwitchActive = Boolean(killSwitchState?.active);
+
     return (
         <html lang="en" suppressHydrationWarning>
             <head>
@@ -78,11 +84,14 @@ export default async function RootLayout({
             </head>
             <body className={`${inter.className} bg-background text-foreground`} suppressHydrationWarning>
                 <StructuredData />
-                <ConfirmLinkProvider>
-                    <BanGuard isMobileDevice={isMobileDevice} initiallyBanned={isKnownBanned}>
-                        {children}
-                    </BanGuard>
-                </ConfirmLinkProvider>
+                <KillSwitchGuard initialKillSwitchActive={initialKillSwitchActive}>
+                    <ConfirmLinkProvider>
+                        <BanGuard isMobileDevice={isMobileDevice} initiallyBanned={isKnownBanned}>
+                            <PartialOfferNotificationBanner />
+                            {children}
+                        </BanGuard>
+                    </ConfirmLinkProvider>
+                </KillSwitchGuard>
                 <Toaster />
             </body>
         </html>

@@ -123,20 +123,21 @@ export default function AdminPurchaseHistoryPage() {
     }
 
     return (
-        <div className="space-y-8">
-            <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Admin</p>
-                <h1 className="text-3xl font-bold tracking-tight text-slate-900">Purchase History</h1>
-                <p className="mt-2 text-slate-500">Review transaction history, plan changes, and billing sources without leaving the admin workspace.</p>
+        <div className="mx-auto max-w-7xl space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/90 backdrop-blur-xl p-6 rounded-[28px] border border-slate-200/80 shadow-sm">
+                <div>
+                    <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Purchase History</h1>
+                    <p className="text-sm font-medium text-slate-500">Review transaction history, plan changes, and billing sources without leaving the admin workspace.</p>
+                </div>
             </div>
 
             {error && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                <div className="rounded-2xl border border-rose-200/80 bg-rose-50/90 p-4 text-sm font-semibold text-rose-800 shadow-sm animate-fade-in">
                     {error}
                 </div>
             )}
 
-            <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-[28px] border border-slate-200/80 bg-white/90 backdrop-blur-xl shadow-sm">
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-[860px] text-left text-sm">
                         <thead className="border-b border-slate-200 bg-slate-50/80 text-slate-500">

@@ -16,12 +16,18 @@ import {
     Monitor,
     Globe,
     MousePointerClick,
+    Download,
+    ShieldCheck,
+    Bot,
+    QrCode,
+    Target,
+    Sparkles,
 } from "lucide-react";
 import { motion, type Variants } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { buildShortUrl } from "@/lib/utils/url-builder";
 import Link from "next/link";
-import { isPaidPlan } from "@/lib/plans";
+import { isPaidPlan, PLAN_CONFIGS } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
 import { DesktopGuestLocked } from "@/components/layout/DesktopGuestLocked";
 
@@ -40,6 +46,13 @@ interface DashboardData {
     devices: Record<string, number>;
     browsers: Record<string, number>;
     os: Record<string, number>;
+    bots?: number;
+    humans?: number;
+    sources?: Record<string, number>;
+    utms?: {
+        sources?: Record<string, number>;
+        campaigns?: Record<string, number>;
+    };
 }
 
 // ─── Animation Variants ─────────────────────────────────────────────────────
@@ -74,31 +87,45 @@ function BreakdownBars({ data }: { data: Record<string, number> }) {
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5);
     const max = entries[0]?.[1] || 1;
+    const total = entries.reduce((acc, curr) => acc + curr[1], 0);
 
     if (entries.length === 0) {
-        return <p className="text-sm text-slate-400">No data yet.</p>;
+        return (
+            <div className="flex flex-col items-center justify-center py-7 text-center space-y-2.5 bg-slate-50/60 rounded-2xl border border-dashed border-slate-200/90 transition-all hover:border-slate-300">
+                <div className="h-9 w-9 rounded-full bg-slate-100/80 flex items-center justify-center text-slate-400 shadow-inner">
+                    <BarChart3 className="h-4 w-4 text-slate-500" />
+                </div>
+                <p className="text-xs font-bold text-slate-700">No Click Traffic Recorded</p>
+                <p className="text-[11px] text-slate-400 max-w-[210px] leading-relaxed">Data will aggregate in real time when visitors open your short URLs.</p>
+            </div>
+        );
     }
 
     return (
-        <div className="space-y-3">
-            {entries.map(([label, count]) => (
-                <div key={label}>
-                    <div className="flex justify-between text-sm mb-1">
-                        <span className="text-slate-700 font-medium capitalize">
-                            {label}
-                        </span>
-                        <span className="text-slate-500 tabular-nums">
-                            {count.toLocaleString()}
-                        </span>
+        <div className="space-y-3.5">
+            {entries.map(([label, count]) => {
+                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                return (
+                    <div key={label} className="group/bar transition-all duration-200 hover:translate-x-1">
+                        <div className="flex justify-between text-xs mb-1.5 font-bold">
+                            <span className="text-slate-700 capitalize flex items-center gap-1.5 group-hover/bar:text-emerald-600 transition-colors">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block opacity-80" />
+                                {label}
+                            </span>
+                            <div className="flex items-center gap-2 tabular-nums">
+                                <span className="text-slate-900 font-extrabold">{count.toLocaleString()}</span>
+                                <span className="text-[10px] font-semibold text-slate-400 bg-slate-100/80 px-1.5 py-0.5 rounded-md">{pct}%</span>
+                            </div>
+                        </div>
+                        <div className="w-full bg-slate-100/90 h-2.5 rounded-full overflow-hidden p-0.5 border border-slate-200/50 shadow-inner">
+                            <div
+                                className="h-full bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-full transition-all duration-500 group-hover/bar:brightness-110 group-hover/bar:shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                                style={{ width: `${(count / max) * 100}%` }}
+                            />
+                        </div>
                     </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                        <div
-                            className="h-full bg-slate-900 rounded-full transition-all duration-500"
-                            style={{ width: `${(count / max) * 100}%` }}
-                        />
-                    </div>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 }
@@ -107,26 +134,39 @@ function BreakdownList({ data }: { data: Record<string, number> }) {
     const entries = Object.entries(data)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10);
+    const total = entries.reduce((acc, curr) => acc + curr[1], 0);
 
     if (entries.length === 0) {
-        return <p className="text-sm text-slate-400">No data yet.</p>;
+        return (
+            <div className="flex flex-col items-center justify-center py-7 text-center space-y-2.5 bg-slate-50/60 rounded-2xl border border-dashed border-slate-200/90 transition-all hover:border-slate-300">
+                <div className="h-9 w-9 rounded-full bg-slate-100/80 flex items-center justify-center text-slate-400 shadow-inner">
+                    <Globe className="h-4 w-4 text-slate-500" />
+                </div>
+                <p className="text-xs font-bold text-slate-700">No Referrers Captured</p>
+                <p className="text-[11px] text-slate-400 max-w-[210px] leading-relaxed">Top referring domains & platforms will appear here.</p>
+            </div>
+        );
     }
 
     return (
-        <div className="space-y-2.5">
-            {entries.map(([label, count]) => (
-                <div
-                    key={label}
-                    className="flex items-center justify-between text-sm"
-                >
-                    <span className="text-slate-700 font-medium truncate mr-4">
-                        {label.replace(/_/g, ".")}
-                    </span>
-                    <span className="text-slate-500 tabular-nums shrink-0">
-                        {count.toLocaleString()}
-                    </span>
-                </div>
-            ))}
+        <div className="space-y-2">
+            {entries.map(([label, count]) => {
+                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                return (
+                    <div
+                        key={label}
+                        className="flex items-center justify-between text-xs px-3.5 py-2.5 rounded-xl bg-slate-50/70 border border-slate-200/60 hover:border-emerald-500/40 hover:bg-emerald-50/30 hover:scale-[1.01] transition-all duration-200 group/row shadow-2xs"
+                    >
+                        <span className="text-slate-800 font-bold truncate mr-4 group-hover/row:text-emerald-700 transition-colors">
+                            {label.replace(/_/g, ".")}
+                        </span>
+                        <div className="flex items-center gap-2 tabular-nums shrink-0">
+                            <span className="text-slate-900 font-black">{count.toLocaleString()}</span>
+                            <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-full border border-emerald-200/50">{pct}%</span>
+                        </div>
+                    </div>
+                );
+            })}
         </div>
     );
 }
@@ -184,6 +224,36 @@ export default function AnalyticsPage() {
     const [data, setData] = useState<DashboardData | null>(null);
     const [error, setError] = useState("");
     const [hoveredBar, setHoveredBar] = useState<number | null>(null);
+    const [exportingCsv, setExportingCsv] = useState(false);
+
+    const handleExportCsv = async () => {
+        if (!user) return;
+        setExportingCsv(true);
+        try {
+            const token = await user.getIdToken();
+            const res = await fetch("/api/user/analytics/export", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) {
+                const errData = await res.json();
+                alert(errData.message || "Failed to export CSV");
+                return;
+            }
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `xurl_analytics_${Date.now()}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch {
+            alert("Failed to download CSV export.");
+        } finally {
+            setExportingCsv(false);
+        }
+    };
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -270,13 +340,34 @@ export default function AnalyticsPage() {
             <TopNavbar />
             <main className="flex-1 flex flex-col w-full overflow-y-auto overflow-x-hidden">
                 <div className="w-full px-6 lg:px-12 py-12">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-                        Analytics
-                    </h1>
-                    <p className="text-slate-500 mt-2">
-                        Track your link performance over the last 30 days.
-                    </p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+                    <div>
+                        <div className="flex items-center gap-2.5">
+                            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+                                Analytics
+                            </h1>
+                            {data && (
+                                <span className="uppercase text-[10px] font-black tracking-widest px-2.5 py-1 rounded-full bg-slate-900 text-white shadow-sm border border-slate-700">
+                                    {PLAN_CONFIGS[data.plan || "free"].label} Tier ({PLAN_CONFIGS[data.plan || "free"].analyticsRetentionDays || 30} Days)
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-slate-500 mt-1">
+                            Track real-time link performance and visitor demographics.
+                        </p>
+                    </div>
+
+                    {data && PLAN_CONFIGS[data.plan || "free"].hasCsvExport && (
+                        <Button
+                            type="button"
+                            onClick={handleExportCsv}
+                            disabled={exportingCsv}
+                            className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-full px-5 py-2.5 text-sm font-bold shadow-md shadow-emerald-600/20 active:scale-95 transition-all"
+                        >
+                            <Download className="h-4 w-4" />
+                            {exportingCsv ? "Exporting..." : "Export CSV Report"}
+                        </Button>
+                    )}
                 </div>
 
                 {error && (
@@ -444,60 +535,70 @@ function FullDashboard({
                 animate="visible"
                 className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
             >
+                {/* Card 1: Total Clicks */}
                 <motion.div
                     variants={cardVariants}
-                    className="relative group rounded-3xl border border-slate-200/60 bg-white/70 backdrop-blur-xl shadow-sm hover:shadow-xl transition-all duration-300 p-6 overflow-hidden"
+                    className="relative group rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white/90 via-white/80 to-slate-50/60 backdrop-blur-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(59,130,246,0.18)] hover:border-blue-500/40 hover:-translate-y-1.5 transition-all duration-300 p-6 overflow-hidden"
                 >
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                     <div className="relative z-10 flex items-center justify-between mb-4">
-                        <span className="text-sm font-medium text-slate-500">
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
                             Total Clicks
                         </span>
-                        <MousePointerClick className="h-5 w-5 text-slate-400" />
+                        <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-blue-500/10 via-indigo-500/10 to-blue-600/10 text-blue-600 border border-blue-500/20 flex items-center justify-center shadow-xs group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                            <MousePointerClick className="h-5 w-5" />
+                        </div>
                     </div>
-                    <p className="text-[42px] font-extrabold text-slate-900 tracking-tight leading-none">
-                        {data.summary.totalClicks.toLocaleString()}
+                    <p className="text-4xl lg:text-[46px] font-black text-slate-900 tracking-tight leading-none">
+                        <AnimatedDummyNumber target={data.summary.totalClicks} />
                     </p>
                 </motion.div>
 
+                {/* Card 2: Active Links */}
                 <motion.div
                     variants={cardVariants}
-                    className="relative group rounded-3xl border border-slate-200/60 bg-white/70 backdrop-blur-xl shadow-sm hover:shadow-xl transition-all duration-300 p-6 overflow-hidden"
+                    className="relative group rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white/90 via-white/80 to-slate-50/60 backdrop-blur-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(16,185,129,0.18)] hover:border-emerald-500/40 hover:-translate-y-1.5 transition-all duration-300 p-6 overflow-hidden"
                 >
-                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-teal-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                     <div className="relative z-10 flex items-center justify-between mb-4">
-                        <span className="text-sm font-medium text-slate-500">
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
                             Active Links
                         </span>
-                        <Link2 className="h-5 w-5 text-slate-400" />
+                        <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-emerald-600/10 text-emerald-600 border border-emerald-500/20 flex items-center justify-center shadow-xs group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                            <Link2 className="h-5 w-5" />
+                        </div>
                     </div>
-                    <p className="text-[42px] font-extrabold text-slate-900 tracking-tight leading-none">
-                        {data.summary.activeLinks}
+                    <p className="text-4xl lg:text-[46px] font-black text-slate-900 tracking-tight leading-none">
+                        <AnimatedDummyNumber target={data.summary.activeLinks} format={false} />
                     </p>
                 </motion.div>
 
+                {/* Card 3: Top Performer */}
                 <motion.div
                     variants={cardVariants}
-                    className="relative group rounded-3xl border border-slate-200/60 bg-white/70 backdrop-blur-xl shadow-sm hover:shadow-xl transition-all duration-300 p-6 overflow-hidden"
+                    className="relative group rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white/90 via-white/80 to-slate-50/60 backdrop-blur-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_-15px_rgba(245,158,11,0.18)] hover:border-amber-500/40 hover:-translate-y-1.5 transition-all duration-300 p-6 overflow-hidden"
                 >
-                    <div className="absolute inset-0 bg-gradient-to-br from-amber-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-orange-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                     <div className="relative z-10 flex items-center justify-between mb-4">
-                        <span className="text-sm font-medium text-slate-500">
+                        <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
                             Top Performer
                         </span>
-                        <Trophy className="h-5 w-5 text-amber-400" />
+                        <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-amber-500/15 via-orange-500/15 to-amber-600/15 text-amber-500 border border-amber-500/30 flex items-center justify-center shadow-xs group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                            <Trophy className="h-5 w-5" />
+                        </div>
                     </div>
                     {topLink ? (
                         <>
-                            <p className="text-lg font-bold text-slate-900 truncate">
+                            <p className="text-lg font-black text-slate-900 truncate tracking-tight">
                                 {topLink.title || topLink.slug}
                             </p>
-                            <p className="text-sm text-slate-500 mt-1">
-                                {topLink.clicks.toLocaleString()} clicks
+                            <p className="text-xs font-semibold text-emerald-600 mt-1 flex items-center gap-1">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />
+                                {topLink.clicks.toLocaleString()} clicks recorded
                             </p>
                         </>
                     ) : (
-                        <p className="text-sm text-slate-400">No links yet</p>
+                        <p className="text-xs font-semibold text-slate-400">No active links created yet</p>
                     )}
                 </motion.div>
             </motion.div>
@@ -507,70 +608,93 @@ function FullDashboard({
                 variants={cardVariants}
                 initial="hidden"
                 animate="visible"
-                className="relative rounded-3xl border border-slate-200/60 bg-white/70 backdrop-blur-xl shadow-sm p-8 mb-8"
+                className="relative rounded-3xl border border-slate-200/80 bg-white/80 backdrop-blur-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_45px_-15px_rgba(16,185,129,0.12)] transition-all duration-300 p-7 lg:p-8 mb-8 overflow-hidden group"
             >
-                <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-lg font-semibold text-slate-900">
-                        Click Timeline
-                    </h2>
-                    <BarChart3 className="h-5 w-5 text-slate-400" />
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                                Click Velocity Timeline
+                            </h2>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 text-[10px] font-bold">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                                Live Monitoring Active
+                            </span>
+                        </div>
+                        <p className="text-xs text-slate-500 font-medium mt-0.5">
+                            Daily click volume distribution across your retention window.
+                        </p>
+                    </div>
+                    <div className="h-9 w-9 rounded-xl bg-slate-100/80 border border-slate-200/60 flex items-center justify-center text-slate-500">
+                        <BarChart3 className="h-4 w-4" />
+                    </div>
                 </div>
 
                 {data.timeline.every((d) => d.clicks === 0) ? (
-                    <div className="flex items-center justify-center h-48 text-sm text-slate-400">
-                        No click data in the last 30 days.
+                    <div className="flex flex-col items-center justify-center py-10 px-4 text-center rounded-2xl bg-gradient-to-b from-slate-50/70 to-slate-100/40 border border-dashed border-slate-200 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.05)_0%,transparent_70%)] pointer-events-none" />
+                        <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-emerald-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-600 mb-3 shadow-inner">
+                            <Sparkles className="h-6 w-6 animate-pulse" />
+                        </div>
+                        <h3 className="text-sm font-extrabold text-slate-900 mb-1">
+                            Ready to Record Your First Click
+                        </h3>
+                        <p className="text-xs text-slate-500 max-w-md leading-relaxed mb-4">
+                            No click activity recorded in this period yet. Share your shortened URLs across social media, emails, or QR codes to watch your live analytics update in real time.
+                        </p>
+                        <Link href="/app">
+                            <Button className="bg-slate-900 hover:bg-slate-800 text-white rounded-full px-5 py-2 text-xs font-bold shadow-md hover:scale-105 active:scale-95 transition-all">
+                                Create Short Link →
+                            </Button>
+                        </Link>
                     </div>
                 ) : (
                     <>
                         <div className="flex items-end gap-[3px] h-48">
                             {data.timeline.map((day, i) => {
-                                const heightPercent =
-                                    (day.clicks / maxClicks) * 100;
+                                const heightPercent = (day.clicks / maxClicks) * 100;
                                 return (
                                     <div
                                         key={day.date}
-                                        className="relative flex-1 group cursor-pointer"
+                                        className="relative flex-1 group/bar cursor-pointer"
                                         onMouseEnter={() => onHoverBar(i)}
                                         onMouseLeave={() => onHoverBar(null)}
                                     >
                                         {hoveredBar === i && (
-                                            <div className="absolute -top-16 left-1/2 -translate-x-1/2 z-10 bg-slate-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg pointer-events-none">
-                                                <p className="font-semibold">
-                                                    {day.clicks} clicks
+                                            <div className="absolute -top-16 left-1/2 -translate-x-1/2 z-20 bg-slate-900 text-white text-xs rounded-xl px-3.5 py-2 whitespace-nowrap shadow-xl border border-slate-700 pointer-events-none">
+                                                <p className="font-extrabold text-emerald-400">
+                                                    {day.clicks.toLocaleString()} clicks
                                                 </p>
-                                                <p className="text-slate-300 text-[11px]">
+                                                <p className="text-slate-300 text-[10px]">
                                                     {formatDate(day.date)}
                                                 </p>
                                             </div>
                                         )}
                                         <div
                                             className={cn(
-                                                "w-full rounded-t-sm transition-all duration-300 ease-out",
+                                                "w-full rounded-t-md transition-all duration-300 ease-out",
                                                 hoveredBar === i
-                                                    ? "bg-gradient-to-t from-slate-600 to-slate-400 shadow-[0_0_15px_rgba(148,163,184,0.5)]"
-                                                    : "bg-gradient-to-t from-slate-800 to-slate-900"
+                                                    ? "bg-gradient-to-t from-emerald-600 via-teal-500 to-cyan-400 shadow-[0_0_20px_rgba(16,185,129,0.7)] scale-x-110"
+                                                    : "bg-gradient-to-t from-slate-700 via-slate-800 to-slate-900 hover:from-emerald-600 hover:to-teal-500"
                                             )}
                                             style={{
-                                                height: `${Math.max(heightPercent, day.clicks > 0 ? 4 : 1)}%`,
+                                                height: `${Math.max(heightPercent, day.clicks > 0 ? 6 : 2)}%`,
                                             }}
                                         />
                                     </div>
                                 );
                             })}
                         </div>
-                        <div className="flex justify-between mt-3 text-xs text-slate-400">
+                        <div className="flex justify-between mt-3 text-xs font-semibold text-slate-400">
                             <span>
-                                {data.timeline[0]
-                                    ? formatDate(data.timeline[0].date)
-                                    : ""}
+                                {data.timeline[0] ? formatDate(data.timeline[0].date) : ""}
                             </span>
                             <span>
                                 {data.timeline[data.timeline.length - 1]
-                                    ? formatDate(
-                                          data.timeline[
-                                              data.timeline.length - 1
-                                          ].date
-                                      )
+                                    ? formatDate(data.timeline[data.timeline.length - 1].date)
                                     : ""}
                             </span>
                         </div>
@@ -583,66 +707,90 @@ function FullDashboard({
                 variants={cardVariants}
                 initial="hidden"
                 animate="visible"
-                className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden mb-8"
+                className="rounded-3xl border border-slate-200/80 bg-white/80 backdrop-blur-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_45px_-15px_rgba(0,0,0,0.06)] transition-all duration-300 overflow-hidden mb-8"
             >
-                <div className="px-6 py-5 border-b border-slate-100">
-                    <h2 className="text-lg font-semibold text-slate-900">
-                        Top Performing Links
-                    </h2>
+                <div className="px-7 py-5 border-b border-slate-100/80 flex items-center justify-between">
+                    <div>
+                        <h2 className="text-lg font-black text-slate-900 tracking-tight">
+                            Top Performing Links
+                        </h2>
+                        <p className="text-xs text-slate-500 font-medium mt-0.5">
+                            Highest engagement links ranked by total click volume.
+                        </p>
+                    </div>
+                    <span className="text-xs font-bold text-slate-500 bg-slate-100/80 px-3 py-1 rounded-full border border-slate-200/60">
+                        Top {data.summary.topLinks.length} Active
+                    </span>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-medium">
+                        <thead className="bg-slate-50/70 border-b border-slate-200/60 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
                             <tr>
-                                <th className="px-6 py-4 whitespace-nowrap w-12">
-                                    #
+                                <th className="px-6 py-4 whitespace-nowrap w-16">
+                                    Rank
                                 </th>
                                 <th className="px-6 py-4 whitespace-nowrap">
                                     Short URL
                                 </th>
                                 <th className="px-6 py-4 whitespace-nowrap">
-                                    Title
+                                    Title / Alias
                                 </th>
                                 <th className="px-6 py-4 whitespace-nowrap text-right">
-                                    Clicks
+                                    Total Clicks
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 text-slate-700">
+                        <tbody className="divide-y divide-slate-100/80 text-slate-700 font-medium">
                             {data.summary.topLinks.length === 0 ? (
                                 <tr>
                                     <td
                                         colSpan={4}
-                                        className="px-6 py-8 text-center text-slate-500"
+                                        className="px-6 py-10 text-center"
                                     >
-                                        No link data yet. Create and share some
-                                        links to see analytics.
+                                        <div className="flex flex-col items-center justify-center space-y-2">
+                                            <div className="h-10 w-10 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
+                                                <Trophy className="h-5 w-5" />
+                                            </div>
+                                            <p className="text-xs font-bold text-slate-700">No Link Data Available</p>
+                                            <p className="text-[11px] text-slate-400 max-w-sm">Create and distribute your short links to start tracking live performance metrics.</p>
+                                        </div>
                                     </td>
                                 </tr>
                             ) : (
                                 data.summary.topLinks.map((link, i) => (
                                     <tr
                                         key={link.slug}
-                                        className="hover:bg-slate-50/50 transition-colors"
+                                        className="hover:bg-slate-50/80 transition-all duration-200 group/row"
                                     >
-                                        <td className="px-6 py-4 font-medium text-slate-400">
-                                            {i + 1}
+                                        <td className="px-6 py-4 font-black text-xs">
+                                            {i === 0 ? (
+                                                <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-amber-100 text-amber-800 text-xs shadow-2xs">🥇</span>
+                                            ) : i === 1 ? (
+                                                <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-slate-100 text-slate-700 text-xs shadow-2xs">🥈</span>
+                                            ) : i === 2 ? (
+                                                <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-orange-100 text-orange-800 text-xs shadow-2xs">🥉</span>
+                                            ) : (
+                                                <span className="text-slate-400 font-bold ml-1.5">#{i + 1}</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <a
                                                 href={buildShortUrl(link.slug)}
                                                 target="_blank"
                                                 rel="noreferrer"
-                                                className="text-slate-900 font-medium font-mono text-xs hover:text-blue-600 transition-colors"
+                                                className="inline-flex items-center gap-1.5 text-slate-900 font-mono text-xs font-bold bg-slate-100/90 px-2.5 py-1 rounded-lg border border-slate-200/70 hover:border-emerald-500/40 hover:bg-emerald-50 hover:text-emerald-700 transition-all"
                                             >
-                                                {buildShortUrl(link.slug).replace(/^https?:\/\//, "")}
+                                                <span>{buildShortUrl(link.slug).replace(/^https?:\/\//, "")}</span>
+                                                <Link2 className="h-3 w-3 text-slate-400 group-hover/row:text-emerald-600" />
                                             </a>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-slate-600 truncate max-w-[200px]">
+                                        <td className="px-6 py-4 whitespace-nowrap text-slate-700 font-semibold truncate max-w-[220px]">
                                             {link.title || link.slug}
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right font-semibold text-slate-900 tabular-nums">
-                                            {link.clicks.toLocaleString()}
+                                        <td className="px-6 py-4 whitespace-nowrap text-right font-black text-slate-900 tabular-nums">
+                                            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/50 text-xs">
+                                                {link.clicks.toLocaleString()} clicks
+                                            </span>
                                         </td>
                                     </tr>
                                 ))
@@ -661,69 +809,188 @@ function FullDashboard({
             >
                 <motion.div
                     variants={cardVariants}
-                    className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6"
+                    className="rounded-3xl border border-slate-200/80 bg-white/80 backdrop-blur-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_45px_-15px_rgba(16,185,129,0.12)] hover:border-emerald-500/40 hover:-translate-y-1 transition-all duration-300 p-7 group"
                 >
-                    <div className="flex items-center gap-2 mb-4">
-                        <Monitor className="h-4 w-4 text-slate-400" />
-                        <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
-                            Devices
-                        </h3>
+                    <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-2.5">
+                            <div className="h-8 w-8 rounded-xl bg-slate-100/80 border border-slate-200/60 flex items-center justify-center text-slate-600 group-hover:scale-110 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-all">
+                                <Monitor className="h-4 w-4" />
+                            </div>
+                            <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">
+                                Devices
+                            </h3>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Hardware</span>
                     </div>
                     <BreakdownBars data={data.devices} />
                 </motion.div>
 
                 <motion.div
                     variants={cardVariants}
-                    className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6"
+                    className="rounded-3xl border border-slate-200/80 bg-white/80 backdrop-blur-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_45px_-15px_rgba(16,185,129,0.12)] hover:border-emerald-500/40 hover:-translate-y-1 transition-all duration-300 p-7 group"
                 >
-                    <div className="flex items-center gap-2 mb-4">
-                        <Globe className="h-4 w-4 text-slate-400" />
-                        <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
-                            Browsers
-                        </h3>
+                    <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-2.5">
+                            <div className="h-8 w-8 rounded-xl bg-slate-100/80 border border-slate-200/60 flex items-center justify-center text-slate-600 group-hover:scale-110 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-all">
+                                <Globe className="h-4 w-4" />
+                            </div>
+                            <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">
+                                Browsers
+                            </h3>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Clients</span>
                     </div>
                     <BreakdownBars data={data.browsers} />
                 </motion.div>
 
                 <motion.div
                     variants={cardVariants}
-                    className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6"
+                    className="rounded-3xl border border-slate-200/80 bg-white/80 backdrop-blur-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_45px_-15px_rgba(16,185,129,0.12)] hover:border-emerald-500/40 hover:-translate-y-1 transition-all duration-300 p-7 group"
                 >
-                    <div className="flex items-center gap-2 mb-4">
-                        <Monitor className="h-4 w-4 text-slate-400" />
-                        <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
-                            Operating Systems
-                        </h3>
+                    <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-2.5">
+                            <div className="h-8 w-8 rounded-xl bg-slate-100/80 border border-slate-200/60 flex items-center justify-center text-slate-600 group-hover:scale-110 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-all">
+                                <Monitor className="h-4 w-4" />
+                            </div>
+                            <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">
+                                Operating Systems
+                            </h3>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Platform</span>
                     </div>
                     <BreakdownBars data={data.os} />
                 </motion.div>
 
                 <motion.div
                     variants={cardVariants}
-                    className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6"
+                    className="rounded-3xl border border-slate-200/80 bg-white/80 backdrop-blur-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_45px_-15px_rgba(16,185,129,0.12)] hover:border-emerald-500/40 hover:-translate-y-1 transition-all duration-300 p-7 group"
                 >
-                    <div className="flex items-center gap-2 mb-4">
-                        <Link2 className="h-4 w-4 text-slate-400" />
-                        <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
-                            Top Referrers
-                        </h3>
+                    <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-2.5">
+                            <div className="h-8 w-8 rounded-xl bg-slate-100/80 border border-slate-200/60 flex items-center justify-center text-slate-600 group-hover:scale-110 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-all">
+                                <Link2 className="h-4 w-4" />
+                            </div>
+                            <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">
+                                Top Referrers
+                            </h3>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Traffic Origin</span>
                     </div>
                     <BreakdownList data={data.referrers} />
                 </motion.div>
 
                 <motion.div
                     variants={cardVariants}
-                    className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6"
+                    className="rounded-3xl border border-slate-200/80 bg-white/80 backdrop-blur-2xl shadow-[0_10px_30px_-10px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_45px_-15px_rgba(16,185,129,0.12)] hover:border-emerald-500/40 hover:-translate-y-1 transition-all duration-300 p-7 group"
                 >
-                    <div className="flex items-center gap-2 mb-4">
-                        <Globe className="h-4 w-4 text-slate-400" />
-                        <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
-                            Top Countries
-                        </h3>
+                    <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-2.5">
+                            <div className="h-8 w-8 rounded-xl bg-slate-100/80 border border-slate-200/60 flex items-center justify-center text-slate-600 group-hover:scale-110 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-all">
+                                <Globe className="h-4 w-4" />
+                            </div>
+                            <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">
+                                Top Countries
+                            </h3>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Geography</span>
                     </div>
                     <BreakdownList data={data.countries} />
                 </motion.div>
+
+                {/* ── Premium Feature: Bot vs Human Traffic Authenticity ── */}
+                {PLAN_CONFIGS[data.plan]?.hasBotDetection && (
+                    <motion.div
+                        variants={cardVariants}
+                        className="rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50/40 via-white to-white shadow-sm p-6"
+                    >
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                                    Traffic Authenticity
+                                </h3>
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                                Business Tier
+                            </span>
+                        </div>
+
+                        {(() => {
+                            const humans = data.humans || 0;
+                            const bots = data.bots || 0;
+                            const total = humans + bots;
+                            const humanPct = total > 0 ? Math.round((humans / total) * 100) : 100;
+                            return (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-2xl font-black text-slate-900">{humanPct}%</span>
+                                            <span className="text-xs font-semibold text-slate-500">Real Human Visitors</span>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-xs font-bold">
+                                            <span className="text-emerald-700 flex items-center gap-1">
+                                                <span className="h-2 w-2 rounded-full bg-emerald-500" /> {humans.toLocaleString()} Humans
+                                            </span>
+                                            <span className="text-amber-700 flex items-center gap-1">
+                                                <Bot className="h-3.5 w-3.5" /> {bots.toLocaleString()} Bots
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="w-full bg-amber-100 h-3 rounded-full overflow-hidden flex">
+                                        <div
+                                            className="h-full bg-emerald-500 transition-all duration-500"
+                                            style={{ width: `${humanPct}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </motion.div>
+                )}
+
+                {/* ── Premium Feature: UTM Campaign Intelligence ── */}
+                {PLAN_CONFIGS[data.plan]?.hasUtmAnalytics && (
+                    <motion.div
+                        variants={cardVariants}
+                        className="rounded-2xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50/40 via-white to-white shadow-sm p-6"
+                    >
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <Target className="h-4 w-4 text-indigo-600" />
+                                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                                    UTM Campaigns
+                                </h3>
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md">
+                                Business Tier
+                            </span>
+                        </div>
+                        <BreakdownBars data={data.utms?.campaigns || {}} />
+                    </motion.div>
+                )}
             </motion.div>
+
+            {/* ── Upgrade Teaser for Lower Tiers ── */}
+            {!PLAN_CONFIGS[data.plan]?.hasUtmAnalytics && (
+                <div className="mt-8 rounded-3xl border border-indigo-200/70 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 p-6 text-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-6">
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-amber-300 animate-pulse" />
+                            <h3 className="text-base font-extrabold tracking-tight text-white">
+                                Want UTM Campaign Tracking & Bot Filtering?
+                            </h3>
+                        </div>
+                        <p className="text-xs text-slate-300 max-w-xl">
+                            Upgrade to <strong className="text-amber-300">Business</strong> or <strong className="text-amber-300">Enterprise</strong> to unlock 90-day history, UTM source attribution, automated bot detection, and direct CSV exports.
+                        </p>
+                    </div>
+                    <Link href="/pricing" className="shrink-0">
+                        <Button className="bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-950 font-black rounded-full px-6 py-2.5 text-xs shadow-lg active:scale-95 transition-all">
+                            Upgrade to Business
+                        </Button>
+                    </Link>
+                </div>
+            )}
 
             {/* Legal Notice */}
             <div className="mt-8 text-center">

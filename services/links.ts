@@ -229,9 +229,10 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                 let effectiveLimit: number;
                 if (currentPlan === "free") {
                     effectiveLimit = config.limit + remainingGiftLinks;
+                } else if (userData.cumulativeQuota && userData.planRenewals && userData.planRenewals > 1) {
+                    effectiveLimit = userData.cumulativeQuota + remainingGiftLinks;
                 } else {
-                    // Use permanent accumulated limit, fallback for legacy users
-                    effectiveLimit = (userData.cumulativeQuota || (config.limit * (userData.planRenewals || 1))) + remainingGiftLinks;
+                    effectiveLimit = (userData.cumulativeQuota || config.limit) + remainingGiftLinks;
                 }
 
                 // Count ALL active links belonging to the user across ALL time (infinite accumulation)

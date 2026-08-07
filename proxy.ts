@@ -42,6 +42,28 @@ function buildRedirectResponse(
     return response;
 }
 
+const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.REDIS_URL;
+const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || "";
+
+// Fast Upstash Redis REST read for sub-millisecond edge proxy checks
+async function checkIsKillSwitchActive(): Promise<boolean> {
+    if (!REDIS_URL || !REDIS_TOKEN) return false;
+    try {
+        const res = await fetch(`${REDIS_URL}/get/system:kill_switch`, {
+            headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
+            cache: "no-store",
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        if (!data.result) return false;
+
+        const parsed = typeof data.result === "string" ? JSON.parse(data.result) : data.result;
+        return Boolean(parsed?.active);
+    } catch {
+        return false;
+    }
+}
+
 export async function proxy(request: NextRequest, event: NextFetchEvent) {
     const { pathname } = request.nextUrl;
 

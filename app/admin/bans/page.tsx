@@ -265,25 +265,26 @@ export default function AdminBansPage() {
     if (!user || !isAdminEmail(user.email)) return null;
 
     return (
-        <div className="mx-auto w-full px-4 py-4 pb-24 lg:px-8 lg:py-6">
-            <div className="mb-6">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Admin Console</p>
-                <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Bans & Appeals</h1>
-                <p className="mt-2 text-base text-slate-600">Strictly enforce platform rules across the entire userbase.</p>
+        <div className="mx-auto max-w-7xl space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/90 backdrop-blur-xl p-6 rounded-[28px] border border-slate-200/80 shadow-sm">
+                <div>
+                    <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Bans & Appeals</h1>
+                    <p className="text-sm font-medium text-slate-500">Strictly enforce platform rules across the entire userbase.</p>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
                 {/* Left Column: Bans & Search (Takes 2 columns on XL screens) */}
                 <div className="xl:col-span-2 space-y-8">
                     {/* Target Ban (Enterprise Form) */}
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 mb-8">
+                    <div className="rounded-[28px] border border-slate-200/80 bg-white/90 backdrop-blur-xl shadow-sm p-6 sm:p-8 mb-8 transition-all duration-300 hover:shadow-md">
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-100/50">
-                                <ShieldAlert className="h-5 w-5 text-rose-600" />
+                            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-50 border border-rose-100">
+                                <ShieldAlert className="h-5 w-5 text-rose-600 animate-pulse" />
                             </div>
                             <div>
-                                <h2 className="text-lg font-semibold tracking-tight text-slate-900">Target Ban / Instant Suspend</h2>
-                                <p className="text-sm text-slate-500">Manually enforce a platform ban by email address.</p>
+                                <h2 className="text-lg font-extrabold tracking-tight text-slate-900">Target Ban / Instant Suspend</h2>
+                                <p className="text-xs font-medium text-slate-500">Manually enforce a platform ban by email address.</p>
                             </div>
                         </div>
                         

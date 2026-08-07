@@ -91,10 +91,56 @@ function AnimatedPlanCard({ plan, activeCurrency }: { plan: PlanConfig, activeCu
     );
 }
 
+import { auth } from "@/lib/firebase/config";
+import { onAuthStateChanged, User } from "firebase/auth";
+
 export default function LandingPage() {
     const router = useRouter();
     const [isNavigating, setIsNavigating] = useState(false);
     const { isMobile, isLowEnd, isMounted } = useDeviceCapabilities();
+    const [user, setUser] = useState<User | null>(null);
+    const [userPlan, setUserPlan] = useState<string>("guest");
+
+    useEffect(() => {
+        const fetchPlan = async (u: User) => {
+            try {
+                const token = await u.getIdToken(true);
+                const res = await fetch("/api/links?pageSize=1", { headers: { Authorization: `Bearer ${token}` } });
+                const data = await res.json();
+                if (data.plan) {
+                    setUserPlan(data.plan.toLowerCase());
+                } else {
+                    setUserPlan("free");
+                }
+            } catch {
+                setUserPlan("free");
+            }
+        };
+
+        const unsub = onAuthStateChanged(auth, async (u) => {
+            setUser(u);
+            if (u) {
+                fetchPlan(u);
+            } else {
+                setUserPlan("guest");
+            }
+        });
+
+        const handleRealtimeUpdate = () => {
+            if (auth.currentUser) {
+                fetchPlan(auth.currentUser);
+            }
+        };
+
+        window.addEventListener("userProfileUpdated", handleRealtimeUpdate);
+        window.addEventListener("linkGenerated", handleRealtimeUpdate);
+
+        return () => {
+            unsub();
+            window.removeEventListener("userProfileUpdated", handleRealtimeUpdate);
+            window.removeEventListener("linkGenerated", handleRealtimeUpdate);
+        };
+    }, []);
 
     // Hoisted Currency State (runs only 1 timer instead of 80+)
     const currencies = [
@@ -245,33 +291,47 @@ export default function LandingPage() {
                     </p>
 
                     {/* Glowing High-Impact Desktop Action Button Row */}
-                    <div className="flex flex-row items-center gap-4 w-auto justify-center mb-8">
-                        <Link href="/app" onClick={(e) => handleNavigation(e, '/app')}>
-                            <Button
-                                size="lg"
-                                className="relative h-14 px-9 text-base font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 text-white rounded-full shadow-[0_0_35px_rgba(16,185,129,0.5)] hover:shadow-[0_0_50px_rgba(16,185,129,0.75)] hover:scale-105 active:scale-95 transition-all duration-300 group flex items-center justify-center gap-2 overflow-hidden border border-emerald-400/40"
-                            >
-                                <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-                                <span className="relative z-10 flex items-center gap-2">
-                                    <span className="relative flex h-2.5 w-2.5">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
-                                    </span>
-                                    <span>Shorten URL Free</span>
-                                </span>
-                                <ArrowRight className="w-5 h-5 relative z-10 group-hover:translate-x-1.5 transition-transform duration-200" />
-                            </Button>
-                        </Link>
-                        <Link href="/pricing" onClick={(e) => handleNavigation(e, '/pricing')}>
-                            <Button
-                                size="lg"
-                                variant="outline"
-                                className="h-14 px-9 text-base font-semibold bg-white/90 text-slate-700 border-slate-200/80 rounded-full shadow-sm hover:shadow-md hover:text-slate-900 hover:bg-white hover:scale-102 transition-all duration-200 active:scale-95"
-                            >
-                                View Pricing
-                            </Button>
-                        </Link>
-                    </div>
+                    {(() => {
+                        const primaryBtn = (!user || userPlan === "guest")
+                            ? { labelDesktop: "Shorten URL Free", labelMobile: "Shorten Free", href: "/app" }
+                            : userPlan === "free"
+                            ? { labelDesktop: "Create Short Link", labelMobile: "Create Link", href: "/app" }
+                            : { labelDesktop: `Create ${userPlan.charAt(0).toUpperCase() + userPlan.slice(1)} Link`, labelMobile: `Create ${userPlan.charAt(0).toUpperCase() + userPlan.slice(1)}`, href: "/app" };
+
+                        const secondaryBtn = (!user || userPlan === "guest" || userPlan === "free")
+                            ? { label: "View Pricing", href: "/pricing" }
+                            : { label: "View Analytics", href: "/analytics" };
+
+                        return (
+                            <div className="flex flex-row items-center gap-4 w-auto justify-center mb-8">
+                                <Link href={primaryBtn.href} onClick={(e) => handleNavigation(e, primaryBtn.href)}>
+                                    <Button
+                                        size="lg"
+                                        className="relative h-14 px-9 text-base font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 text-white rounded-full shadow-[0_0_35px_rgba(16,185,129,0.5)] hover:shadow-[0_0_50px_rgba(16,185,129,0.75)] hover:scale-105 active:scale-95 transition-all duration-300 group flex items-center justify-center gap-2 overflow-hidden border border-emerald-400/40"
+                                    >
+                                        <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+                                        <span className="relative z-10 flex items-center gap-2">
+                                            <span className="relative flex h-2.5 w-2.5">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+                                            </span>
+                                            <span>{primaryBtn.labelDesktop}</span>
+                                        </span>
+                                        <ArrowRight className="w-5 h-5 relative z-10 group-hover:translate-x-1.5 transition-transform duration-200" />
+                                    </Button>
+                                </Link>
+                                <Link href={secondaryBtn.href} onClick={(e) => handleNavigation(e, secondaryBtn.href)}>
+                                    <Button
+                                        size="lg"
+                                        variant="outline"
+                                        className="h-14 px-9 text-base font-semibold bg-white/90 text-slate-700 border-slate-200/80 rounded-full shadow-sm hover:shadow-md hover:text-slate-900 hover:bg-white hover:scale-102 transition-all duration-200 active:scale-95"
+                                    >
+                                        {secondaryBtn.label}
+                                    </Button>
+                                </Link>
+                            </div>
+                        );
+                    })()}
 
                     {/* Live Trust & Performance Stats */}
                     <div className="mt-8 flex flex-wrap items-center justify-center gap-5 text-xs font-semibold text-slate-600 bg-white/70 backdrop-blur-md px-5 py-2 rounded-full border border-slate-200/70 shadow-sm">
@@ -307,26 +367,40 @@ export default function LandingPage() {
                     </p>
 
                     {/* Mobile Action Button Row */}
-                    <div className="flex flex-row items-center gap-2 w-full max-w-[320px] justify-center mt-1">
-                        <Link href="/app" onClick={(e) => handleNavigation(e, '/app')} className="flex-1">
-                            <Button
-                                size="sm"
-                                className="w-full h-10 px-3 text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-full shadow-[0_0_20px_rgba(16,185,129,0.4)] active:scale-95 flex items-center justify-center gap-1"
-                            >
-                                <span>Shorten Free</span>
-                                <ArrowRight className="w-3.5 h-3.5" />
-                            </Button>
-                        </Link>
-                        <Link href="/pricing" onClick={(e) => handleNavigation(e, '/pricing')} className="flex-1">
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="w-full h-10 px-3 text-xs font-semibold bg-white/90 text-slate-700 border-slate-200/80 rounded-full shadow-sm active:scale-95"
-                            >
-                                View Pricing
-                            </Button>
-                        </Link>
-                    </div>
+                    {(() => {
+                        const primaryBtn = (!user || userPlan === "guest")
+                            ? { labelMobile: "Shorten Free", href: "/app" }
+                            : userPlan === "free"
+                            ? { labelMobile: "Create Link", href: "/app" }
+                            : { labelMobile: `Create ${userPlan.charAt(0).toUpperCase() + userPlan.slice(1)}`, href: "/app" };
+
+                        const secondaryBtn = (!user || userPlan === "guest" || userPlan === "free")
+                            ? { label: "View Pricing", href: "/pricing" }
+                            : { label: "Analytics", href: "/analytics" };
+
+                        return (
+                            <div className="flex flex-row items-center gap-2 w-full max-w-[320px] justify-center mt-1">
+                                <Link href={primaryBtn.href} onClick={(e) => handleNavigation(e, primaryBtn.href)} className="flex-1">
+                                    <Button
+                                        size="sm"
+                                        className="w-full h-10 px-3 text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-full shadow-[0_0_20px_rgba(16,185,129,0.4)] active:scale-95 flex items-center justify-center gap-1"
+                                    >
+                                        <span>{primaryBtn.labelMobile}</span>
+                                        <ArrowRight className="w-3.5 h-3.5" />
+                                    </Button>
+                                </Link>
+                                <Link href={secondaryBtn.href} onClick={(e) => handleNavigation(e, secondaryBtn.href)} className="flex-1">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="w-full h-10 px-3 text-xs font-semibold bg-white/90 text-slate-700 border-slate-200/80 rounded-full shadow-sm active:scale-95"
+                                    >
+                                        {secondaryBtn.label}
+                                    </Button>
+                                </Link>
+                            </div>
+                        );
+                    })()}
 
                     {/* Mobile Live Trust Stats */}
                     <div className="flex items-center justify-center gap-2 text-[10px] font-semibold text-slate-600 bg-white/80 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-slate-200/70 shadow-sm mt-1">

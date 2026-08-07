@@ -138,9 +138,11 @@ export async function applyPlanUpgrade(
             existingUser?.planStatus === "active" &&
             (!existingUser?.planExpiry || existingUser?.planExpiry > now);
 
-        // Legacy fallback: Initialize cumulativeQuota based on past renewals if it doesn't exist yet
+        // If user is currently on "free" plan or revoked, carried-over cumulative quota is 0!
         let currentCumulativeQuota = existingUser?.cumulativeQuota || 0;
-        if (!existingUser?.cumulativeQuota && existingUser?.plan && existingUser.plan !== "free") {
+        if (!existingUser?.plan || existingUser.plan === "free" || existingUser.planStatus === "revoked") {
+            currentCumulativeQuota = 0;
+        } else if (!existingUser?.cumulativeQuota) {
             const legacyPlanConfig = PLAN_CONFIGS[existingUser.plan as PlanType];
             if (legacyPlanConfig) {
                 currentCumulativeQuota = legacyPlanConfig.limit * (existingUser.planRenewals || 1);
@@ -191,8 +193,8 @@ export async function applyPlanUpgrade(
             planStart: now,
             planExpiry: effectiveExpiry,
             planRenewals: 1,
-            // Add the new plan's limit to the user's permanent cumulative quota
-            cumulativeQuota: planId === "free" ? currentCumulativeQuota : currentCumulativeQuota + newPlanConfig.limit,
+            // Cumulative quota accumulates ONLY on renewals of the same active plan; new grants set limit directly
+            cumulativeQuota: planId === "free" ? 0 : (isRenewal ? currentCumulativeQuota + newPlanConfig.limit : newPlanConfig.limit),
             apiEnabled: apiAccessEnabled,
             apiQuotaTotal,
             apiRequestsUsed: 0,

@@ -85,7 +85,7 @@ export interface OrderDocument {
     promoDiscountValue?: number | null;
     currency: string;
     status: "created" | "paid" | "consumed" | "failed";
-    source?: "razorpay" | "developer_mode" | "promo_free" | "admin_grant";
+    source?: "razorpay" | "developer_mode" | "promo_free" | "admin_grant" | "partial_offer";
     createdAt: number;
     updatedAt: number;
 }
@@ -166,6 +166,13 @@ export interface AnalyticsDocument {
     devices: Record<string, number>;
     browsers: Record<string, number>;
     os: Record<string, number>;
+    bots?: number;
+    humans?: number;
+    sources?: Record<string, number>;
+    utms?: {
+        sources?: Record<string, number>;
+        campaigns?: Record<string, number>;
+    };
 }
 
 /**

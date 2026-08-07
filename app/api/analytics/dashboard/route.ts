@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { getDashboardSummary, getLinkAnalytics } from "@/services/analytics";
-import { resolvePlanType } from "@/lib/plans";
+import { resolvePlanType, PLAN_CONFIGS } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
 import { logger } from "@/lib/utils/logger";
 import type { AnalyticsDocument } from "@/types";
@@ -66,13 +66,15 @@ export async function GET(request: NextRequest) {
             });
         }
 
+        const retentionDays = PLAN_CONFIGS[plan]?.analyticsRetentionDays || 30;
+
         // ── Dashboard summary (uses existing service function) ──
         const summary = await getDashboardSummary(uid);
 
         // ── Per-link analytics for top links (parallel fetch) ──
         const slugsToFetch = summary.topLinks.slice(0, 10).map((l) => l.slug);
         const perLinkAnalytics = await Promise.all(
-            slugsToFetch.map((slug) => getLinkAnalytics(slug, 30))
+            slugsToFetch.map((slug) => getLinkAnalytics(slug, retentionDays))
         );
 
         // ── Aggregate into timeline and breakdowns ──
@@ -82,32 +84,45 @@ export async function GET(request: NextRequest) {
         const devices: Record<string, number> = {};
         const browsers: Record<string, number> = {};
         const os: Record<string, number> = {};
+        const sources: Record<string, number> = {};
+        const utms = { sources: {} as Record<string, number>, campaigns: {} as Record<string, number> };
+        let totalBots = 0;
+        let totalHumans = 0;
 
         for (const linkDocs of perLinkAnalytics) {
             for (const doc of linkDocs) {
+                const analyticsDoc = doc as AnalyticsDocument;
                 // Timeline aggregation
-                const existing = timelineMap.get(doc.date);
+                const existing = timelineMap.get(analyticsDoc.date);
                 if (existing) {
-                    existing.clicks += doc.clicks || 0;
-                    existing.uniqueVisitors += doc.uniqueVisitors || 0;
+                    existing.clicks += analyticsDoc.clicks || 0;
+                    existing.uniqueVisitors += analyticsDoc.uniqueVisitors || 0;
                 } else {
-                    timelineMap.set(doc.date, {
-                        clicks: doc.clicks || 0,
-                        uniqueVisitors: doc.uniqueVisitors || 0,
+                    timelineMap.set(analyticsDoc.date, {
+                        clicks: analyticsDoc.clicks || 0,
+                        uniqueVisitors: analyticsDoc.uniqueVisitors || 0,
                     });
                 }
 
+                totalBots += analyticsDoc.bots || 0;
+                totalHumans += analyticsDoc.humans || 0;
+
                 // Breakdown aggregation (handle sparse Firestore data)
-                mergeRecord(referrers, (doc as AnalyticsDocument).referrers);
-                mergeRecord(countries, (doc as AnalyticsDocument).countries);
-                mergeRecord(devices, (doc as AnalyticsDocument).devices);
-                mergeRecord(browsers, (doc as AnalyticsDocument).browsers);
-                mergeRecord(os, (doc as AnalyticsDocument).os);
+                mergeRecord(referrers, analyticsDoc.referrers);
+                mergeRecord(countries, analyticsDoc.countries);
+                mergeRecord(devices, analyticsDoc.devices);
+                mergeRecord(browsers, analyticsDoc.browsers);
+                mergeRecord(os, analyticsDoc.os);
+                mergeRecord(sources, analyticsDoc.sources);
+                if (analyticsDoc.utms) {
+                    mergeRecord(utms.sources, analyticsDoc.utms.sources);
+                    mergeRecord(utms.campaigns, analyticsDoc.utms.campaigns);
+                }
             }
         }
 
-        // Fill timeline to full 30 days with zero entries for missing dates
-        const timeline = buildFullTimeline(timelineMap, 30);
+        // Fill timeline to full retention window with zero entries for missing dates
+        const timeline = buildFullTimeline(timelineMap, retentionDays);
 
         return NextResponse.json({
             plan,
@@ -118,6 +133,10 @@ export async function GET(request: NextRequest) {
             devices,
             browsers,
             os,
+            bots: totalBots,
+            humans: totalHumans,
+            sources,
+            utms,
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to fetch analytics.";

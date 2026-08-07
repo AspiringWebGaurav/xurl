@@ -44,6 +44,14 @@ export interface PlanConfig {
     apiAccess?: boolean;
     /** Total API requests included with the active plan purchase */
     apiQuotaTotal?: number;
+    /** Analytics retention window in days */
+    analyticsRetentionDays?: number;
+    /** Whether UTM campaign tracking is enabled */
+    hasUtmAnalytics?: boolean;
+    /** Whether Bot vs Human traffic detection is enabled */
+    hasBotDetection?: boolean;
+    /** Whether CSV export is enabled */
+    hasCsvExport?: boolean;
 }
 
 // ─── Central Plan Configuration ─────────────────────────────────────────────
@@ -59,6 +67,10 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
         cooldownMs: 24 * 60 * 60 * 1000,          // 24 hours
         apiAccess: false,
         apiQuotaTotal: 0,
+        analyticsRetentionDays: 7,
+        hasUtmAnalytics: false,
+        hasBotDetection: false,
+        hasCsvExport: false,
     },
     starter: {
         limit: 5,
@@ -68,6 +80,10 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
         label: "Starter",
         apiAccess: false,
         apiQuotaTotal: 0,
+        analyticsRetentionDays: 30,
+        hasUtmAnalytics: false,
+        hasBotDetection: false,
+        hasCsvExport: false,
     },
     pro: {
         limit: 25,
@@ -77,6 +93,10 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
         label: "Pro",
         apiAccess: false,
         apiQuotaTotal: 0,
+        analyticsRetentionDays: 30,
+        hasUtmAnalytics: false,
+        hasBotDetection: false,
+        hasCsvExport: true,
     },
     business: {
         limit: 100,
@@ -87,6 +107,10 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
         badge: "MOST_POPULAR",
         apiAccess: true,
         apiQuotaTotal: 500,
+        analyticsRetentionDays: 90,
+        hasUtmAnalytics: true,
+        hasBotDetection: true,
+        hasCsvExport: true,
     },
     enterprise: {
         limit: 300,
@@ -96,6 +120,10 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
         label: "Enterprise",
         apiAccess: true,
         apiQuotaTotal: 5000,
+        analyticsRetentionDays: 365,
+        hasUtmAnalytics: true,
+        hasBotDetection: true,
+        hasCsvExport: true,
     },
     bigenterprise: {
         limit: 600,
@@ -105,6 +133,10 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
         label: "Big Enterprise",
         apiAccess: true,
         apiQuotaTotal: 5000,
+        analyticsRetentionDays: 365,
+        hasUtmAnalytics: true,
+        hasBotDetection: true,
+        hasCsvExport: true,
     },
     guest: {
         limit: 1,
@@ -114,6 +146,10 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
         label: "Guest",
         apiAccess: false,
         apiQuotaTotal: 0,
+        analyticsRetentionDays: 7,
+        hasUtmAnalytics: false,
+        hasBotDetection: false,
+        hasCsvExport: false,
     }
 };
 

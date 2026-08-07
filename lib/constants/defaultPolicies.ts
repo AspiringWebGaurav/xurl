@@ -15,7 +15,7 @@ export const defaultPolicies: Record<string, Policy> = {
     privacy: {
         id: "privacy",
         title: "Privacy Policy",
-        lastUpdated: "July 22, 2026",
+        lastUpdated: "August 7, 2026 (Previously revised: July 22, 2026)",
         sections: [
             {
                 title: "Information We Collect",
@@ -30,6 +30,10 @@ export const defaultPolicies: Record<string, Policy> = {
                 content: "We use strictly necessary cookies for authentication via Firebase Auth and to persist consent state (e.g., your agreement to these policies). We utilize a deterministic device fingerprint hash acting as a secure session token to seamlessly track analytics without compromising anonymity. No third-party advertising cookies or tracking pixels are ever injected into our application.",
             },
             {
+                title: "Emergency Appeals Data Protocol",
+                content: "During active Emergency Maintenance Holds (Kill Switch mode), direct appeal submissions (user email and inquiry details) are stored with zero-trust encryption in administrative logs. This data is accessed exclusively by authorized security engineers solely for incident resolution and emergency query response.",
+            },
+            {
                 title: "Data Retention & Account Bans",
                 content: "We enforce zero-tolerance abuse policies. If your account violates our Acceptable Use standards, we reserve the right to retain minimal identifying information (hashed email, IP addresses, device fingerprints) indefinitely to prevent ban evasion. Standard active data is retained as long as your account exists.",
             }
@@ -38,7 +42,7 @@ export const defaultPolicies: Record<string, Policy> = {
     terms: {
         id: "terms",
         title: "Terms of Service",
-        lastUpdated: "August 6, 2026 (Previously updated: July 22, 2026)",
+        lastUpdated: "August 7, 2026 (Previously revised: July 22, 2026)",
         sections: [
             {
                 title: "Acceptance of Terms",
@@ -63,13 +67,48 @@ export const defaultPolicies: Record<string, Policy> = {
             {
                 title: "Limitation of Liability",
                 content: "In no event shall XURL, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from (i) your access to or use of or inability to access or use the Service; (ii) any conduct or content of any third party on the Service; (iii) any content obtained from the Service; and (iv) unauthorized access, use or alteration of your transmissions or content, whether based on warranty, contract, tort (including negligence) or any other legal theory."
+            },
+            {
+                title: "Emergency Service Hold & Maintenance Protocol",
+                content: "XURL administrators reserve the unilateral right to engage a Global Emergency Hold ('Kill Switch') during active security threats, system migrations, or database integrity checks. During an Emergency Hold, public link creation, billing checkouts, and profile edits are temporarily paused. Existing shortened link redirects remain operational. Users may submit direct emergency appeals through our maintenance interface."
+            },
+            {
+                title: "Strict Policy-Driven Infrastructure & Governance",
+                content: "XURL operates strictly on automated policy enforcement. All user actions, guest quotas, rate limits, tier upgrades, and emergency maintenance holds are strictly governed by our published binding legal and technical policies. No manual overrides, informal exceptions, or undocumented API privileges are granted under any circumstances."
+            },
+            {
+                title: "Proprietary Architecture & Trade Secret Protection",
+                content: "To safeguard system security and protect platform innovations from malicious reverse-engineering, XURL retains full intellectual property rights over its internal Edge routing architecture, proprietary abuse scoring algorithms, and database indexing schemas. Public documentation details external interface contracts only; full internal system mechanics remain proprietary trade secrets."
+            }
+        ]
+    },
+    "emergency-policy": {
+        id: "emergency-policy",
+        title: "Emergency Protocol & Incident Response Policy",
+        lastUpdated: "August 7, 2026 (Effective: August 7, 2026)",
+        sections: [
+            {
+                title: "1. Global Emergency Kill Switch Protocol",
+                content: "To protect system integrity, database security, and prevent distributed abuse during active security incidents, XURL administrators reserve the right to engage a global Emergency Maintenance Hold ('Kill Switch'). During an active Emergency Hold, all public shortener interfaces, account controls, and payment checkouts are temporarily paused."
+            },
+            {
+                title: "2. Edge Interception & Link Operational State",
+                content: "During an Emergency Hold, existing shortened link redirects remain active and operational via our Edge CDN cache layer. However, API endpoints block non-administrative requests with HTTP 503 Service Unavailable."
+            },
+            {
+                title: "3. Direct Emergency Appeals Process",
+                content: "Users impacted by an Emergency Hold or requiring urgent business assistance may submit a Direct Emergency Appeal via our edge maintenance interface. Submissions are transmitted directly to administrator security logs for priority review."
+            },
+            {
+                title: "4. Admin Bypass & Restoration",
+                content: "Only verified administrator accounts are granted bypass permissions during an Emergency Hold. When system safety is confirmed, administrators disengage the Kill Switch, triggering an automated 3-2-1 restoration sequence and system pre-loader."
             }
         ]
     },
     "guest-policy": {
         id: "guest-policy",
         title: "Guest Usage Policy",
-        lastUpdated: "August 6, 2026 (Previously updated: July 22, 2026)",
+        lastUpdated: "August 7, 2026 (Previously revised: July 22, 2026)",
         sections: [
             {
                 title: "Scope of Guest Access",
@@ -92,44 +131,76 @@ export const defaultPolicies: Record<string, Policy> = {
     "acceptable-use": {
         id: "acceptable-use",
         title: "Acceptable Use Policy",
-        lastUpdated: "July 22, 2026",
+        lastUpdated: "August 7, 2026 (Previously revised: July 22, 2026)",
         sections: [
             {
-                title: "Prohibited Content",
-                content: "You must not use our service to shorten links leading to malware, phishing sites, illegal content, or any material that infringes upon the intellectual property rights of others. We actively scan endpoints and automatically terminate non-compliant links."
+                title: "1. Prohibited Content Categories",
+                content: "You are strictly prohibited from using XURL to shorten, mask, or redirect to any URLs that contain or promote: (a) malware, ransomware, spyware, or malicious payloads; (b) phishing schemes, credential harvesters, or deceptive landing pages; (c) illegal substances, unauthorized pharmaceuticals, or illicit contraband; (d) copyright infringement or stolen intellectual property; (e) spam campaigns, unsolicited commercial messages, or automated bot traffic."
+            },
+            {
+                title: "2. Automated Threat Scanning & Algorithmic Termination",
+                content: "XURL employs continuous automated threat detection, Google Safe Browsing telemetry, and real-time destination URL inspection. Any shortened link found to resolve to a high-risk or flagged endpoint will be **immediately suspended or permanently deleted without prior notice**. Repeated submission of non-compliant links will result in an immediate account ban."
+            },
+            {
+                title: "3. Network Exploitation & DDoS Restrictions",
+                content: "Attempting to bypass platform rate limits, probe internal Edge APIs, deploy automated scraping scripts, or participate in distributed denial-of-service (DDoS) attacks against XURL infrastructure is prohibited. Violators will have their IP range and device fingerprints added to our perpetual firewall blocklist."
+            },
+            {
+                title: "4. Ban Enforcement & Loss of Access",
+                content: "When an account or identity is banned for violating this policy, all active shortened links associated with that identity are permanently revoked. Banned users forfeit all accrued subscription quotas, custom slugs, and analytics history."
             }
         ]
     },
     "code-of-conduct": {
         id: "code-of-conduct",
         title: "Code of Conduct",
-        lastUpdated: "July 22, 2026",
+        lastUpdated: "August 7, 2026 (Previously revised: July 22, 2026)",
         sections: [
             {
-                title: "Community Standards",
-                content: "We expect all users interacting within any community-driven aspects of our platform to treat each other with respect. Harassment, abuse, or intimidation will not be tolerated."
+                title: "1. Community & Support Interaction Standards",
+                content: "XURL is committed to maintaining a professional, safe, and respectful environment for all users, developer contributors, and support staff. Users interacting with XURL representatives via direct appeals, support channels, or community forums must refrain from abusive language, harassment, discrimination, or malicious behavior."
+            },
+            {
+                title: "2. Zero Tolerance for Harassment & Intimidation",
+                content: "Threats of violence, hate speech, targeted harassment, or attempts to doxx XURL team members or other users will result in immediate termination of all account privileges and potential referral to law enforcement agencies."
             }
         ]
     },
     "open-source": {
         id: "open-source",
         title: "Open Source Policy",
-        lastUpdated: "July 22, 2026",
+        lastUpdated: "August 7, 2026 (Previously revised: July 22, 2026)",
         sections: [
             {
-                title: "Attribution & Licenses",
-                content: "Our software leverages several open-source libraries. While we offer enterprise services, we adhere strictly to the licenses of our dependencies. See our technical documentation for a complete listing of open-source acknowledgments."
+                title: "1. Attribution & Underlying Dependencies",
+                content: "XURL builds upon industry-standard open-source libraries, including React, Next.js, Framer Motion, Tailwind CSS, Lucide Icons, and Firebase Web SDKs. We acknowledge and respect the open-source community, adhering strictly to the licenses (MIT, Apache 2.0, BSD) of our upstream dependencies."
+            },
+            {
+                title: "2. Dual Licensing & Proprietary Add-ons",
+                content: "While XURL integrates open-source components, proprietary Edge routing proxies, custom anti-abuse scoring engines, and administrative control tools are proprietary trade secrets of XURL. Reuse of proprietary XURL branding, assets, or proprietary backend code without written authorization is strictly prohibited."
             }
         ]
     },
     refund: {
         id: "refund",
         title: "Refund Policy",
-        lastUpdated: "July 22, 2026",
+        lastUpdated: "August 7, 2026 (Previously revised: July 22, 2026)",
         sections: [
             {
-                title: "Standard Refund Terms",
-                content: "Due to the nature of our digital services and infrastructure costs, all sales are generally final. However, we offer a 7-day money-back guarantee for initial enterprise plan upgrades if the platform fails to meet your technical requirements. We do not refund accounts that have been terminated for violating our Acceptable Use Policy."
+                title: "1. Digital Service Sales & Immediate Provisioning",
+                content: "XURL subscription upgrades, link package grants, and plan add-ons are digital cloud services that are provisioned immediately upon transaction confirmation. Because infrastructure capacity and Edge routing resources are reserved instantly, all transactions are generally final and non-refundable."
+            },
+            {
+                title: "2. 7-Day Enterprise Technical Guarantee",
+                content: "We offer a **7-day money-back guarantee** for first-time paid plan upgrades (Starter, Pro, Business, Enterprise) if the platform experiences persistent, unresolvable technical defects that prevent normal link shortening. Refund requests must be submitted to support within 7 calendar days of purchase."
+            },
+            {
+                title: "3. Forfeiture of Refunds Upon Terms Violation",
+                content: "Accounts that have been suspended or permanently banned due to violations of our Acceptable Use Policy (e.g., shortening phishing, malware, or spam links) **forfeit all eligibility for refunds or credit adjustments**."
+            },
+            {
+                title: "4. Fraud Prevention & Unauthorized Chargebacks",
+                content: "Initiating fraudulent payment chargebacks without first contacting XURL support will result in immediate perpetual lockout of the associated account, deletion of all active shortened links, and inclusion of payment details on our risk blocklist."
             }
         ]
     }

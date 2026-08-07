@@ -460,19 +460,20 @@ export default function AdminGrantPlanPage() {
 
     return (
         <div className="space-y-8">
-                <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Admin</p>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Grant Plan</h1>
-                    <p className="text-slate-500">Search users by email, select a plan and duration, and grant access with zero billing.</p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/90 backdrop-blur-xl p-6 rounded-[28px] border border-slate-200/80 shadow-sm">
+                    <div>
+                        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Grant Plan Access</h1>
+                        <p className="text-sm font-medium text-slate-500">Search users by email, select a plan and duration, and grant access with zero billing.</p>
+                    </div>
                 </div>
 
                 {(error || success) && (
-                    <div className={`rounded-lg border px-4 py-3 text-sm ${error ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+                    <div className={`rounded-2xl border p-4 text-sm font-semibold shadow-sm animate-fade-in ${error ? "border-rose-200/80 bg-rose-50/90 text-rose-800" : "border-emerald-200/80 bg-emerald-50/90 text-emerald-800"}`}>
                         {error || success}
                     </div>
                 )}
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">
+                <div className="rounded-[28px] border border-slate-200/80 bg-white/90 backdrop-blur-xl p-6 lg:p-7 shadow-sm space-y-5">
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         <div className="flex flex-col gap-2">
                             <label className="text-sm font-semibold text-slate-800">Recipient email</label>

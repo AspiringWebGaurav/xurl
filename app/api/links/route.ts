@@ -265,8 +265,10 @@ export async function GET(request: NextRequest) {
         let effectiveLimit: number;
         if (plan === "free") {
             effectiveLimit = config.limit + giftBonus;
+        } else if (userData?.cumulativeQuota && userData?.planRenewals && userData.planRenewals > 1) {
+            effectiveLimit = userData.cumulativeQuota + giftBonus;
         } else {
-            effectiveLimit = (userData?.cumulativeQuota || (config.limit * (userData?.planRenewals || 1))) + giftBonus;
+            effectiveLimit = (userData?.cumulativeQuota || config.limit) + giftBonus;
         }
         
         const planRenewals = userData?.planRenewals || 1;

@@ -373,60 +373,61 @@ export default function AdminPromoCodesPage() {
 
     return (
         <div className="space-y-8">
-                <div className="mb-8 flex flex-col gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Admin</p>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">Promo Codes</h1>
-                    <p className="text-slate-500">Create, edit, enable, disable, and delete purchase coupons without changing the payment flow.</p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/90 backdrop-blur-xl p-6 rounded-[28px] border border-slate-200/80 shadow-sm">
+                    <div>
+                        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Promo Codes</h1>
+                        <p className="text-sm font-medium text-slate-500">Create, edit, enable, disable, and delete purchase coupons without changing the payment flow.</p>
+                    </div>
                 </div>
 
                 {(error || success) && (
-                    <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${error ? "border-red-200 bg-red-50 text-red-600" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+                    <div className={`rounded-2xl border p-4 text-sm font-semibold shadow-sm animate-fade-in ${error ? "border-rose-200/80 bg-rose-50/90 text-rose-800" : "border-emerald-200/80 bg-emerald-50/90 text-emerald-800"}`}>
                         {error || success}
                     </div>
                 )}
 
-                <div className="mb-8 grid gap-4 md:grid-cols-3">
-                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <p className="text-sm font-medium text-slate-500">Total Redemptions</p>
-                        <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">{analyticsSummary.totalRedemptions}</p>
-                        <p className="mt-1 text-xs text-slate-400">Successful promo uses across all codes</p>
+                <div className="grid gap-4 md:grid-cols-3">
+                    <div className="rounded-[28px] border border-slate-200/80 bg-white/90 backdrop-blur-xl p-6 shadow-sm transition-all duration-300 hover:shadow-[0_20px_50px_rgba(99,102,241,0.12)] hover:border-indigo-300 hover:-translate-y-1">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Redemptions</p>
+                        <p className="mt-2 text-3xl font-black tracking-tight text-slate-900">{analyticsSummary.totalRedemptions}</p>
+                        <p className="mt-1 text-xs font-medium text-slate-400">Successful promo uses across all codes</p>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <p className="text-sm font-medium text-slate-500">Active Codes</p>
-                        <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">{analyticsSummary.activeCodes}</p>
-                        <p className="mt-1 text-xs text-slate-400">Currently available for checkout</p>
+                    <div className="rounded-[28px] border border-slate-200/80 bg-white/90 backdrop-blur-xl p-6 shadow-sm transition-all duration-300 hover:shadow-[0_20px_50px_rgba(16,185,129,0.12)] hover:border-emerald-300 hover:-translate-y-1">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Active Codes</p>
+                        <p className="mt-2 text-3xl font-black tracking-tight text-slate-900">{analyticsSummary.activeCodes}</p>
+                        <p className="mt-1 text-xs font-medium text-slate-400">Currently available for checkout</p>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <p className="text-sm font-medium text-slate-500">Exhausted Codes</p>
-                        <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">{analyticsSummary.exhaustedCodes}</p>
-                        <p className="mt-1 text-xs text-slate-400">Usage-limited codes with no remaining redemptions</p>
+                    <div className="rounded-[28px] border border-slate-200/80 bg-white/90 backdrop-blur-xl p-6 shadow-sm transition-all duration-300 hover:shadow-[0_20px_50px_rgba(245,158,11,0.12)] hover:border-amber-300 hover:-translate-y-1">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Exhausted Codes</p>
+                        <p className="mt-2 text-3xl font-black tracking-tight text-slate-900">{analyticsSummary.exhaustedCodes}</p>
+                        <p className="mt-1 text-xs font-medium text-slate-400">Usage-limited codes with no remaining redemptions</p>
                     </div>
                 </div>
 
                 <div className="grid gap-8 lg:grid-cols-[380px_minmax(0,1fr)]">
-                    <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <section className="rounded-[28px] border border-slate-200/80 bg-white/90 backdrop-blur-xl p-6 lg:p-7 shadow-sm">
                         <div className="mb-5 flex items-center gap-2">
-                            <Plus className="h-5 w-5 text-slate-400" />
-                            <h2 className="text-lg font-semibold text-slate-900">{editingId ? "Edit promo code" : "Create promo code"}</h2>
+                            <Plus className="h-5 w-5 text-indigo-600" />
+                            <h2 className="text-lg font-extrabold text-slate-900">{editingId ? "Edit promo code" : "Create promo code"}</h2>
                         </div>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="mb-1.5 block text-sm font-medium text-slate-700">Code</label>
-                                <Input value={form.code} onChange={(event) => setForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))} placeholder="Leave blank to auto-generate" className="rounded-xl" />
+                                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-600">Code</label>
+                                <Input value={form.code} onChange={(event) => setForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))} placeholder="Leave blank to auto-generate" className="h-11 rounded-2xl border-slate-200/80 bg-slate-50/80 font-bold focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10" />
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Discount type</label>
-                                    <select value={form.discountType} onChange={(event) => setForm((current) => ({ ...current, discountType: event.target.value as "percentage" | "fixed" }))} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none">
+                                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-600">Discount type</label>
+                                    <select value={form.discountType} onChange={(event) => setForm((current) => ({ ...current, discountType: event.target.value as "percentage" | "fixed" }))} className="h-11 w-full rounded-2xl border border-slate-200/80 bg-slate-50/80 px-3 text-sm font-bold text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all">
                                         <option value="percentage">Percentage</option>
                                         <option value="fixed">Fixed (INR)</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Discount value</label>
-                                    <Input value={form.discountValue} onChange={(event) => setForm((current) => ({ ...current, discountValue: event.target.value }))} type="number" min="1" className="rounded-xl" />
+                                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-600">Discount value</label>
+                                    <Input value={form.discountValue} onChange={(event) => setForm((current) => ({ ...current, discountValue: event.target.value }))} type="number" min="1" className="h-11 rounded-2xl border-slate-200/80 bg-slate-50/80 font-bold focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10" />
                                 </div>
                             </div>
 

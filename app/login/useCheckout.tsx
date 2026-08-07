@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
 import { ensureUserDocument } from "@/lib/firebase/user-profile";
+import { isAdminEmail } from "@/lib/admin-config";
 import { useGoogleLogin } from "@/lib/hooks/useGoogleLogin";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -32,10 +33,12 @@ export function useCheckout() {
     const paymentStateRef = useRef(paymentState);
     const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
     const [renewalData, setRenewalData] = useState<RenewalData | null>(null);
+    const [killSwitchActive, setKillSwitchActive] = useState(false);
 
     const router = useRouter();
     const searchParams = useSearchParams();
     const plan = searchParams.get("plan");
+    const redirectParam = searchParams.get("redirect");
     const planKey = plan ? plan.toLowerCase() : null;
     const planContext = planKey && PLAN_DATA[planKey] ? PLAN_DATA[planKey] : null;
     const planDisplayName = planContext?.badgeName.replace(/\s+Plan$/, "") ?? "";
@@ -45,10 +48,57 @@ export function useCheckout() {
     }, [paymentState]);
 
     useEffect(() => {
+        const checkKillSwitch = async () => {
+            try {
+                const res = await fetch("/api/public/kill-switch");
+                if (res.ok) {
+                    const data = await res.json();
+                    setKillSwitchActive(Boolean(data?.active));
+                }
+            } catch {
+                setKillSwitchActive(false);
+            }
+        };
+        checkKillSwitch();
+    }, []);
+
+    useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (u) => {
             if (u) {
+                // Check if Kill Switch is active
+                try {
+                    const res = await fetch("/api/public/kill-switch");
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data?.active) {
+                            if (!isAdminEmail(u.email)) {
+                                await signOut(auth);
+                                setUser(null);
+                                setAuthLoading(false);
+                                toast.error("⛔ Access Denied: Kill Switch mode permits only verified Admin accounts.", {
+                                    duration: 6000,
+                                });
+                                return;
+                            } else {
+                                setUser(u);
+                                setAuthLoading(false);
+                                router.push("/admin");
+                                return;
+                            }
+                        }
+                    }
+                } catch {
+                    // Fallthrough to normal check
+                }
+
                 await ensureUserDocument(u);
                 setUser(u);
+
+                if (redirectParam === "/admin" && isAdminEmail(u.email)) {
+                    router.push("/admin");
+                    return;
+                }
+
                 if (!plan) {
                     router.push("/");
                 } else {
@@ -90,7 +140,7 @@ export function useCheckout() {
             }
         });
         return () => unsubscribe();
-    }, [router, plan, planKey]);
+    }, [router, plan, planKey, redirectParam]);
 
     const verifyPayment = async (orderId: string, planName: string, paymentId?: string, signature?: string) => {
         let attempts = 0;
@@ -207,7 +257,7 @@ export function useCheckout() {
                 const res = await fetch("/api/payments/create-order", {
                     method: "POST",
                     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                    body: JSON.stringify({ planId: plan, promoCode: appliedPromo?.code ?? null })
+                    body: JSON.stringify({ planId: plan, promoCode: appliedPromo?.isManualPromo ? appliedPromo.code : null })
                 });
                 const data = await res.json();
 
@@ -297,6 +347,7 @@ export function useCheckout() {
         planKey,
         planContext,
         planDisplayName,
+        killSwitchActive,
         handlePurchase,
         handleLogin,
         isLoggingIn,

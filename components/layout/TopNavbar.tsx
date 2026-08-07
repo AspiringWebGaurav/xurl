@@ -84,9 +84,17 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
     const [isPricingHovered, setIsPricingHovered] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
+    const isAdminPage = pathname?.startsWith("/admin");
     const pricingLabels = ["Pricing", "Plans"] as const;
     const isDevEnv = process.env.NODE_ENV === "development";
     const isDeveloper = isAdminEmail(user?.email);
+
+    // Auto-close history sidebar when navigating to admin pages
+    useEffect(() => {
+        if (isAdminPage) {
+            setIsHistoryOpen(false);
+        }
+    }, [isAdminPage]);
 
     const syncUserHistoryState = useCallback(async (currentUser: User) => {
         try {
@@ -269,15 +277,15 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                 void ensureUserDocument(u);
                 void syncUserHistoryState(u);
                 
-                // Realtime Sync Listener
-                let initialSnapshot = true;
+                // Realtime Sync Listener - Updates UI instantly on Admin Revoke/Grant or profile change
                 snapshotUnsub = onSnapshot(doc(db, "users", u.uid), (docSnap) => {
-                    if (initialSnapshot) {
-                        initialSnapshot = false;
-                        return;
-                    }
                     if (docSnap.exists()) {
-                        // Whenever the user document changes (e.g. updatedAt pinged by admin), refresh data
+                        const userData = docSnap.data();
+                        if (userData.plan) {
+                            setPlan(String(userData.plan).toLowerCase());
+                        }
+                        void syncUserHistoryState(u);
+                        window.dispatchEvent(new CustomEvent("userProfileUpdated", { detail: userData }));
                         window.dispatchEvent(new Event("linkGenerated"));
                     }
                 }, (error) => {
@@ -781,33 +789,35 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                 ) : (
                     user ? (
                         <>
-                                {/* Desktop History Button */}
-                                <button
-                                    onClick={() => { setIsHistoryOpen(true); setHasNewHistory(false); }}
-                                    className={cn(
-                                        navActionBase,
-                                        secondaryAction,
-                                        "hidden sm:flex relative"
-                                    )}
-                                >
-                                    History
-                                    <AnimatePresence>
-                                        {linkCount !== null && linkCount > 0 && (
-                                            <motion.div
-                                                key={linkCount}
-                                                initial={{ scale: 0.5, opacity: 0 }}
-                                                animate={{ scale: pulseBadge ? 1.2 : 1, opacity: 1 }}
-                                                transition={{ duration: 0.2, type: "spring", stiffness: 300, damping: 15 }}
-                                                className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 ring-2 ring-background shadow-sm"
-                                            >
-                                                {linkCount > 99 ? '99+' : linkCount}
-                                            </motion.div>
+                                {/* Desktop History Button (Hidden on Admin routes) */}
+                                {!isAdminPage && (
+                                    <button
+                                        onClick={() => { setIsHistoryOpen(true); setHasNewHistory(false); }}
+                                        className={cn(
+                                            navActionBase,
+                                            secondaryAction,
+                                            "hidden sm:flex relative"
                                         )}
-                                    </AnimatePresence>
-                                    {hasNewHistory && (
-                                        <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
-                                    )}
-                                </button>
+                                    >
+                                        History
+                                        <AnimatePresence>
+                                            {linkCount !== null && linkCount > 0 && (
+                                                <motion.div
+                                                    key={linkCount}
+                                                    initial={{ scale: 0.5, opacity: 0 }}
+                                                    animate={{ scale: pulseBadge ? 1.2 : 1, opacity: 1 }}
+                                                    transition={{ duration: 0.2, type: "spring", stiffness: 300, damping: 15 }}
+                                                    className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 ring-2 ring-background shadow-sm"
+                                                >
+                                                    {linkCount > 99 ? '99+' : linkCount}
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                        {hasNewHistory && (
+                                            <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+                                        )}
+                                    </button>
+                                )}
 
                                 <DropdownMenu open={notificationOpen} onOpenChange={(open) => {
                                     setNotificationOpen(open);
@@ -932,9 +942,11 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                                                 </Link>
                                             </DropdownMenuItem>
                                         )}
-                                        <DropdownMenuItem className="sm:hidden text-[13px]" onClick={() => { setIsHistoryOpen(true); setHasNewHistory(false); }}>
-                                            <span className="flex-1">Link History</span>
-                                        </DropdownMenuItem>
+                                        {!isAdminPage && (
+                                            <DropdownMenuItem className="sm:hidden text-[13px]" onClick={() => { setIsHistoryOpen(true); setHasNewHistory(false); }}>
+                                                <span className="flex-1">Link History</span>
+                                            </DropdownMenuItem>
+                                        )}
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem
                                             className="text-red-500 focus:text-red-600 focus:bg-red-50 cursor-pointer text-[13px]"

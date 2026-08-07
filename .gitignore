@@ -78,6 +78,7 @@ temp/
 scripts/
 .scripts/
 .local/
+/local-testing
 CLAUDE.md
 .claude/
 screenshot/
@@ -98,6 +99,7 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
-
-
+# Local AI Config & Customizations
+.agents/
+.gemini/
 

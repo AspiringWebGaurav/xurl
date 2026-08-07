@@ -15,6 +15,7 @@ import { formatTTLToText } from "@/lib/utils/format-time";
 
 import { PLAN_CONFIGS, PAID_PLAN_ORDER } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
+import type { PartialOffer } from "@/services/partial-offers";
 
 /** Reads ?plan= from URL — must be wrapped in <Suspense>. */
 function SearchParamsReader({ onPlan }: { onPlan: (plan: string | null) => void }) {
@@ -133,20 +134,19 @@ const containerVariants: Variants = {
     hidden: {},
     visible: {
         transition: {
-            staggerChildren: 0.08,
+            staggerChildren: 0.02,
         },
     },
 };
 
 const cardVariants: Variants = {
-    hidden: { opacity: 0, y: 20 },
+    hidden: { opacity: 0, y: 10 },
     visible: {
         opacity: 1,
         y: 0,
         transition: {
-            type: "spring",
-            stiffness: 280,
-            damping: 18,
+            duration: 0.25,
+            ease: "easeOut",
         },
     },
 };
@@ -182,10 +182,11 @@ export default function PricingPage() {
     const [isFreeCardHovered, setIsFreeCardHovered] = useState(false);
     const [freeSlideCycleKey, setFreeSlideCycleKey] = useState(0);
     const [dynamicTiers, setDynamicTiers] = useState<PricingTier[]>(generateTiers());
-    const [freeTtlMs, setFreeTtlMs] = useState<number | undefined>(undefined);
-    const [guestTtlMs, setGuestTtlMs] = useState<number | undefined>(undefined);
+    const [freeTtlMs, setFreeTtlMs] = useState<number | undefined>(PLAN_CONFIGS.free.ttlMs);
+    const [guestTtlMs, setGuestTtlMs] = useState<number | undefined>(PLAN_CONFIGS.guest.ttlMs);
     const [activeOffer, setActiveOffer] = useState<any>(null);
     const [isTourRunning, setIsTourRunning] = useState(false);
+    const [isInitialLoading, setIsInitialLoading] = useState(true);
 
     const router = useRouter();
     const [focusPlan, setFocusPlan] = useState<string | null>(null);
@@ -207,31 +208,20 @@ export default function PricingPage() {
                     if (d > maxD) { maxD = d; best = o; }
                 }
                 setActiveOffer(best);
-                setFreeTtlMs(data.computedPlans?.free?.ttlMs);
-                setGuestTtlMs(data.computedPlans?.guest?.ttlMs);
+                setFreeTtlMs(data.computedPlans?.free?.ttlMs || PLAN_CONFIGS.free.ttlMs);
+                setGuestTtlMs(data.computedPlans?.guest?.ttlMs || PLAN_CONFIGS.guest.ttlMs);
                 setDynamicTiers(generateTiers(data.computedPlans, best));
             })
-            .catch(console.error);
+            .catch(console.error)
+            .finally(() => {
+                if (mounted) setIsInitialLoading(false);
+            });
         return () => { mounted = false; };
     }, []);
 
     /* ── Automated Guided Tour ── */
     useEffect(() => {
         if (typeof window === "undefined") return;
-
-        // Mobile Safe Guard
-        if (window.innerWidth <= 768) {
-            // Basic scroll intro for mobile
-            const timer = setTimeout(() => {
-                const root = document.getElementById("pricing-root");
-                const cardsEl = document.getElementById("pricing-cards-grid");
-                if (root && cardsEl) {
-                    const target = cardsEl.offsetTop - 9.5;
-                    if (target > 0) smoothScrollTo(root, target, 1400);
-                }
-            }, 700);
-            return () => clearTimeout(timer);
-        }
 
         let tourAborted = false;
         
@@ -328,26 +318,56 @@ export default function PricingPage() {
         }
     }, [focusPlan]);
 
+    const [targetedOffer, setTargetedOffer] = useState<PartialOffer | null>(null);
+
     useEffect(() => {
+        const fetchUserState = async (u: User) => {
+            try {
+                const token = await u.getIdToken(true);
+                const [resLinks, resOffers] = await Promise.all([
+                    fetch("/api/links?pageSize=1", { headers: { "Authorization": `Bearer ${token}` } }),
+                    fetch("/api/user/partial-offers", { headers: { "Authorization": `Bearer ${token}` } }),
+                ]);
+                const dataLinks = await resLinks.json();
+                if (dataLinks.plan) {
+                    setCurrentPlan(dataLinks.plan);
+                }
+                const dataOffers = await resOffers.json();
+                if (resOffers.ok && Array.isArray(dataOffers.offers) && dataOffers.offers.length > 0) {
+                    setTargetedOffer(dataOffers.offers[0]);
+                } else {
+                    setTargetedOffer(null);
+                }
+            } catch (err) {
+                console.error("Failed to fetch user state", err);
+            }
+        };
+
         const unsubscribe = onAuthStateChanged(auth, async (u) => {
             setUser(u);
             if (u) {
                 await ensureUserDocument(u);
-                try {
-                    const token = await u.getIdToken();
-                    const res = await fetch("/api/links?pageSize=1", { headers: { "Authorization": `Bearer ${token}` } });
-                    const data = await res.json();
-                    if (data.plan) {
-                        setCurrentPlan(data.plan);
-                    }
-                } catch (err) {
-                    console.error("Failed to fetch current plan", err);
-                }
+                fetchUserState(u);
             } else {
                 setCurrentPlan("free");
+                setTargetedOffer(null);
             }
         });
-        return () => unsubscribe();
+
+        const handleRealtimeUpdate = () => {
+            if (auth.currentUser) {
+                fetchUserState(auth.currentUser);
+            }
+        };
+
+        window.addEventListener("userProfileUpdated", handleRealtimeUpdate);
+        window.addEventListener("linkGenerated", handleRealtimeUpdate);
+
+        return () => {
+            unsubscribe();
+            window.removeEventListener("userProfileUpdated", handleRealtimeUpdate);
+            window.removeEventListener("linkGenerated", handleRealtimeUpdate);
+        };
     }, []);
 
     useEffect(() => {
@@ -491,7 +511,110 @@ export default function PricingPage() {
             </Suspense>
             <TopNavbar />
 
-            <main className="flex-1 py-10 px-6 lg:px-8 flex flex-col items-center z-10">
+            <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 flex flex-col items-center z-10 w-full max-w-7xl mx-auto">
+                {targetedOffer && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -15, scale: 0.99 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
+                        className="w-full mb-8 relative overflow-hidden rounded-[28px] border-2 border-indigo-500/60 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 shadow-[0_25px_60px_-15px_rgba(99,102,241,0.35)] text-white p-6 sm:p-8 relative z-20"
+                    >
+                        {/* Animated Background Neon Ambient Light Glow */}
+                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-600/25 via-purple-600/15 to-transparent animate-pulse pointer-events-none" />
+                        <div className="absolute top-0 right-1/4 w-96 h-96 bg-emerald-500/15 rounded-full blur-[100px] pointer-events-none animate-pulse" />
+
+                        <div className="relative z-10 space-y-4">
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                                {/* Left Title & Recipient Details */}
+                                <div className="space-y-1.5 flex-1">
+                                    <div className="flex flex-wrap items-center gap-2.5">
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/25 px-3 py-1 text-xs font-black text-amber-300 border border-amber-400/40 shadow-sm animate-pulse">
+                                            <Zap className="h-3.5 w-3.5 fill-amber-300" />
+                                            🔥 VIP Admin Granted Special Offer
+                                        </span>
+                                        <span className="text-xs font-bold text-indigo-200 bg-white/10 px-2.5 py-1 rounded-full border border-white/10">
+                                            Target Account: <strong className="text-white font-mono">{user?.email || targetedOffer.targetEmail}</strong>
+                                        </span>
+                                        {targetedOffer.usageLimit !== null && targetedOffer.usageLimit !== undefined && (
+                                            <span className="text-xs font-bold text-purple-200 bg-purple-500/20 px-2.5 py-1 rounded-full border border-purple-400/30">
+                                                Single-Use Grant ({targetedOffer.redemptionCount || 0}/{targetedOffer.usageLimit} Used)
+                                            </span>
+                                        )}
+                                    </div>
+                                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-md">
+                                        {targetedOffer.title}
+                                    </h2>
+                                    <p className="text-xs sm:text-sm font-medium text-slate-300 max-w-3xl leading-relaxed">
+                                        {targetedOffer.description || "You have been granted an exclusive custom discount on your plan upgrades."}
+                                    </p>
+                                </div>
+
+                                {/* Right Big Discount Tag */}
+                                <div className="shrink-0 flex items-center gap-4 bg-white/10 border border-white/20 rounded-2xl p-4 sm:p-5 backdrop-blur-xl shadow-inner">
+                                    <div className="flex flex-col items-start lg:items-end">
+                                        <span className="text-[11px] font-extrabold uppercase tracking-widest text-indigo-300">Discount Unlocked</span>
+                                        <span className="text-3xl sm:text-4xl font-black text-amber-300 tracking-tight drop-shadow">
+                                            {targetedOffer.discountType === "percentage"
+                                                ? `${targetedOffer.discountValue}% OFF`
+                                                : targetedOffer.discountType === "flat"
+                                                ? `₹${targetedOffer.discountValue} OFF`
+                                                : `₹${targetedOffer.discountValue} Fixed Price`}
+                                        </span>
+                                        {targetedOffer.expiresAt ? (
+                                            <span className="text-[11px] font-semibold text-slate-300 mt-0.5">
+                                                Expires: {new Date(targetedOffer.expiresAt).toLocaleDateString()}
+                                            </span>
+                                        ) : (
+                                            <span className="text-[11px] font-bold text-emerald-400 mt-0.5 flex items-center gap-1">
+                                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping inline-block" /> Active Now (No Expiry)
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Granted Plan Breakdown Row */}
+                            <div className="pt-3 border-t border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-200 mr-1">Eligible Plan Deals:</span>
+                                    {PAID_PLAN_ORDER.filter(p => targetedOffer.plans.includes("all") || targetedOffer.plans.includes(p)).map((planKey) => {
+                                        const baseINR = PLAN_CONFIGS[planKey as keyof typeof PLAN_CONFIGS]?.priceINR || 0;
+                                        let finalINR = baseINR;
+                                        if (targetedOffer.discountType === "percentage") {
+                                            finalINR = baseINR * (1 - targetedOffer.discountValue / 100);
+                                        } else if (targetedOffer.discountType === "flat") {
+                                            finalINR = Math.max(0, baseINR - targetedOffer.discountValue);
+                                        } else if (targetedOffer.discountType === "custom_price") {
+                                            finalINR = Math.max(0, targetedOffer.discountValue);
+                                        }
+                                        finalINR = Math.round(finalINR * 100) / 100;
+                                        const planLabel = PLAN_CONFIGS[planKey as keyof typeof PLAN_CONFIGS]?.label || planKey;
+                                        return (
+                                            <button
+                                                key={planKey}
+                                                type="button"
+                                                onClick={() => {
+                                                    const cardEl = document.getElementById(`plan-${planKey}`);
+                                                    if (cardEl) {
+                                                        cardEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                                                    }
+                                                }}
+                                                className="flex items-center gap-2 rounded-xl bg-indigo-500/25 border border-indigo-400/50 hover:border-amber-400/70 px-3 py-1.5 transition-all hover:scale-105"
+                                            >
+                                                <span className="text-xs font-black text-white">{planLabel}:</span>
+                                                <span className="text-xs font-bold text-slate-400 line-through">₹{baseINR}</span>
+                                                <span className="text-sm font-black text-emerald-400">
+                                                    {finalINR === 0 ? "₹0 FREE" : `₹${finalINR}`}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+
                 <div className="text-center max-w-3xl mb-10 relative z-10">
                     <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 text-xs font-bold mb-4 shadow-sm">
                         <span className="flex h-2 w-2 relative">
@@ -508,13 +631,33 @@ export default function PricingPage() {
                     </p>
                 </div>
 
-                <motion.div
-                    id="pricing-cards-grid"
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="visible"
-                    className="max-w-7xl w-full grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3 group/cards"
-                >
+                {isInitialLoading ? (
+                    <div className="max-w-7xl w-full grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+                        {[1, 2, 3, 4, 5, 6].map((i) => (
+                            <div key={i} className="h-[480px] rounded-3xl border border-slate-200/70 bg-white/80 backdrop-blur-xl p-7 flex flex-col justify-between animate-pulse shadow-sm">
+                                <div className="space-y-3">
+                                    <div className="h-7 w-28 bg-slate-200/80 rounded-xl" />
+                                    <div className="h-4 w-36 bg-slate-100/80 rounded-md" />
+                                    <div className="h-10 w-24 bg-slate-200/80 rounded-xl mt-4" />
+                                </div>
+                                <div className="space-y-3 my-6">
+                                    <div className="h-4 w-full bg-slate-100/80 rounded-md" />
+                                    <div className="h-4 w-4/5 bg-slate-100/80 rounded-md" />
+                                    <div className="h-4 w-3/4 bg-slate-100/80 rounded-md" />
+                                    <div className="h-4 w-5/6 bg-slate-100/80 rounded-md" />
+                                </div>
+                                <div className="h-11 w-full bg-slate-200/80 rounded-2xl" />
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <motion.div
+                        id="pricing-cards-grid"
+                        variants={containerVariants}
+                        initial="hidden"
+                        animate="visible"
+                        className="max-w-7xl w-full grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3 group/cards"
+                    >
                     <motion.div
                         id="plan-free"
                         variants={cardVariants}
@@ -649,6 +792,24 @@ export default function PricingPage() {
                     {/* Paid Plans */}
                     {dynamicTiers.map((tier) => {
                         const isFocused = focusPlan === tier.planId;
+                        const isTargetedPlan = Boolean(
+                            targetedOffer && (targetedOffer.plans.includes("all") || targetedOffer.plans.includes(tier.planId.toLowerCase()))
+                        );
+
+                        let displayPriceINR = tier.priceINR;
+                        let strikePriceINR: number | undefined = tier.originalPriceINR;
+
+                        if (isTargetedPlan && targetedOffer) {
+                            strikePriceINR = tier.priceINR;
+                            if (targetedOffer.discountType === "percentage") {
+                                displayPriceINR = tier.priceINR * (1 - targetedOffer.discountValue / 100);
+                            } else if (targetedOffer.discountType === "flat") {
+                                displayPriceINR = Math.max(0, tier.priceINR - targetedOffer.discountValue);
+                            } else if (targetedOffer.discountType === "custom_price") {
+                                displayPriceINR = Math.max(0, targetedOffer.discountValue);
+                            }
+                            displayPriceINR = Math.round(displayPriceINR * 100) / 100;
+                        }
 
                         return (
                             <motion.div
@@ -659,7 +820,9 @@ export default function PricingPage() {
                                 className={cn(
                                     cardBase,
                                     "group-hover/cards:[&:not(:hover)]:opacity-95 transition-all duration-300",
-                                    isFocused
+                                    isTargetedPlan
+                                        ? "border-emerald-500 bg-gradient-to-b from-emerald-50/40 via-white to-white ring-2 ring-emerald-500/40 shadow-[0_0_40px_-5px_rgba(16,185,129,0.35)]"
+                                        : isFocused
                                         ? "border-amber-400 ring-2 ring-amber-400/45 shadow-[0_24px_56px_-32px_rgba(251,191,36,0.38)]"
                                         : tier.isPopular
                                             ? "border-primary/40 bg-slate-50/50 ring-1 ring-primary/12 shadow-[0_22px_52px_-30px_rgba(15,23,42,0.34)] hover:border-primary/55 hover:shadow-[0_30px_64px_-28px_rgba(15,23,42,0.38)]"
@@ -668,7 +831,7 @@ export default function PricingPage() {
                                                 : "border-slate-200 hover:border-slate-300"
                                 )}
                             >
-                                {tier.isPopular && (
+                                {tier.isPopular && !isTargetedPlan && (
                                     <motion.div
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
@@ -681,8 +844,16 @@ export default function PricingPage() {
                                     </motion.div>
                                 )}
 
-                                <div className="mb-4">
-                                    {activeOffer && tier.originalPriceINR !== undefined && (
+                                {isTargetedPlan && targetedOffer && (
+                                    <div className="absolute -top-3.5 left-0 right-0 flex justify-center">
+                                        <span className="rounded-full bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-white shadow-lg animate-pulse">
+                                            🎉 Granted Special Deal ({targetedOffer.discountType === "percentage" ? `${targetedOffer.discountValue}% OFF` : `₹${targetedOffer.discountValue} OFF`})
+                                        </span>
+                                    </div>
+                                )}
+
+                                <div className="mb-4 pt-1">
+                                    {activeOffer && tier.originalPriceINR !== undefined && !isTargetedPlan && (
                                         <div className="mb-2 inline-block rounded-full bg-gradient-to-r from-violet-600 via-fuchsia-600 to-orange-500 px-2.5 py-0.5 text-[10px] font-black tracking-wide text-white shadow-[0_0_15px_-3px_rgba(217,70,239,0.5)] animate-pulse">
                                             🎪 {activeOffer.name} — {activeOffer.type === 'percentage' ? `${activeOffer.value}% OFF` : `₹${activeOffer.value} OFF`}
                                         </div>
@@ -698,10 +869,10 @@ export default function PricingPage() {
                                     <p className="min-h-[40px] text-[13px] leading-5 text-slate-500">{tier.description}</p>
                                 </div>
                                 <div className="mb-5 flex flex-col gap-1.5">
-                                    {tier.originalPriceINR !== undefined && (
+                                    {strikePriceINR !== undefined && (
                                         <div className="inline-block">
                                             <span className="text-2xl font-bold text-slate-400 line-through decoration-rose-500/80 decoration-[3px]">
-                                                {currencySymbols[currency]}{formatPrice(tier.originalPriceINR)}
+                                                {currencySymbols[currency]}{formatPrice(strikePriceINR)}
                                             </span>
                                             <span className="ml-1 text-lg font-semibold text-slate-400 line-through decoration-rose-500/80 decoration-[3px]">/mo</span>
                                         </div>
@@ -710,16 +881,16 @@ export default function PricingPage() {
                                         <div className="flex flex-wrap items-end gap-1.5 text-slate-900">
                                             <span className="pb-1 text-[26px] font-bold tracking-[-0.04em]">{currencySymbols[currency]}</span>
                                             <motion.span
-                                                key={currency + tier.priceINR}
+                                                key={currency + displayPriceINR}
                                                 initial={{ opacity: 0, filter: "blur(4px)" }}
                                                 animate={{ opacity: 1, filter: "blur(0px)" }}
                                                 transition={{ duration: 0.4, ease: "easeOut" }}
                                                 className={cn(
                                                     priceValueBase,
-                                                    tier.originalPriceINR !== undefined ? "bg-gradient-to-br from-violet-600 via-fuchsia-600 to-orange-500 bg-clip-text text-transparent drop-shadow-sm" : ""
+                                                    isTargetedPlan ? "text-emerald-600 font-black drop-shadow-sm" : tier.originalPriceINR !== undefined ? "bg-gradient-to-br from-violet-600 via-fuchsia-600 to-orange-500 bg-clip-text text-transparent drop-shadow-sm" : ""
                                                 )}
                                             >
-                                                {formatPrice(tier.priceINR)}
+                                                {formatPrice(displayPriceINR)}
                                             </motion.span>
                                             <span className="pb-1.5 text-sm font-semibold text-slate-400">/mo</span>
                                         </div>
@@ -785,6 +956,7 @@ export default function PricingPage() {
                         );
                     })}
                 </motion.div>
+                )}
 
                 <div id="feature-comparison" className="mt-12 w-full max-w-7xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
                     <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">

@@ -51,10 +51,17 @@ const docs = [
         href: "https://github.com/your-org/xurl/tree/main/Documentation/Developer-Guide.md",
     },
     {
-        title: "Security",
+        title: "Security & Emergency Protocols",
         description:
-            "Authentication model, abuse protection, SSRF defense, rate limiting, and payment security.",
-        href: "https://github.com/your-org/xurl/tree/main/Documentation/Security.md",
+            "Authentication model, abuse protection, rate limiting, Global Emergency Kill Switch, and Direct Appeals.",
+        href: "/emergency-policy",
+        internal: true,
+    },
+    {
+        title: "Developer Guide",
+        description:
+            "Local setup, project patterns, available scripts, and contributing guidelines.",
+        href: "https://github.com/your-org/xurl/tree/main/Documentation/Developer-Guide.md",
     },
 ];
 
@@ -87,6 +94,30 @@ export default function DocumentationPage() {
                             </p>
                         </Link>
                     ))}
+                </div>
+
+                {/* Policy Governance & Proprietary Technology Notice */}
+                <div className="rounded-2xl border border-border bg-card/60 p-6 md:p-8 backdrop-blur-xl space-y-4 shadow-sm">
+                    <div className="flex items-center gap-3 text-foreground font-bold text-base">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            📜
+                        </div>
+                        <span>Strict Policy-Driven Architecture & Technology Protection</span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                        The XURL platform operates <strong>100% on policy-driven governance</strong>. All quota enforcement, rate limits, tier grants, and Emergency Maintenance Holds are strictly executed according to our published legal policies. To maintain platform integrity and security, public documentation defines external interface contracts only. Internal Edge routing mechanisms, anti-abuse scoring heuristics, and proprietary database architectures remain protected under trade secret and intellectual property policies.
+                    </p>
+                    <div className="pt-2 flex flex-wrap gap-4 text-xs font-semibold">
+                        <Link href="/terms" className="text-primary hover:underline">
+                            Terms of Service →
+                        </Link>
+                        <Link href="/privacy" className="text-primary hover:underline">
+                            Privacy Policy →
+                        </Link>
+                        <Link href="/emergency-policy" className="text-primary hover:underline">
+                            Emergency Protocol Policy →
+                        </Link>
+                    </div>
                 </div>
             </main>
             <HomeFooter />

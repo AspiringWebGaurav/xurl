@@ -11,6 +11,9 @@ import { getDevModeForUser, isDevEnvironment, isDeveloperEmail } from "@/lib/dev
 import { applyPlanUpgrade } from "@/services/plan-upgrade";
 
 // Ensure a user can only create 10 orders per hour
+import { getApplicablePartialOfferForUser, calculatePartialOfferPrice, recordPartialOfferRedemption } from "@/services/partial-offers";
+
+// Ensure a user can only create 10 orders per hour
 const ORDER_RATE_LIMIT = 10;
 const ORDER_RATE_TTL = 3600;
 
@@ -84,7 +87,13 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ code: "INVALID_PLAN", message: "Invalid plan specified." }, { status: 400 });
         }
 
-        const promoValidation = promoCode
+        const isRealPromoCode = promoCode && 
+            !promoCode.startsWith("PARTIAL_OFFER_") && 
+            !promoCode.startsWith("GLOBAL_OFFER_") && 
+            !promoCode.startsWith("Admin Special Deal") &&
+            !promoCode.startsWith("Global Offer");
+
+        const promoValidation = isRealPromoCode
             ? await validatePromoCodeForPlan(promoCode, planId, decoded.uid)
             : null;
 
@@ -100,12 +109,21 @@ export async function POST(request: NextRequest) {
         const dynamicPriceINR = dynamicPlanConfig.priceINR;
         const baseAmountPaise = Math.round(dynamicPriceINR * 100);
 
+        // Check for targeted partial offer for current user email
+        const userEmail = decoded.email || "";
+        const partialOffer = await getApplicablePartialOfferForUser(userEmail, planId);
+
         const globalOffer = await getBestActiveOffer(dynamicPriceINR);
 
         let finalAmountPaise = baseAmountPaise;
         let globalDiscountPaise = 0;
+        let partialOfferDiscountPaise = 0;
         
-        if (globalOffer) {
+        if (partialOffer) {
+            const { finalPriceINR } = calculatePartialOfferPrice(dynamicPriceINR, partialOffer);
+            partialOfferDiscountPaise = baseAmountPaise - Math.round(finalPriceINR * 100);
+            finalAmountPaise -= partialOfferDiscountPaise;
+        } else if (globalOffer) {
             const discountedINR = calculateDiscountedPrice(dynamicPriceINR, globalOffer);
             globalDiscountPaise = baseAmountPaise - Math.round(discountedINR * 100);
             finalAmountPaise -= globalDiscountPaise;
@@ -138,6 +156,11 @@ export async function POST(request: NextRequest) {
             appliedPromoType = promoValidation.discountType;
             appliedPromoValue = promoValidation.discountValue;
             appliedPromoId = promoValidation.promoId;
+        } else if (partialOffer) {
+            appliedPromoCode = `PARTIAL_OFFER_${partialOffer.id}`;
+            appliedPromoType = partialOffer.discountType;
+            appliedPromoValue = partialOffer.discountValue;
+            appliedPromoId = partialOffer.id || null;
         } else if (globalOffer) {
             appliedPromoCode = `GLOBAL_OFFER_${globalOffer.id}`;
             appliedPromoType = globalOffer.type;
@@ -200,8 +223,8 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // ─── Free Fulfillment (100% Promo Code Bypass) ──────────────────────
-        if (finalAmountPaise === 0 && promoValidation?.valid) {
+        // ─── Free Fulfillment (100% Promo / Partial Offer / Global Offer Bypass) ──────
+        if (finalAmountPaise === 0) {
             const syntheticOrderId = `free-${decoded.uid}-${now}`;
             const orderDoc: OrderDocument = {
                 orderId: syntheticOrderId,
@@ -216,7 +239,7 @@ export async function POST(request: NextRequest) {
                 promoDiscountValue: appliedPromoValue,
                 currency: "INR",
                 status: "paid",
-                source: "promo_free",
+                source: partialOffer ? "partial_offer" : "promo_free",
                 createdAt: now,
                 updatedAt: now,
             };
@@ -224,13 +247,23 @@ export async function POST(request: NextRequest) {
             await adminDb.collection("orders").doc(syntheticOrderId).set(orderDoc);
 
             await applyPlanUpgrade(planId, decoded.uid, syntheticOrderId, `free-${now}`, undefined, {
-                source: "promo_free",
+                source: partialOffer ? "partial_offer" : "promo_free",
                 amountPaise: 0,
             });
 
+            if (partialOffer && partialOffer.id) {
+                await recordPartialOfferRedemption({
+                    offerId: partialOffer.id,
+                    userId: decoded.uid,
+                    userEmail: userEmail,
+                    planId,
+                    orderId: syntheticOrderId,
+                });
+            }
+
             logger.info(
                 "payment_order_free_fulfillment",
-                `100% Promo Code applied for user ${decoded.uid} plan ${planId}`
+                `100% Discount applied for user ${decoded.uid} plan ${planId}`
             );
 
             return NextResponse.json({

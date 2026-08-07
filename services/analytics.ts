@@ -60,6 +60,9 @@ export async function recordClick(
         referrer?: string;
         country?: string;
         userAgent?: string;
+        utmSource?: string;
+        utmCampaign?: string;
+        isQr?: boolean;
     }
 ): Promise<void> {
     try {
@@ -71,6 +74,8 @@ export async function recordClick(
         const dailyDocId = `${slug}_${today}`;
         const dailyRef = adminDb.collection("analytics").doc(dailyDocId);
         const { device, browser, os } = parseUserAgent(metadata.userAgent || "");
+        const ua = metadata.userAgent || "";
+        const isBot = /bot|crawler|spider|slack|discord|whatsapp|twitterbot|facebookexternalhit|telegram/i.test(ua);
 
         // 1) Increment total clicks on the link document
         await adminDb.collection("links").doc(slug).update({
@@ -82,8 +87,12 @@ export async function recordClick(
             slug,
             date: today,
             clicks: FieldValue.increment(1),
-            uniqueVisitors: FieldValue.increment(1), // simplified — real impl would deduplicate by IP/fingerprint
+            uniqueVisitors: FieldValue.increment(1),
+            [isBot ? "bots" : "humans"]: FieldValue.increment(1),
         };
+
+        const sourceKey = metadata.isQr ? "qr" : (metadata.referrer ? "web" : "direct");
+        updates[`sources.${sourceKey}`] = FieldValue.increment(1);
 
         // Increment nested counters using dot notation
         if (metadata.referrer) {
@@ -93,6 +102,15 @@ export async function recordClick(
         if (metadata.country) {
             updates[`countries.${metadata.country}`] = FieldValue.increment(1);
         }
+        if (metadata.utmSource) {
+            const srcKey = metadata.utmSource.replace(/\./g, "_").slice(0, 50);
+            updates[`utms.sources.${srcKey}`] = FieldValue.increment(1);
+        }
+        if (metadata.utmCampaign) {
+            const campKey = metadata.utmCampaign.replace(/\./g, "_").slice(0, 50);
+            updates[`utms.campaigns.${campKey}`] = FieldValue.increment(1);
+        }
+
         updates[`devices.${device}`] = FieldValue.increment(1);
         updates[`browsers.${browser}`] = FieldValue.increment(1);
         updates[`os.${os}`] = FieldValue.increment(1);

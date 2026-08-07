@@ -4,10 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PLAN_CONFIGS, resolvePlanType } from "@/lib/plans";
-import { Loader2, Tag } from "lucide-react";
+import { auth } from "@/lib/firebase/config";
+import { Loader2, Tag, Sparkles } from "lucide-react";
 
 export interface AppliedPromo {
     code: string;
+    isManualPromo?: boolean;
     originalAmount: number;
     discountAmount: number;
     finalAmount: number;
@@ -35,9 +37,12 @@ export function PromoCodeSection({ planId, onPromoChange, variant = "default" }:
     const [error, setError] = useState("");
     const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
     const [globalOffer, setGlobalOffer] = useState<any>(null);
+    const [partialOffer, setPartialOffer] = useState<any>(null);
 
     useEffect(() => {
         let mounted = true;
+        
+        // Fetch Public Global Offers
         fetch("/api/config/public")
             .then(res => res.json())
             .then(data => {
@@ -55,6 +60,33 @@ export function PromoCodeSection({ planId, onPromoChange, variant = "default" }:
                 setGlobalOffer(best);
             })
             .catch(console.error);
+
+        // Fetch User Targeted Partial Offers
+        const user = auth.currentUser;
+        if (user) {
+            user.getIdToken().then((token) => {
+                fetch("/api/user/partial-offers", {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (!mounted || !Array.isArray(data.offers) || data.offers.length === 0) {
+                            setPartialOffer(null);
+                            return;
+                        }
+                        const applicable = data.offers.find((o: any) => 
+                            o.plans.includes("all") || o.plans.includes(resolvedPlan.toLowerCase())
+                        );
+                        if (applicable) {
+                            setPartialOffer(applicable);
+                        } else {
+                            setPartialOffer(null);
+                        }
+                    })
+                    .catch(() => setPartialOffer(null));
+            });
+        }
+
         return () => { mounted = false; };
     }, [resolvedPlan]);
 
@@ -62,14 +94,24 @@ export function PromoCodeSection({ planId, onPromoChange, variant = "default" }:
         setCode("");
         setError("");
         setAppliedPromo(null);
-        onPromoChange(null);
-    }, [resolvedPlan, onPromoChange]);
+    }, [resolvedPlan]);
 
     const summary = useMemo(() => {
-        let globalDiscountPaise = 0;
         let finalAmount = baseAmount;
 
-        if (globalOffer) {
+        if (partialOffer) {
+            const priceINR = PLAN_CONFIGS[resolvedPlan].priceINR;
+            let finalPrice = priceINR;
+            if (partialOffer.discountType === "percentage") {
+                finalPrice = Math.max(0, priceINR * (1 - partialOffer.discountValue / 100));
+            } else if (partialOffer.discountType === "flat") {
+                finalPrice = Math.max(0, priceINR - partialOffer.discountValue);
+            } else if (partialOffer.discountType === "custom_price") {
+                finalPrice = Math.max(0, partialOffer.discountValue);
+            }
+            const partialDiscountPaise = baseAmount - Math.round(finalPrice * 100);
+            finalAmount -= partialDiscountPaise;
+        } else if (globalOffer) {
             const priceINR = PLAN_CONFIGS[resolvedPlan].priceINR;
             let finalPrice = priceINR;
             if (globalOffer.type === "percentage") {
@@ -77,12 +119,12 @@ export function PromoCodeSection({ planId, onPromoChange, variant = "default" }:
             } else if (globalOffer.type === "flat") {
                 finalPrice = Math.max(0, priceINR - globalOffer.value);
             }
-            globalDiscountPaise = baseAmount - Math.round(finalPrice * 100);
+            const globalDiscountPaise = baseAmount - Math.round(finalPrice * 100);
             finalAmount -= globalDiscountPaise;
         }
 
-        let promoDiscountPaise = 0;
         if (appliedPromo) {
+            let promoDiscountPaise = 0;
             if (appliedPromo.discountType === "free_plan") {
                 promoDiscountPaise = finalAmount;
             } else if (appliedPromo.discountType === "percentage") {
@@ -96,13 +138,22 @@ export function PromoCodeSection({ planId, onPromoChange, variant = "default" }:
 
         const totalDiscountPaise = baseAmount - finalAmount;
         // Backward calculate GST since the final amount is inclusive
-        const subtotalPaise = Math.round(finalAmount / 1.18);
-        const gstPaise = finalAmount - subtotalPaise;
+        const subtotalPaise = finalAmount === 0 ? 0 : Math.round(finalAmount / 1.18);
+        const gstPaise = finalAmount === 0 ? 0 : finalAmount - subtotalPaise;
+
+        let codeLabel = "";
+        if (partialOffer) {
+            codeLabel = `Admin Special Deal (${partialOffer.title})`;
+        } else if (globalOffer) {
+            codeLabel = `Global Offer (${globalOffer.name})`;
+        }
+
+        if (appliedPromo) {
+            codeLabel = codeLabel ? `${codeLabel} + ${appliedPromo.code}` : appliedPromo.code;
+        }
 
         return {
-            code: appliedPromo 
-                ? (globalOffer ? `Global Offer + ${appliedPromo.code}` : appliedPromo.code)
-                : (globalOffer ? `Global Offer (${globalOffer.name})` : ""),
+            code: codeLabel,
             originalAmount: baseAmount,
             discountAmount: totalDiscountPaise,
             subtotalAmount: subtotalPaise,
@@ -111,7 +162,15 @@ export function PromoCodeSection({ planId, onPromoChange, variant = "default" }:
             discountType: "fixed" as const,
             discountValue: totalDiscountPaise,
         };
-    }, [appliedPromo, baseAmount, globalOffer, resolvedPlan]);
+    }, [appliedPromo, baseAmount, globalOffer, partialOffer, resolvedPlan]);
+
+    useEffect(() => {
+        if (summary.discountAmount > 0) {
+            onPromoChange(summary);
+        } else {
+            onPromoChange(null);
+        }
+    }, [summary, onPromoChange]);
 
     if (PLAN_CONFIGS[resolvedPlan].priceINR <= 0) {
         return null;
@@ -143,6 +202,7 @@ export function PromoCodeSection({ planId, onPromoChange, variant = "default" }:
 
             const nextPromo: AppliedPromo = {
                 code: data.code,
+                isManualPromo: true,
                 originalAmount: data.originalAmount,
                 discountAmount: data.discountAmount,
                 subtotalAmount: Math.round(data.finalAmount / 1.18),
@@ -173,6 +233,21 @@ export function PromoCodeSection({ planId, onPromoChange, variant = "default" }:
 
     return (
         <div className={`mb-4 ${variant === "default" ? "rounded-xl border border-slate-200 bg-slate-50 px-4 py-3" : "px-1 py-1"}`}>
+            {partialOffer && (
+                <div className="mb-3 flex items-center justify-between rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-emerald-500/10 p-3 text-indigo-950 shadow-sm">
+                    <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-indigo-600 animate-pulse shrink-0" />
+                        <div>
+                            <p className="text-xs font-black">🎉 Admin Granted Offer Applied</p>
+                            <p className="text-[11px] text-slate-600 font-medium">{partialOffer.title}</p>
+                        </div>
+                    </div>
+                    <span className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md shrink-0">
+                        {partialOffer.discountType === "percentage" ? `${partialOffer.discountValue}% OFF` : `₹${partialOffer.discountValue} OFF`}
+                    </span>
+                </div>
+            )}
+
             <div className={`flex items-center gap-2 text-slate-900 ${variant === "minimal" ? "px-1" : ""}`}>
                 <Tag className={`${variant === "minimal" ? "h-4 w-4" : "h-3.5 w-3.5"} text-slate-500`} />
                 <p className={`${variant === "minimal" ? "text-sm" : "text-xs"} font-semibold`}>Promo code</p>

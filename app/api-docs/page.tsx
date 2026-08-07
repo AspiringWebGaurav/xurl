@@ -41,6 +41,20 @@ const endpoints = [
     },
     {
         method: "GET",
+        path: "/api/public/kill-switch",
+        description: "Check global emergency kill switch status.",
+        auth: "None",
+        rateLimit: "Dynamic",
+    },
+    {
+        method: "POST",
+        path: "/api/public/appeals",
+        description: "Submit a direct emergency appeal during outage mode.",
+        auth: "None",
+        rateLimit: "5/min",
+    },
+    {
+        method: "GET",
         path: "/api/redirect/{slug}",
         description: "Resolve a short link to its destination URL.",
         auth: "None",
@@ -230,8 +244,8 @@ export default function ApiDocsPage() {
                     <div className="rounded-xl border border-border bg-card p-6">
                         <h2 className="text-base font-semibold text-foreground mb-2">Error Format</h2>
                         <p className="text-sm text-muted-foreground leading-relaxed">
-                            All errors return <code className="text-xs bg-muted px-1 py-0.5 rounded">{`{"error": "message"}`}</code> with
-                            standard HTTP status codes: 400, 401, 403, 404, 429, 500.
+                            All errors return <code className="text-xs bg-muted px-1 py-0.5 rounded">{`{"error": "code", "message": "details"}`}</code> with
+                            standard HTTP status codes: 400, 401, 403, 404, 429, 500, and 503 (Emergency Kill Switch Active).
                         </p>
                     </div>
                     <div className="rounded-xl border border-border bg-card p-6">

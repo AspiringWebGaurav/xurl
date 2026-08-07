@@ -33,8 +33,15 @@ function LoginContent() {
     }
 
     return (
-        <div id="login-root" className="flex flex-col h-[100dvh] w-full overflow-hidden bg-slate-50">
+        <div id="login-root" className="flex flex-col h-[100dvh] w-full overflow-hidden bg-slate-50 relative">
             <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
+
+            {checkoutState.killSwitchActive && (
+                <div className="bg-rose-950 text-rose-200 px-4 py-2.5 text-center shadow-lg font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 border-b border-rose-500/40 z-50">
+                    <ShieldCheck className="h-4 w-4 text-rose-400 shrink-0" />
+                    <span>EMERGENCY KILL SWITCH MODE ACTIVE — ONLY VERIFIED ADMIN CREDENTIALS PERMITTED</span>
+                </div>
+            )}
             
             <AnimatePresence>
                 {(paymentState === "processing" || paymentState === "success" || paymentState === "free_success" || paymentState === "failed" || paymentState === "cancelled") && (
