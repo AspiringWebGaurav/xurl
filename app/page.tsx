@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { TopNavbar } from "@/components/layout/TopNavbar";
+import { HomeFooter } from "@/components/layout/HomeFooter";
 import { TiltedCarousel } from "@/components/content/tilted-carousel";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ArrowRight, Link2, Check } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PLAN_CONFIGS, PlanConfig } from "@/lib/plans";
 import { Logo } from "@/components/ui/Logo";
@@ -14,23 +15,19 @@ import { Logo } from "@/components/ui/Logo";
 // Hook to detect low-end devices and mobile screens
 function useDeviceCapabilities() {
     const [isMobile, setIsMobile] = useState(false);
-    const [isLowEnd, setIsLowEnd] = useState(false);
-    const [isMounted, setIsMounted] = useState(false);
+    const [isLowEnd] = useState(() => {
+        if (typeof window === "undefined") return false;
+        const cores = navigator.hardwareConcurrency || 4;
+        // @ts-expect-error deviceMemory is non-standard
+        const memory = navigator.deviceMemory || 4;
+        return cores <= 4 || memory <= 4;
+    });
+    const [isMounted] = useState(() => typeof window !== "undefined");
 
     useEffect(() => {
-        setIsMounted(true);
         const checkMobile = () => setIsMobile(window.innerWidth < 768);
         checkMobile();
         window.addEventListener('resize', checkMobile);
-
-        // Detect low-end based on hardware concurrency (cores) or device memory
-        const cores = navigator.hardwareConcurrency || 4;
-        // @ts-ignore
-        const memory = navigator.deviceMemory || 4;
-        if (cores <= 4 || memory <= 4) {
-            setIsLowEnd(true);
-        }
-
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
@@ -168,7 +165,7 @@ export default function LandingPage() {
     // Filter out free and guest plans
     const paidPlans = Object.entries(PLAN_CONFIGS)
         .filter(([key]) => key !== "free" && key !== "guest")
-        .map(([_, plan]) => plan);
+        .map(([, plan]) => plan);
 
     // For low-end devices or mobile, we drastically reduce the duplication to save DOM nodes and RAM
     const isConstrained = isMobile || isLowEnd;
@@ -411,18 +408,10 @@ export default function LandingPage() {
                 </div>
             </main>
 
-            {/* Blended Footer */}
-            <footer className="absolute bottom-0 inset-x-0 z-50 px-4 py-2 sm:px-6 sm:py-6 bg-transparent">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-1 sm:gap-3 w-full">
-                    <div className="text-[11px] sm:text-xs font-medium text-slate-900/40 hidden sm:block">
-                        &copy; {new Date().getFullYear()} XURL. All rights reserved.
-                    </div>
-                    <div className="flex items-center justify-center gap-6 text-[10px] sm:text-xs font-medium text-slate-900/50 w-full sm:w-auto">
-                        <Link href="/terms" target="_blank" className="hover:text-slate-900/80 transition-colors duration-300">Terms</Link>
-                        <Link href="/privacy" target="_blank" className="hover:text-slate-900/80 transition-colors duration-300">Privacy</Link>
-                    </div>
-                </div>
-            </footer>
+            {/* OG Blended Home Footer */}
+            <div className="relative z-50 shrink-0">
+                <HomeFooter />
+            </div>
         </div>
     );
 }
