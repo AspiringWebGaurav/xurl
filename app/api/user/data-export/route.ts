@@ -22,6 +22,9 @@ function escapeCsv(val: string | number | boolean | null | undefined): string {
     return `"${str}"`;
 }
 
+// In-memory sliding window rate-limit cache: userId -> Array of timestamps
+const exportRateLimitMap = new Map<string, number[]>();
+
 export async function GET(request: NextRequest) {
     try {
         const authHeader = request.headers.get("authorization");
@@ -36,6 +39,53 @@ export async function GET(request: NextRequest) {
         } catch {
             return NextResponse.json({ code: "UNAUTHORIZED", message: "Invalid authentication token." }, { status: 401 });
         }
+
+        // 1. Emergency Kill Switch Guard Check
+        try {
+            const configSnap = await adminDb.collection("system_config").doc("global").get();
+            if (configSnap.exists && configSnap.data()?.killSwitch === true) {
+                return NextResponse.json(
+                    { code: "EMERGENCY_HOLD", message: "Data export is temporarily paused during active Emergency Maintenance." },
+                    { status: 503 }
+                );
+            }
+        } catch {
+            // Non-blocking if config doc is absent
+        }
+
+        // 2. Export Cooldown & Rate Limit Check (Max 3 exports / hour, 60s cooldown)
+        const nowMs = Date.now();
+        const userHistory = exportRateLimitMap.get(decoded.uid) || [];
+        // Clean timestamps older than 1 hour (3600,000 ms)
+        const recentExports = userHistory.filter(ts => nowMs - ts < 3600 * 1000);
+
+        if (recentExports.length >= 3) {
+            const oldestExport = recentExports[0];
+            const waitSeconds = Math.ceil((oldestExport + 3600 * 1000 - nowMs) / 1000);
+            return NextResponse.json(
+                { 
+                    code: "RATE_LIMITED", 
+                    message: `Export rate limit exceeded (Max 3 per hour). Please wait ${Math.ceil(waitSeconds / 60)} minute(s) before requesting another data archive.` 
+                },
+                { status: 429 }
+            );
+        }
+
+        const lastExportMs = recentExports[recentExports.length - 1] || 0;
+        if (nowMs - lastExportMs < 60 * 1000) {
+            const cooldownSecs = Math.ceil((60 * 1000 - (nowMs - lastExportMs)) / 1000);
+            return NextResponse.json(
+                { 
+                    code: "COOLDOWN_ACTIVE", 
+                    message: `Please wait ${cooldownSecs} second(s) between consecutive data exports.` 
+                },
+                { status: 429 }
+            );
+        }
+
+        // Record current export timestamp
+        recentExports.push(nowMs);
+        exportRateLimitMap.set(decoded.uid, recentExports);
 
         const { searchParams } = new URL(request.url);
         const format = (searchParams.get("format") || "json").toLowerCase();
@@ -406,6 +456,23 @@ https://xurl.com/privacy
         exportFolder.file("checksums.sha256", checksumEntries.join("\n"));
 
         const zipBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+
+        // Security Audit Logging
+        try {
+            await adminDb.collection("logs").add({
+                action: "USER_DATA_EXPORT",
+                userId: decoded.uid,
+                exportId,
+                format,
+                range,
+                quality,
+                itemCount: filteredLinks.length,
+                timestamp: Date.now(),
+                userAgent: request.headers.get("user-agent") || "unknown",
+            });
+        } catch (logErr) {
+            console.warn("Failed to record export audit log:", logErr);
+        }
 
         return new NextResponse(new Uint8Array(zipBuffer), {
             status: 200,

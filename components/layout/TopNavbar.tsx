@@ -14,9 +14,9 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/Logo";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getDeviceFingerprint, getOrCreateGuestSessionId } from "@/lib/utils/fingerprint";
+import { getOrCreateGuestSessionId } from "@/lib/utils/fingerprint";
 import { cn } from "@/lib/utils";
-import { History, LogOut, Loader2, ArrowLeft, BarChart3 } from "lucide-react";
+import { History, LogOut, Loader2, ArrowLeft, BarChart3, User as UserIcon, KeyRound, CreditCard, Download, ShieldCheck } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { usePathname, useRouter } from "next/navigation";
 import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, runTransaction } from "firebase/firestore";
@@ -908,55 +908,129 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
 
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <button className="relative h-8 w-8 rounded-full overflow-hidden border border-slate-200 shadow-sm hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-1 transition-all">
+                                        <button className="relative h-9 w-9 rounded-full overflow-hidden border border-border/80 shadow-sm hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 transition-all cursor-pointer">
                                             <UserAvatar user={user} className="h-full w-full object-cover text-xs" />
                                         </button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-56 mt-1.5" sideOffset={4}>
-                                        <div className="flex items-center justify-start gap-2 p-2">
-                                            <div className="flex flex-col space-y-0.5 leading-none">
-                                                {user.displayName && <p className="font-medium text-[13px]">{user.displayName}</p>}
-                                                <p className="w-[200px] truncate text-xs text-muted-foreground">{user.email}</p>
+                                    <DropdownMenuContent align="end" className="w-64 mt-2 p-1.5 rounded-2xl border-border/80 bg-card/95 backdrop-blur-xl shadow-2xl space-y-1" sideOffset={6}>
+                                        {/* User Header Profile Card */}
+                                        <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-muted/40 border border-border/50">
+                                            <UserAvatar user={user} className="h-9 w-9 rounded-full shrink-0 border border-border" />
+                                            <div className="flex flex-col min-w-0 flex-1 leading-tight">
+                                                <div className="flex items-center justify-between gap-1">
+                                                    <p className="font-bold text-xs text-foreground truncate">{user.displayName || "User Account"}</p>
+                                                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full border shrink-0 font-mono ${
+                                                        plan === "enterprise" || plan === "business"
+                                                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                                                            : plan === "pro" || plan === "starter"
+                                                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                                            : "bg-primary/10 text-primary border-primary/20"
+                                                    }`}>
+                                                        {plan}
+                                                    </span>
+                                                </div>
+                                                <p className="truncate text-[11px] text-muted-foreground mt-0.5 font-mono">{user.email}</p>
                                             </div>
                                         </div>
-                                        <DropdownMenuSeparator />
+
+                                        <DropdownMenuSeparator className="bg-border/60 my-1" />
+
+                                        {/* Profile */}
                                         <DropdownMenuItem asChild>
-                                            <Link href="/profile" className="w-full cursor-pointer text-[13px]">
-                                                <span className="flex-1">Profile</span>
+                                            <Link href="/profile" className="flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold hover:bg-muted cursor-pointer transition">
+                                                <div className="h-7 w-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20">
+                                                    <UserIcon className="h-3.5 w-3.5" />
+                                                </div>
+                                                <div className="flex flex-col leading-tight flex-1">
+                                                    <span className="font-bold text-foreground">Profile & Account</span>
+                                                    <span className="text-[10px] text-muted-foreground font-normal">Account preferences & name</span>
+                                                </div>
                                             </Link>
                                         </DropdownMenuItem>
+
+                                        {/* API Keys */}
                                         <DropdownMenuItem asChild>
-                                            <Link href="/dashboard/api" className="w-full cursor-pointer text-[13px]">
-                                                <span className="flex-1">API Keys</span>
+                                            <Link href="/dashboard/api" className="flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold hover:bg-muted cursor-pointer transition">
+                                                <div className="h-7 w-7 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0 border border-indigo-500/20">
+                                                    <KeyRound className="h-3.5 w-3.5" />
+                                                </div>
+                                                <div className="flex flex-col leading-tight flex-1">
+                                                    <span className="font-bold text-foreground">API Keys</span>
+                                                    <span className="text-[10px] text-muted-foreground font-normal">Access keys & developer logs</span>
+                                                </div>
                                             </Link>
                                         </DropdownMenuItem>
+
+                                        {/* Billing */}
                                         <DropdownMenuItem asChild>
-                                            <Link href="/purchase-history" className="w-full cursor-pointer text-[13px]">
-                                                <span className="flex-1">Billing</span>
+                                            <Link href="/purchase-history" className="flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold hover:bg-muted cursor-pointer transition">
+                                                <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                                                    <CreditCard className="h-3.5 w-3.5" />
+                                                </div>
+                                                <div className="flex flex-col leading-tight flex-1">
+                                                    <span className="font-bold text-foreground">Billing & Plans</span>
+                                                    <span className="text-[10px] text-muted-foreground font-normal">Invoices, plans & receipts</span>
+                                                </div>
                                             </Link>
                                         </DropdownMenuItem>
+
+                                        {/* Data Export */}
+                                        <DropdownMenuItem asChild>
+                                            <Link href="/data-export" className="flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold hover:bg-muted cursor-pointer transition">
+                                                <div className="h-7 w-7 rounded-lg bg-cyan-500/10 text-cyan-500 flex items-center justify-center shrink-0 border border-cyan-500/20">
+                                                    <Download className="h-3.5 w-3.5" />
+                                                </div>
+                                                <div className="flex flex-col leading-tight flex-1">
+                                                    <span className="font-bold text-foreground">Download My Data</span>
+                                                    <span className="text-[10px] text-muted-foreground font-normal">GDPR / CCPA data export</span>
+                                                </div>
+                                            </Link>
+                                        </DropdownMenuItem>
+
+                                        {/* Admin Panel */}
                                         {canAccessAdmin && (
                                             <DropdownMenuItem asChild>
-                                                <Link href="/admin" className="w-full cursor-pointer text-[13px]">
-                                                    <span className="flex-1">Admin</span>
+                                                <Link href="/admin" className="flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 cursor-pointer transition border border-amber-500/20 bg-amber-500/5">
+                                                    <div className="h-7 w-7 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
+                                                        <ShieldCheck className="h-3.5 w-3.5" />
+                                                    </div>
+                                                    <div className="flex flex-col leading-tight flex-1">
+                                                        <span className="font-bold">Admin Console</span>
+                                                        <span className="text-[10px] opacity-80 font-normal">System control panel</span>
+                                                    </div>
                                                 </Link>
                                             </DropdownMenuItem>
                                         )}
+
                                         {!isAdminPage && (
-                                            <DropdownMenuItem className="sm:hidden text-[13px]" onClick={() => { setIsHistoryOpen(true); setHasNewHistory(false); }}>
-                                                <span className="flex-1">Link History</span>
+                                            <DropdownMenuItem className="sm:hidden flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold hover:bg-muted cursor-pointer transition" onClick={() => { setIsHistoryOpen(true); setHasNewHistory(false); }}>
+                                                <div className="h-7 w-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20">
+                                                    <History className="h-3.5 w-3.5" />
+                                                </div>
+                                                <div className="flex flex-col leading-tight flex-1">
+                                                    <span className="font-bold text-foreground">Link History</span>
+                                                    <span className="text-[10px] text-muted-foreground font-normal">View your short links</span>
+                                                </div>
                                             </DropdownMenuItem>
                                         )}
-                                        <DropdownMenuSeparator />
+
+                                        <DropdownMenuSeparator className="bg-border/60 my-1" />
+
+                                        {/* Sign Out */}
                                         <DropdownMenuItem
-                                            className="text-red-500 focus:text-red-600 focus:bg-red-50 cursor-pointer text-[13px]"
+                                            className="flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 dark:hover:bg-rose-500/20 cursor-pointer transition"
                                             onClick={async () => {
                                                 await signOut();
                                                 router.push("/");
                                             }}
                                         >
-                                            <LogOut className="mr-2 h-3.5 w-3.5" />
-                                            <span>Sign out</span>
+                                            <div className="h-7 w-7 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0 border border-rose-500/20">
+                                                <LogOut className="h-3.5 w-3.5" />
+                                            </div>
+                                            <div className="flex flex-col leading-tight flex-1">
+                                                <span className="font-bold">Sign Out</span>
+                                                <span className="text-[10px] text-rose-400 font-normal">End active session safely</span>
+                                            </div>
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>

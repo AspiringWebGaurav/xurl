@@ -5,10 +5,14 @@ import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
 import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { TopNavbar } from "@/components/layout/TopNavbar";
-import { Loader2 } from "lucide-react";
+import { HomeFooter } from "@/components/layout/HomeFooter";
+import { MobileFooter } from "@/components/mobile/MobileFooter";
+import { Loader2, CreditCard, ArrowLeft, Receipt, Gift, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { useSearchParams } from "next/navigation";
-import { DesktopGuestLocked } from "@/components/layout/DesktopGuestLocked";
+import { Button } from "@/components/ui/button";
+import { motion } from "framer-motion";
+import Link from "next/link";
 
 type Transaction = {
     id: string;
@@ -33,7 +37,7 @@ function PurchaseHistoryContent() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
-    const [error, setError] = useState("");
+    const [userPlan, setUserPlan] = useState("free");
     const searchParams = useSearchParams();
     const highlightId = useMemo(() => searchParams.get("highlight"), [searchParams]);
 
@@ -52,9 +56,11 @@ function PurchaseHistoryContent() {
                         setTransactions(data.transactions);
                         setHasMore(data.transactions.length === 20);
                     }
+                    if (data.plan) {
+                        setUserPlan(data.plan);
+                    }
                 } catch (e) {
                     console.error("Failed to fetch transactions", e);
-                    setError("Failed to load your transaction history.");
                 }
             }
             setLoading(false);
@@ -86,221 +92,178 @@ function PurchaseHistoryContent() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+            <div className="h-[100dvh] flex flex-col items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
     }
 
-    if (!user) {
-        return (
-            <div className="min-h-screen flex flex-col bg-slate-50">
-                <TopNavbar />
-                <main className="flex-1 w-full px-4 py-12">
-                    <div className="mb-8">
-                        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Purchase History</h1>
-                        <p className="text-slate-500 mt-2">View your past transactions and plan usage over time.</p>
-                    </div>
-                    <DesktopGuestLocked
-                        title="Sign in Required"
-                        message="Please sign in to view your purchase history."
-                    >
-                        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden overflow-x-auto">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-medium">
-                                    <tr>
-                                        <th className="px-6 py-4">Date</th>
-                                        <th className="px-6 py-4">Action</th>
-                                        <th className="px-6 py-4">Plan</th>
-                                        <th className="px-6 py-4">Duration</th>
-                                        <th className="px-6 py-4">Links Granted</th>
-                                        <th className="px-6 py-4">Source</th>
-                                        <th className="px-6 py-4 text-right">Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {Array.from({ length: 5 }).map((_, i) => (
-                                        <tr key={i}>
-                                            <td className="px-6 py-4"><div className="h-4 w-24 bg-slate-200 rounded animate-pulse" /></td>
-                                            <td className="px-6 py-4"><div className="h-6 w-16 bg-slate-200 rounded animate-pulse" /></td>
-                                            <td className="px-6 py-4"><div className="h-4 w-16 bg-slate-200 rounded animate-pulse" /></td>
-                                            <td className="px-6 py-4"><div className="h-4 w-12 bg-slate-200 rounded animate-pulse" /></td>
-                                            <td className="px-6 py-4"><div className="h-4 w-8 bg-slate-200 rounded animate-pulse" /></td>
-                                            <td className="px-6 py-4"><div className="h-4 w-16 bg-slate-200 rounded animate-pulse" /></td>
-                                            <td className="px-6 py-4 text-right"><div className="h-4 w-12 bg-slate-200 rounded animate-pulse ml-auto" /></td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </DesktopGuestLocked>
-                </main>
-            </div>
-        );
-    }
-
-    const formatAction = (action: string) => {
+    const formatActionBadge = (action: string) => {
         switch (action) {
-            case "guest_use": return "Guest Usage";
-            case "free_use": return "Free Usage";
-            case "upgrade": return "Upgrade";
-            case "renew": return "Renewal";
-            case "downgrade": return "Downgrade";
-            case "expire": return "Expired";
-            case "admin_grant": return "Admin Grant";
-            default: return action;
+            case "upgrade": return { label: "Upgrade", class: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" };
+            case "renew": return { label: "Renewal", class: "bg-primary/10 text-primary border-primary/20" };
+            case "admin_grant": return { label: "Admin Gift", class: "bg-amber-500/10 text-amber-500 border-amber-500/20" };
+            case "downgrade": return { label: "Downgrade", class: "bg-rose-500/10 text-rose-500 border-rose-500/20" };
+            default: return { label: action, class: "bg-muted text-muted-foreground border-border" };
         }
-    };
-
-    const formatPlan = (plan: string) => {
-        const names: Record<string, string> = {
-            free: "Free",
-            starter: "Starter",
-            pro: "Pro",
-            business: "Business",
-            enterprise: "Enterprise",
-            bigenterprise: "Big Enterprise",
-            guest: "Guest"
-        };
-        return names[plan.toLowerCase()] || plan;
-    };
-
-    const formatDuration = (transaction: Transaction) => {
-        const isAdminGrant = transaction.action === "admin_grant";
-        if (
-            transaction.overrideExpiryMs === null ||
-            transaction.durationOption === "permanent" ||
-            (isAdminGrant && !transaction.durationOption && !transaction.customValue && !transaction.customUnit)
-        ) {
-            return isAdminGrant ? "Admin Gift - PERMANENT" : "Permanent";
-        }
-        if (transaction.durationOption && transaction.durationOption !== "custom") {
-            const map: Record<string, string> = {
-                "1d": "1 day",
-                "5d": "5 days",
-                "10d": "10 days",
-                "30d": "30 days",
-                "1d_gift": "1 day",
-            };
-            return map[transaction.durationOption] || transaction.durationOption;
-        }
-        if (transaction.durationOption === "custom" && transaction.customValue && transaction.customUnit) {
-            return `${transaction.customValue} ${transaction.customUnit}`;
-        }
-        if (transaction.planType && (transaction.action === "upgrade" || transaction.action === "renew")) {
-            return "30 days";
-        }
-        if (transaction.action === "admin_grant") {
-            return "Admin gift";
-        }
-        return "—";
     };
 
     return (
-        <div className="min-h-screen flex flex-col bg-slate-50">
-            <TopNavbar />
-            <main className="flex-1 w-full px-4 py-12">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Purchase History</h1>
-                    <p className="text-slate-500 mt-2">View your past transactions and plan usage over time.</p>
-                </div>
+        <div className="h-[100dvh] flex flex-col justify-between bg-background overflow-hidden select-none">
+            {/* Header Navbar */}
+            <div className="shrink-0">
+                <TopNavbar />
+            </div>
 
-                {error && (
-                    <div className="mb-6 p-4 rounded-lg bg-red-50 text-red-600 border border-red-200">
-                        {error}
+            {/* Main Single-Screen Content View (Broad Responsive Enlarge) */}
+            <main className="flex-1 min-h-0 w-full max-w-5xl lg:max-w-6xl mx-auto px-4 sm:px-8 py-3 sm:py-6 flex flex-col justify-center items-center overflow-hidden">
+                {!user ? (
+                    <div className="w-full max-w-xl text-center p-8 rounded-3xl border border-border/80 bg-card/80 backdrop-blur-xl shadow-2xl space-y-4">
+                        <CreditCard className="h-12 w-12 text-muted-foreground mx-auto" />
+                        <h1 className="text-xl font-bold text-foreground">Sign in Required</h1>
+                        <p className="text-sm text-muted-foreground">Please sign in to view your billing and purchase history.</p>
                     </div>
-                )}
+                ) : (
+                    <motion.div 
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="w-full space-y-3 sm:space-y-5"
+                    >
+                        {/* Header Banner */}
+                        <div className="flex items-center justify-between gap-2 px-1">
+                            <Link href="/" className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-muted-foreground hover:text-foreground transition">
+                                <ArrowLeft className="h-4 w-4" />
+                                <span>Back to shortener</span>
+                            </Link>
 
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-medium">
-                            <tr>
-                                <th className="px-6 py-4">Date</th>
-                                <th className="px-6 py-4">Action</th>
-                                <th className="px-6 py-4">Plan</th>
-                                <th className="px-6 py-4">Duration</th>
-                                <th className="px-6 py-4">Links Granted</th>
-                                <th className="px-6 py-4">Source</th>
-                                <th className="px-6 py-4 text-right">Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 text-slate-700">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[11px] sm:text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-mono">
+                                    Billing & Receipts
+                                </span>
+                                <Link href="/pricing" className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-primary hover:underline">
+                                    <span>Explore Plans</span>
+                                </Link>
+                            </div>
+                        </div>
+
+                        {/* Active Plan Overview Card */}
+                        <div className="p-5 sm:p-6 rounded-3xl border border-border/80 bg-card/80 backdrop-blur-2xl shadow-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                                    <Receipt className="h-6 w-6 sm:h-7 sm:w-7" />
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-3">
+                                        <h2 className="text-base sm:text-xl font-black text-foreground tracking-tight">Active Subscription</h2>
+                                        <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-mono">
+                                            {userPlan} Tier
+                                        </span>
+                                    </div>
+                                    <p className="text-xs sm:text-sm text-muted-foreground">Managed via secure platform billing integration.</p>
+                                </div>
+                            </div>
+
+                            <Link href="/pricing">
+                                <Button size="sm" className="h-11 sm:h-12 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-xs sm:text-sm px-5 shadow-lg w-full sm:w-auto">
+                                    <span>Manage Plan</span>
+                                    <ChevronRight className="h-4 w-4 ml-1.5" />
+                                </Button>
+                            </Link>
+                        </div>
+
+                        {/* Transactions Table Card */}
+                        <div className="p-5 sm:p-6 rounded-3xl border border-border/80 bg-card/80 backdrop-blur-2xl shadow-2xl space-y-3">
+                            <div className="flex items-center justify-between text-xs sm:text-sm font-bold text-foreground px-1">
+                                <span>Billing Transaction Records ({transactions.length})</span>
+                                <span className="text-xs text-muted-foreground font-mono">Real-time ledger</span>
+                            </div>
+
                             {transactions.length === 0 ? (
-                                <tr>
-                                    <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
-                                        No transaction history found.
-                                    </td>
-                                </tr>
+                                <div className="text-center py-10 space-y-3">
+                                    <Gift className="h-10 w-10 text-muted-foreground/40 mx-auto" />
+                                    <p className="text-sm font-bold text-foreground">No purchase transactions found</p>
+                                    <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                                        You are currently operating on the default Free plan tier. Upgrade to unlock bulk short links and API access.
+                                    </p>
+                                </div>
                             ) : (
-                                transactions.map((t) => (
-                                    <tr
-                                        key={t.id}
-                                        className={`hover:bg-slate-50/50 transition-colors ${highlightId === t.id ? "animate-highlight-pulse" : ""}`}
-                                    >
-                                        <td className="px-6 py-4 text-slate-900 font-medium">
-                                            {format(t.createdAt, "MMM d, yyyy h:mm a")}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider
-                                                ${t.action === 'upgrade' || t.action === 'renew' || t.action === 'admin_grant' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' :
-                                                  t.action === 'downgrade' || t.action === 'expire' ? 'bg-amber-50 text-amber-700 border border-amber-200/60' :
-                                                  'bg-slate-100 text-slate-600 border border-slate-200'}
-                                            `}>
-                                                {formatAction(t.action)}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 font-medium">
-                                            {formatPlan(t.planType)}
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-500">
-                                            {formatDuration(t)}
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-500">
-                                            {t.linksAllocated > 0 ? `+${t.linksAllocated}` : t.linksAllocated}
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-500 capitalize">{t.source || "-"}</td>
-                                        <td className="px-6 py-4 text-right text-slate-500">
-                                            {t.amount !== undefined ? (t.amount === 0 ? "₹0" : `₹${t.amount / 100}`) : "-"}
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                <div className="divide-y divide-border/60 max-h-60 overflow-y-auto pr-1">
+                                    {transactions.map((tx) => {
+                                        const badge = formatActionBadge(tx.action);
+                                        const dateStr = format(new Date(tx.createdAt), "MMM d, yyyy • HH:mm");
+                                        const isHighlighted = highlightId === tx.id;
 
-                {transactions.length > 0 && hasMore && (
-                    <div className="mt-8 flex justify-center">
-                        <button
-                            onClick={handleLoadMore}
-                            disabled={loadingMore}
-                            className="px-6 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all inline-flex items-center"
-                        >
-                            {loadingMore ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Loading...
-                                </>
-                            ) : 'Load More'}
-                        </button>
-                    </div>
+                                        return (
+                                            <div 
+                                                key={tx.id} 
+                                                className={`py-3 px-3 flex items-center justify-between text-xs sm:text-sm transition rounded-2xl ${
+                                                    isHighlighted ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/40"
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-3.5 min-w-0">
+                                                    <span className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-black uppercase border shrink-0 font-mono ${badge.class}`}>
+                                                        {badge.label}
+                                                    </span>
+                                                    <div className="flex flex-col min-w-0 leading-tight">
+                                                        <span className="font-bold text-foreground capitalize truncate">
+                                                            {tx.planType} Plan ({tx.linksAllocated ? `${tx.linksAllocated} links` : "Standard"})
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground font-mono mt-0.5">{dateStr}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-4 shrink-0 font-mono text-right">
+                                                    <span className="font-black text-foreground text-sm sm:text-base">
+                                                        {tx.amount && tx.amount > 0 ? `$${(tx.amount / 100).toFixed(2)}` : "Free"}
+                                                    </span>
+                                                    <span className="text-xs text-emerald-500 font-bold hidden sm:inline">
+                                                        COMPLETED
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {hasMore && transactions.length > 0 && (
+                                <div className="pt-2 text-center">
+                                    <Button 
+                                        size="sm" 
+                                        variant="outline" 
+                                        onClick={handleLoadMore} 
+                                        disabled={loadingMore}
+                                        className="h-9 sm:h-10 text-xs font-bold px-5 rounded-xl border-border"
+                                    >
+                                        {loadingMore ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                        <span>Load Older Transactions</span>
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
                 )}
             </main>
-        </div>
-    );
-}
 
-function LoadingFallback() {
-    return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-            <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+            {/* Footer */}
+            <div className="shrink-0 hidden md:block">
+                <HomeFooter />
+            </div>
+            <div className="shrink-0 block md:hidden">
+                <MobileFooter />
+            </div>
         </div>
     );
 }
 
 export default function PurchaseHistoryPage() {
     return (
-        <Suspense fallback={<LoadingFallback />}>
+        <Suspense fallback={
+            <div className="h-[100dvh] flex flex-col items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        }>
             <PurchaseHistoryContent />
         </Suspense>
     );

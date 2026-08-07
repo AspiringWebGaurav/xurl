@@ -159,7 +159,7 @@ export default function DataExportPage() {
                 <TopNavbar isCreateDisabled={false} />
             </div>
 
-            <main className="flex-1 flex flex-col justify-center max-w-4xl mx-auto w-full px-3.5 sm:px-6 py-1 sm:py-2 overflow-hidden">
+            <main className="flex-1 min-h-0 w-full max-w-5xl lg:max-w-6xl mx-auto px-4 sm:px-8 py-3 sm:py-6 flex flex-col justify-center overflow-hidden">
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-12 space-y-2">
                         <Loader2 className="h-7 w-7 animate-spin text-primary" />
@@ -170,15 +170,15 @@ export default function DataExportPage() {
                     <motion.div 
                         initial={{ opacity: 0, y: 12, scale: 0.98 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                        className="rounded-2xl sm:rounded-3xl border border-border bg-card p-5 sm:p-8 shadow-sm space-y-4 max-w-lg mx-auto text-center my-auto"
+                        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                        className="rounded-3xl border border-border/80 bg-card/80 backdrop-blur-2xl p-6 sm:p-10 shadow-2xl space-y-4 max-w-xl mx-auto text-center"
                     >
-                        <div className="mx-auto flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                            <Lock className="h-6 w-6 sm:h-7 sm:w-7" />
+                        <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto border border-primary/20">
+                            <Lock className="h-6 w-6" />
                         </div>
 
-                        <div className="space-y-1.5">
-                            <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-foreground">
+                        <div className="space-y-2">
+                            <h1 className="text-xl sm:text-3xl font-black tracking-tight text-foreground">
                                 Sign In to Download Your Data
                             </h1>
                             <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
@@ -186,41 +186,41 @@ export default function DataExportPage() {
                             </p>
                         </div>
 
-                        <div className="pt-1 flex flex-col sm:flex-row gap-2.5 justify-center">
+                        <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
                             <Link
                                 href="/login"
-                                className="inline-flex items-center justify-center gap-2 h-10 sm:h-11 px-5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-semibold text-xs sm:text-sm transition shadow-sm"
+                                className="inline-flex items-center justify-center gap-2 h-11 sm:h-12 px-6 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-xs sm:text-sm transition shadow-lg"
                             >
                                 Sign In / Register Free
                                 <ArrowRight className="h-4 w-4" />
                             </Link>
                             <Link
                                 href="/guest-policy"
-                                className="inline-flex items-center justify-center gap-2 h-10 sm:h-11 px-5 rounded-xl border border-border bg-background hover:bg-muted font-semibold text-xs sm:text-sm text-foreground transition"
+                                className="inline-flex items-center justify-center gap-2 h-11 sm:h-12 px-6 rounded-2xl border border-border bg-background hover:bg-muted font-bold text-xs sm:text-sm text-foreground transition"
                             >
                                 View Guest Policy
                             </Link>
                         </div>
                     </motion.div>
                 ) : (
-                    /* 📦 AUTHENTICATED DATA PORTAL (Strict 100dvh Non-Scrollable Layout for All Screens) */
+                    /* 📦 AUTHENTICATED DATA PORTAL (Broad Responsive Executive Card) */
                     <motion.div 
                         initial={{ opacity: 0, y: 10, scale: 0.99 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                        className="rounded-2xl sm:rounded-3xl border border-border bg-card p-3.5 sm:p-7 shadow-sm space-y-3 sm:space-y-5 my-auto overflow-hidden"
+                        className="rounded-3xl border border-border/80 bg-card/80 backdrop-blur-2xl p-4 sm:p-8 lg:p-10 shadow-2xl space-y-4 sm:space-y-6 my-auto overflow-hidden"
                     >
                         {/* Friendly Page Header */}
-                        <div className="border-b border-border pb-2.5 sm:pb-4 flex flex-row items-center justify-between gap-2">
+                        <div className="border-b border-border/60 pb-3 sm:pb-5 flex flex-row items-center justify-between gap-3">
                             <div>
-                                <h1 className="text-lg sm:text-3xl font-bold tracking-tight text-foreground">
+                                <h1 className="text-xl sm:text-3xl lg:text-4xl font-black tracking-tight text-foreground">
                                     Download Your Data
                                 </h1>
-                                <p className="text-[11px] sm:text-sm text-muted-foreground mt-0.5 line-clamp-1 sm:line-clamp-none">
-                                    Get a complete copy of your links, click stats, and account details.
+                                <p className="text-xs sm:text-base text-muted-foreground mt-1 line-clamp-1 sm:line-clamp-none">
+                                    Get a complete machine-readable archive of your links, click stats, and account records.
                                 </p>
                             </div>
-                            <span className="text-[10px] sm:text-xs text-muted-foreground bg-muted px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full border border-border shrink-0 font-mono w-fit max-w-[140px] sm:max-w-none truncate">
+                            <span className="text-xs text-muted-foreground bg-muted/60 px-3 py-1 rounded-full border border-border shrink-0 font-mono w-fit max-w-[160px] sm:max-w-none truncate font-semibold">
                                 {user.email}
                             </span>
                         </div>
@@ -396,8 +396,11 @@ export default function DataExportPage() {
                                         )}
                                     </motion.button>
 
-                                    <p className="text-center text-[10px] sm:text-[11px] text-muted-foreground">
-                                        Instant direct download • Safe & private
+                                    <p className="text-center text-[10px] sm:text-[11px] text-muted-foreground flex items-center justify-center gap-1 flex-wrap">
+                                        <span>Instant direct download • Safe & private •</span>
+                                        <Link href="/privacy" className="text-primary underline underline-offset-2 font-semibold hover:text-primary/80">
+                                            GDPR & CCPA Policy (Max 3/hr)
+                                        </Link>
                                     </p>
                                 </div>
                             </div>

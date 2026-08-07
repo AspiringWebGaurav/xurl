@@ -39,7 +39,7 @@ export const defaultPolicies: Record<string, Policy> = {
             },
             {
                 title: "Data Portability & User Archive Export Rights (GDPR / CCPA)",
-                content: "All registered XURL accounts (Free, Starter, Pro, Business, and Enterprise) possess the unconditional right to export a machine-readable data archive of their account profile, shortened URL records, click telemetry, and billing history. Data exports may be requested at any time via our dedicated Data Portability Portal (/data-export). Guest accounts are unauthenticated and ephemeral, and are therefore excluded from data archive exports under our Guest Usage Policy.",
+                content: "All registered XURL accounts (Free, Starter, Pro, Business, and Enterprise) possess the unconditional right to export a machine-readable data archive of their account profile, shortened URL records, click telemetry, and billing history under GDPR Article 20 and CCPA §1798.100. Data exports may be requested at any time via our dedicated Data Portability Portal (/data-export). To prevent distributed denial-of-service (DDoS) attacks, CPU resource exhaustion, and bot scraping, data exports are strictly rate-limited to a maximum of **3 export archives per hour per user account**, with a mandatory 60-second cooldown between downloads. Guest accounts are unauthenticated and ephemeral, and are therefore excluded from data archive exports under our Guest Usage Policy.",
             }
         ]
     },
@@ -147,7 +147,7 @@ export const defaultPolicies: Record<string, Policy> = {
             },
             {
                 title: "3. Network Exploitation & DDoS Restrictions",
-                content: "Attempting to bypass platform rate limits, probe internal Edge APIs, deploy automated scraping scripts, or participate in distributed denial-of-service (DDoS) attacks against XURL infrastructure is prohibited. Violators will have their IP range and device fingerprints added to our perpetual firewall blocklist."
+                content: "Attempting to bypass platform rate limits, probe internal Edge APIs, deploy automated scraping scripts, or participate in distributed denial-of-service (DDoS) attacks against XURL infrastructure—including automated script hammering of our Data Export engine (/api/user/data-export)—is strictly prohibited. Violators will have their IP range and device fingerprints added to our perpetual firewall blocklist."
             },
             {
                 title: "4. Ban Enforcement & Loss of Access",
