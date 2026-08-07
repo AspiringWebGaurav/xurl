@@ -238,6 +238,10 @@ export async function GET(request: NextRequest) {
         </div>
     </div>
 
+    <script id="xurl-data" type="application/json">
+        ${JSON.stringify({ links: filteredLinks })}
+    </script>
+
     <script>
         function filterLinks() {
             var input = document.getElementById('searchInput').value.toLowerCase();

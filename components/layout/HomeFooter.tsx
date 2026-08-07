@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { useConfirmLink } from "@/components/providers/ConfirmLinkProvider";
 import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/utils";
@@ -66,7 +67,10 @@ const minimalLegalLinks = [
 /*  Component                                                           */
 /* ------------------------------------------------------------------ */
 
-export function HomeFooter() {
+export function HomeFooter({ className }: { className?: string } = {}) {
+    const pathname = usePathname();
+    const isLandingPage = pathname === "/";
+
     const [expanded, setExpanded] = useState(false);
     const { handleLinkClick } = useConfirmLink();
     const footerRef = useRef<HTMLDivElement>(null);
@@ -102,11 +106,22 @@ export function HomeFooter() {
                 }
             `}</style>
 
-            <footer ref={footerRef} className="relative shrink-0 border-t border-border/40 bg-background/30 backdrop-blur-xl dark:bg-slate-950/30 dark:border-white/10 transition-colors">
+            <footer 
+                ref={footerRef} 
+                className={cn(
+                    "relative shrink-0 transition-all duration-300",
+                    isLandingPage 
+                        ? "border-t-0 bg-transparent" 
+                        : "border-t border-border/40 bg-background/30 backdrop-blur-xl dark:bg-slate-950/30 dark:border-white/10",
+                    className
+                )}
+            >
                 {/* ── Minimal row (always visible) ── */}
                 <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3 px-6 py-4 text-xs text-muted-foreground relative z-10">
                     {/* Left — tagline */}
-                    <p className="opacity-70 whitespace-nowrap">Minimal URL Shortener</p>
+                    <p className={cn("whitespace-nowrap transition-opacity", isLandingPage ? "text-slate-600/70 font-medium" : "opacity-70")}>
+                        Minimal URL Shortener
+                    </p>
 
                     {/* Center — logo */}
                     <div className="justify-self-center opacity-80 transition-opacity hover:opacity-100">
@@ -130,7 +145,12 @@ export function HomeFooter() {
                                             handleLinkClick(e, link.href);
                                         }
                                     }}
-                                    className="rounded-md px-2 py-1 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground no-underline"
+                                    className={cn(
+                                        "rounded-md px-2 py-1 transition-colors duration-150 no-underline",
+                                        isLandingPage 
+                                            ? "text-slate-600/80 hover:bg-slate-200/50 hover:text-slate-900 font-medium" 
+                                            : "hover:bg-muted/70 hover:text-foreground"
+                                    )}
                                 >
                                     {link.label}
                                 </Link>
@@ -138,13 +158,18 @@ export function HomeFooter() {
                         })}
 
                         {/* Divider */}
-                        <span className="mx-1 h-3 w-px bg-border" aria-hidden="true" />
+                        <span className={cn("mx-1 h-3 w-px", isLandingPage ? "bg-slate-300/60" : "bg-border")} aria-hidden="true" />
 
                         {/* Expand / Collapse button */}
                         <button
                             type="button"
                             onClick={() => setExpanded((prev) => !prev)}
-                            className="group ml-0.5 flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground/70 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground cursor-pointer"
+                            className={cn(
+                                "group ml-0.5 flex items-center gap-1 rounded-md px-2 py-1 transition-colors duration-150 cursor-pointer",
+                                isLandingPage 
+                                    ? "text-slate-600/80 hover:bg-slate-200/50 hover:text-slate-900 font-medium" 
+                                    : "text-muted-foreground/70 hover:bg-muted/70 hover:text-foreground"
+                            )}
                             aria-expanded={expanded}
                             aria-label={expanded ? "Collapse footer" : "Expand footer"}
                         >
@@ -172,7 +197,12 @@ export function HomeFooter() {
                             animate={{ y: 0, opacity: 1 }}
                             exit={{ y: 20, opacity: 0 }}
                             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                            className="absolute bottom-full left-0 right-0 z-50 bg-card dark:bg-slate-900 border-t border-x border-border/80 shadow-[0_-25px_60px_-15px_rgba(0,0,0,0.35)] rounded-t-3xl overflow-hidden"
+                            className={cn(
+                                "absolute bottom-full left-0 right-0 z-50 rounded-t-3xl overflow-hidden shadow-[0_-25px_60px_-15px_rgba(0,0,0,0.2)]",
+                                isLandingPage
+                                    ? "bg-white/95 text-slate-900 border-t border-x border-slate-200/80 backdrop-blur-xl"
+                                    : "bg-card dark:bg-slate-900 border-t border-x border-border/80 shadow-[0_-25px_60px_-15px_rgba(0,0,0,0.35)]"
+                            )}
                         >
                             <div className="w-full px-10 xl:px-20 pt-8 pb-6">
                                 {/* Link columns — 4-equal grid on desktop */}
