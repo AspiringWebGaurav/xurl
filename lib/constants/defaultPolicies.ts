@@ -36,6 +36,10 @@ export const defaultPolicies: Record<string, Policy> = {
             {
                 title: "Data Retention & Account Bans",
                 content: "We enforce zero-tolerance abuse policies. If your account violates our Acceptable Use standards, we reserve the right to retain minimal identifying information (hashed email, IP addresses, device fingerprints) indefinitely to prevent ban evasion. Standard active data is retained as long as your account exists.",
+            },
+            {
+                title: "Data Portability & User Archive Export Rights (GDPR / CCPA)",
+                content: "All registered XURL accounts (Free, Starter, Pro, Business, and Enterprise) possess the unconditional right to export a machine-readable data archive of their account profile, shortened URL records, click telemetry, and billing history. Data exports may be requested at any time via our dedicated Data Portability Portal (/data-export). Guest accounts are unauthenticated and ephemeral, and are therefore excluded from data archive exports under our Guest Usage Policy.",
             }
         ]
     },

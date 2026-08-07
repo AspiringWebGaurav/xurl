@@ -15,6 +15,10 @@ export function ConfirmLinkProvider({ children }: { children: ReactNode }) {
     const [confirmLink, setConfirmLink] = useState<string | null>(null);
 
     const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+        // Internal application links bypass the modal and open directly
+        if (!href || href.startsWith("/")) {
+            return;
+        }
         e.preventDefault();
         setConfirmLink(href);
         // Subtle vibration if supported

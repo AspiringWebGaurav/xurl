@@ -40,6 +40,7 @@ const footerColumns = [
     {
         label: "Legal",
         links: [
+            { href: "/data-export", label: "Download My Data" },
             { href: "/policy", label: "All Policies" },
             { href: "/terms", label: "Terms of Service" },
             { href: "/privacy", label: "Privacy Policy" },

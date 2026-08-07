@@ -4,11 +4,10 @@ import { useEffect, useState, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, ShieldAlert, Send, CheckCircle2, Loader2, Lock, ArrowRight, Activity, ShieldCheck, Zap } from "lucide-react";
+import { AlertTriangle, ShieldAlert, Send, CheckCircle2, Loader2, Lock, ArrowRight, Activity, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Logo } from "@/components/ui/Logo";
 
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
@@ -66,15 +65,19 @@ export function KillSwitchGuard({
         };
 
         checkKillSwitch();
-        const interval = setInterval(checkKillSwitch, 4000);
 
-        const handleUpdate = () => checkKillSwitch();
-        window.addEventListener("systemKillSwitchUpdated", handleUpdate);
+        const handleUpdate = (e?: CustomEvent) => {
+            if (e?.detail) {
+                setKillSwitch(e.detail);
+            } else {
+                checkKillSwitch();
+            }
+        };
+        window.addEventListener("systemKillSwitchUpdated", handleUpdate as EventListener);
 
         return () => {
             unsub();
-            clearInterval(interval);
-            window.removeEventListener("systemKillSwitchUpdated", handleUpdate);
+            window.removeEventListener("systemKillSwitchUpdated", handleUpdate as EventListener);
         };
     }, []);
 
@@ -322,7 +325,7 @@ export function KillSwitchGuard({
             } else {
                 setError(data.message || "Failed to submit appeal");
             }
-        } catch (err) {
+        } catch {
             setError("Network error. Please try again.");
         } finally {
             setSubmitting(false);
