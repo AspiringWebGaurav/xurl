@@ -278,15 +278,22 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                 void syncUserHistoryState(u);
                 
                 // Realtime Sync Listener - Updates UI instantly on Admin Revoke/Grant or profile change
+                let prevDocSig = "";
                 snapshotUnsub = onSnapshot(doc(db, "users", u.uid), (docSnap) => {
                     if (docSnap.exists()) {
                         const userData = docSnap.data();
+                        const newDocSig = `${userData.plan}_${userData.activeLinks}_${JSON.stringify(userData.giftQuotas || [])}_${userData.planExpiry || ""}`;
+                        
                         if (userData.plan) {
                             setPlan(String(userData.plan).toLowerCase());
                         }
                         void syncUserHistoryState(u);
-                        window.dispatchEvent(new CustomEvent("userProfileUpdated", { detail: userData }));
-                        window.dispatchEvent(new Event("linkGenerated"));
+                        
+                        if (newDocSig !== prevDocSig) {
+                            prevDocSig = newDocSig;
+                            window.dispatchEvent(new CustomEvent("userProfileUpdated", { detail: userData }));
+                            window.dispatchEvent(new Event("linkGenerated"));
+                        }
                     }
                 }, (error) => {
                     console.debug("TopNavbar users listener error (expected on logout):", error);

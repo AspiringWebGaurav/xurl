@@ -1,8 +1,9 @@
 import type { Transaction } from "firebase-admin/firestore";
+import type { UserDocument } from "@/types";
 import { adminDb } from "@/lib/firebase/admin";
 import { resolvePlanType, type PlanType } from "@/lib/plans";
 import { applyPlanUpgrade } from "@/services/plan-upgrade";
-import { createTransaction } from "@/services/transactions";
+import { createTransaction, type TransactionSource } from "@/services/transactions";
 import { createNotificationForUser } from "@/services/notifications";
 import { PLAN_CONFIGS } from "@/lib/plans";
 
@@ -62,7 +63,7 @@ async function applyLinkGift(
 
     const execute = async (tx: Transaction): Promise<string | null> => {
         const userSnap = await tx.get(userRef);
-        const userData = userSnap.exists ? (userSnap.data() as any) : null;
+        const userData = userSnap.exists ? (userSnap.data() as UserDocument) : null;
         const currentPlan = resolvePlanType(userData?.plan || "free");
         const existingGifts: { id: string; amount: number; expiresAt: number | null; used?: number }[] = Array.isArray(userData?.giftQuotas)
             ? userData.giftQuotas
@@ -91,7 +92,7 @@ async function applyLinkGift(
                 planType: currentPlan,
                 action: "admin_grant",
                 linksAllocated: quantity,
-                source: source as any,
+                source: source as TransactionSource,
                 amount: 0,
                 reason,
                 recipientEmail: metadata?.recipientEmail ?? null,

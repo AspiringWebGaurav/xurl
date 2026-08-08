@@ -58,7 +58,7 @@ export async function getDynamicConfig(): Promise<DynamicConfig> {
                 const parsed = DynamicConfigSchema.parse(JSON.parse(cached));
                 return parsed;
             } catch (e) {
-                logger.error("dynamic_config", "Cache contains invalid Zod schema, falling back to DB.");
+                logger.error("dynamic_config", "Cache contains invalid Zod schema, falling back to DB.", { error: String(e) });
             }
         }
 

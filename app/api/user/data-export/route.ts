@@ -22,8 +22,9 @@ function escapeCsv(val: string | number | boolean | null | undefined): string {
     return `"${str}"`;
 }
 
-// In-memory sliding window rate-limit cache: userId -> Array of timestamps
+// In-memory sliding window rate-limit cache: userId -> Array of timestamps (self-cleaning)
 const exportRateLimitMap = new Map<string, number[]>();
+const MAX_EXPORT_LIMITER_ENTRIES = 5_000;
 
 export async function GET(request: NextRequest) {
     try {
@@ -55,9 +56,26 @@ export async function GET(request: NextRequest) {
 
         // 2. Export Cooldown & Rate Limit Check (Max 3 exports / hour, 60s cooldown)
         const nowMs = Date.now();
+
+        // Evict desynced/stale entries if Map is near capacity
+        if (exportRateLimitMap.size >= MAX_EXPORT_LIMITER_ENTRIES) {
+            for (const [uid, timestamps] of exportRateLimitMap) {
+                const valid = timestamps.filter(ts => nowMs - ts < 3600 * 1000);
+                if (valid.length === 0) {
+                    exportRateLimitMap.delete(uid);
+                } else {
+                    exportRateLimitMap.set(uid, valid);
+                }
+            }
+        }
+
         const userHistory = exportRateLimitMap.get(decoded.uid) || [];
         // Clean timestamps older than 1 hour (3600,000 ms)
         const recentExports = userHistory.filter(ts => nowMs - ts < 3600 * 1000);
+
+        if (recentExports.length === 0 && exportRateLimitMap.has(decoded.uid)) {
+            exportRateLimitMap.delete(decoded.uid);
+        }
 
         if (recentExports.length >= 3) {
             const oldestExport = recentExports[0];

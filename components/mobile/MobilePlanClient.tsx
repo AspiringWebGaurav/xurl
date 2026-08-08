@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
@@ -11,7 +11,7 @@ import { triggerHaptic } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
 import { MobileFooter } from "@/components/mobile/MobileFooter";
 import { TopNavbar } from "@/components/layout/TopNavbar";
-import { Check, ChevronLeft, ShieldCheck, Zap } from "lucide-react";
+import { Check, ShieldCheck, Zap } from "lucide-react";
 import { PLAN_CONFIGS, PAID_PLAN_ORDER, PlanType } from "@/lib/plans";
 import { formatTTLToText } from "@/lib/utils/format-time";
 
@@ -35,7 +35,13 @@ function formatTtl(ttlMs: number): string {
     return `Expires in ${hours} hour${hours > 1 ? "s" : ""}`;
 }
 
-
+const PLAN_UI_META: Record<string, { description: string; features: string[]; ctaText: string; comparisonHint?: string }> = {
+    starter: { description: "Personal use", features: ["Login required", "Custom aliases", "Analytics Dashboard"], ctaText: "Start" },
+    pro: { description: "For power users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Priority support"], ctaText: "Go Pro" },
+    business: { description: "Best value for heavy users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "4× more links than Pro"], ctaText: "Get Business", comparisonHint: "Most Popular" },
+    enterprise: { description: "Advanced link management", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "Custom domains integration"], ctaText: "Go Enterprise" },
+    bigenterprise: { description: "Maximum scale", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "Dedicated account manager"], ctaText: "Go Big" },
+};
 
 export default function MobilePlanClient() {
     const [currency, setCurrency] = useState<Currency>("INR");
@@ -48,14 +54,6 @@ export default function MobilePlanClient() {
     const [freeTTL, setFreeTTL] = useState("10 minutes");
     const [guestTTL, setGuestTTL] = useState("5 minutes");
     const [activeOffer, setActiveOffer] = useState<any>(null);
-
-    const PLAN_UI_META: Record<string, { description: string; features: string[]; ctaText: string; comparisonHint?: string }> = {
-        starter: { description: "Personal use", features: ["Login required", "Custom aliases", "Analytics Dashboard"], ctaText: "Start" },
-        pro: { description: "For power users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Priority support"], ctaText: "Go Pro" },
-        business: { description: "Best value for heavy users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "4× more links than Pro"], ctaText: "Get Business", comparisonHint: "Most Popular" },
-        enterprise: { description: "Advanced link management", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "Custom domains integration"], ctaText: "Go Enterprise" },
-        bigenterprise: { description: "Maximum scale", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "Dedicated account manager"], ctaText: "Go Big" },
-    };
 
     useEffect(() => {
         let mounted = true;
@@ -70,18 +68,19 @@ export default function MobilePlanClient() {
                 if (computedPlans.free?.ttlMs) setFreeTTL(formatTTLToText(computedPlans.free.ttlMs));
                 if (computedPlans.guest?.ttlMs) setGuestTTL(formatTTLToText(computedPlans.guest.ttlMs));
 
-                let best = null;
+                let best: { type?: string; value?: number } | null = null;
                 if (config?.offers) {
                     const now = Date.now();
-                    const validOffers = config.offers.filter((o: any) => o.isActive && (!o.expiresAt || o.expiresAt > now));
+                    const validOffers = (config.offers as Array<{ isActive?: boolean; expiresAt?: number | null; type?: string; value?: number }>).filter((o) => o.isActive && (!o.expiresAt || o.expiresAt > now));
                     const proxyPrice = computedPlans.business?.priceINR ?? PLAN_CONFIGS.business.priceINR;
                     let maxD = 0;
                     for (const o of validOffers) {
-                        const d = o.type === "percentage" ? proxyPrice * (o.value / 100) : o.value;
+                        const val = o.value || 0;
+                        const d = o.type === "percentage" ? proxyPrice * (val / 100) : val;
                         if (d > maxD) { maxD = d; best = o; }
                     }
                 }
-                setActiveOffer(best);
+                setActiveOffer(best as Record<string, unknown> | null);
 
                 const generatedTiers = PAID_PLAN_ORDER.map((planId: PlanType) => {
                     const cfg = computedPlans[planId] || PLAN_CONFIGS[planId];
@@ -89,10 +88,11 @@ export default function MobilePlanClient() {
                     const activePrice = cfg.priceINR;
                     let discountedPrice = activePrice;
                     if (best) {
+                        const val = best.value || 0;
                         if (best.type === "percentage") {
-                            discountedPrice = Math.max(0, activePrice * (1 - best.value / 100));
+                            discountedPrice = Math.max(0, activePrice * (1 - val / 100));
                         } else if (best.type === "flat") {
-                            discountedPrice = Math.max(0, activePrice - best.value);
+                            discountedPrice = Math.max(0, activePrice - val);
                         }
                     }
                     return {

@@ -46,7 +46,7 @@ const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.REDIS_URL;
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || "";
 
 // Fast Upstash Redis REST read for sub-millisecond edge proxy checks
-async function checkIsKillSwitchActive(): Promise<boolean> {
+export async function checkIsKillSwitchActive(): Promise<boolean> {
     if (!REDIS_URL || !REDIS_TOKEN) return false;
     try {
         const res = await fetch(`${REDIS_URL}/get/system:kill_switch`, {

@@ -102,7 +102,7 @@ export async function createPartialOffer(data: Omit<PartialOffer, "id" | "create
         targetEmail: finalOffer.targetEmail,
         adminEmail,
         details: `Created partial offer "${finalOffer.title}" (${finalOffer.discountType} ${finalOffer.discountValue})`,
-        newValue: finalOffer as any,
+        newValue: finalOffer as Record<string, unknown>,
     });
 
     return finalOffer;
@@ -155,8 +155,8 @@ export async function updatePartialOffer(
         targetEmail: validated.targetEmail,
         adminEmail,
         details: `Updated partial offer "${validated.title}"`,
-        previousValue: prevData as any,
-        newValue: validated as any,
+        previousValue: prevData as Record<string, unknown>,
+        newValue: validated as Record<string, unknown>,
     });
 
     return { ...validated, id };
@@ -179,7 +179,7 @@ export async function deletePartialOffer(id: string, adminEmail: string): Promis
         targetEmail: data.targetEmail,
         adminEmail,
         details: `Deleted partial offer "${data.title}"`,
-        previousValue: data as any,
+        previousValue: data as Record<string, unknown>,
     });
 }
 
@@ -427,7 +427,7 @@ export async function revokePartialOfferAndRevertUser(
         targetEmail: offerData.targetEmail,
         adminEmail,
         details: `Revoked offer "${offerData.title}" and reverted ${revokedCount} user plan(s) back to previous plan`,
-        previousValue: offerData as any,
+        previousValue: offerData as Record<string, unknown>,
     });
 
     return { revokedCount, revertedEmails };

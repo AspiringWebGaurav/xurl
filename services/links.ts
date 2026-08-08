@@ -21,7 +21,7 @@ import { logger } from "@/lib/utils/logger";
 import { writeActivityEvent } from "@/lib/admin/activity-events-writer";
 import type { LinkDocument, CreateLinkInput as OriginalCreateLinkInput, CreateLinkResponse, UserDocument } from "@/types";
 import type { PlanType } from "@/lib/plans";
-import { PLAN_CONFIGS, GUEST_CONFIG, resolvePlanType } from "@/lib/plans";
+import { GUEST_CONFIG, resolvePlanType } from "@/lib/plans";
 import { getAllComputedPlanConfigs } from "@/lib/services/dynamic-config";
 import { buildShortUrl } from "@/lib/utils/url-builder";
 import { safeRedis } from "@/lib/redis/client";
@@ -180,7 +180,6 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                     const freeConfig = computedPlans.free;
                     const usageCount = userData.free_usage_count || 0;
                     const lastUsed = userData.free_last_used_at || 0;
-                    const giftUsageCount = userData.gift_usage_count || 0;
                     
                     const effectiveMaxUses = (freeConfig.maxUses || 3);
                     const pref = input.quotaPreference || 'auto';
@@ -684,7 +683,7 @@ export async function adminDeleteLink(slug: string): Promise<void> {
         await adminDb.collection("users").doc(existing.userId).set(
             {
                 activeLinks: FieldValue.increment(-1),
-                linksCreated: FieldValue.increment(-1),
+                // Note: linksCreated is a lifetime counter and must NOT be decremented
                 updatedAt: Date.now(),
             },
             { merge: true }

@@ -263,7 +263,7 @@ export async function applyPlanUpgrade(
                 userId,
                 planId,
                 orderId: orderId || null,
-                discountType: promoData?.discountType || (orderData?.promoDiscountType as any) || "fixed",
+                discountType: promoData?.discountType || (orderData?.promoDiscountType as "percentage" | "fixed" | "free_plan") || "fixed",
                 discountValue: promoData?.discountValue ?? (orderData?.promoDiscountValue || 0),
                 redeemedAt: now,
             };

@@ -84,7 +84,7 @@ export async function recordAbuseStrike(
             }
         }
 
-        const updates: any = {
+        const updates: Record<string, unknown> = {
             idorStrikes,
             reservedStrikes,
             adminAccessStrikes,

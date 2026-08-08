@@ -7,10 +7,26 @@ import { env } from "@/lib/env";
 import { buildShortUrl } from "@/lib/utils/url-builder";
 import { getDeviceFingerprint, getOrCreateGuestSessionId } from "@/lib/utils/fingerprint";
 import { toast } from "sonner";
-import { formatCooldown } from "@/lib/utils/format-time";
 import { useGoogleLogin } from "@/lib/hooks/useGoogleLogin";
 import { useRouter } from "next/navigation";
 import type { GuestQuotaResult } from "@/lib/server/quota-check";
+
+export interface UserQuotaState {
+    plan?: string;
+    limit?: number;
+    activeLinks?: number;
+    linksCreated?: number;
+    freeUsageCount?: number;
+    freeMaxUses?: number;
+    cooldownRemainingMs?: number;
+    canCreateFreeLink?: boolean;
+    activeGiftQuotas?: Array<{ id: string; amount: number; expiresAt: number | null; used?: number }>;
+    giftUsageCount?: number;
+    paidLinksCreated?: number;
+    planTtlHours?: number | null;
+    expiredLinksCount?: number | null;
+    [key: string]: any;
+}
 
 export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
     const [user, setUser] = useState<User | null>(null);
@@ -148,8 +164,9 @@ export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
                             });
 
                             // Initialize selectedQuota (prioritize gift, fallback to free)
-                            const totalGiftBonus = d.activeGiftQuotas?.reduce((sum: number, g: any) => sum + (g.amount || 0), 0) || 0;
-                            const hasGiftsAvailable = totalGiftBonus > (d.giftUsageCount || 0);
+                            const activeGifts = (d.activeGiftQuotas as Array<{ amount?: number }> | undefined) || [];
+                            const totalGiftBonus = activeGifts.reduce((sum, g) => sum + (g.amount || 0), 0);
+                            const hasGiftsAvailable = totalGiftBonus > (Number(d.giftUsageCount) || 0);
                             const savedPref = typeof window !== 'undefined' ? localStorage.getItem('xurl_quota_pref') : null;
 
                             if (hasGiftsAvailable && savedPref !== 'free') {
@@ -686,8 +703,9 @@ export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
                                     giftUsageCount: d.giftUsageCount
                                 });
                                 // Initialize selectedQuota (prioritize gift, fallback to free)
-                                const totalGiftBonus = d.activeGiftQuotas?.reduce((sum: number, g: any) => sum + (g.amount || 0), 0) || 0;
-                                const hasGiftsAvailable = totalGiftBonus > (d.giftUsageCount || 0);
+                                const activeGifts = (d.activeGiftQuotas as Array<{ amount?: number }> | undefined) || [];
+                                const totalGiftBonus = activeGifts.reduce((sum, g) => sum + (g.amount || 0), 0);
+                                const hasGiftsAvailable = totalGiftBonus > (Number(d.giftUsageCount) || 0);
                                 const savedPref = typeof window !== 'undefined' ? localStorage.getItem('xurl_quota_pref') : null;
 
                                 if (hasGiftsAvailable && savedPref !== 'free') {
@@ -750,16 +768,22 @@ export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
         return () => window.clearTimeout(timeoutId);
     }, [isStrictlyLoading]);
 
-    // Determine if the user has reached their quota limit or is in cooldown
+    const freeUsageCount = Number(quota?.freeUsageCount);
+    const freeMaxUses = Number(quota?.freeMaxUses);
+    const cooldownMs = Number(quota?.cooldownRemainingMs);
+    const activeGiftList = (quota?.activeGiftQuotas as Array<{ amount?: number }> | undefined) || [];
+    const totalGifts = activeGiftList.reduce((sum, g) => sum + (g.amount || 0), 0);
+    const giftUsed = Number(quota?.giftUsageCount) || 0;
+
     const isFreeLimitReached = !!(user && quota?.plan === "free" && (
         selectedQuota === 'free'
-            ? ((quota.freeUsageCount !== undefined && quota.freeMaxUses !== undefined && quota.freeUsageCount >= quota.freeMaxUses) ||
-                (quota.cooldownRemainingMs !== undefined && quota.cooldownRemainingMs > 0))
+            ? ((quota.freeUsageCount !== undefined && quota.freeMaxUses !== undefined && freeUsageCount >= freeMaxUses) ||
+                (cooldownMs > 0))
             : (selectedQuota === 'gift'
-                ? ((quota.activeGiftQuotas?.reduce((sum: number, g: any) => sum + (g.amount || 0), 0) || 0) <= (quota.giftUsageCount || 0))
-                : true) // default disable if nothing selected
+                ? (totalGifts <= giftUsed)
+                : true)
     ));
-    const isPaidOverQuota = !!(user && quota && quota.plan !== "free" && quota.paidLinksCreated >= quota.limit);
+    const isPaidOverQuota = !!(user && quota && quota.plan !== "free" && Number(quota.paidLinksCreated) >= Number(quota.limit));
     const isOverQuota = isFreeLimitReached || isPaidOverQuota;
     const isDisabled = isOverQuota;
 
@@ -783,6 +807,7 @@ export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
         isRateLimited, setIsRateLimited, showDelayedModuleSkeleton, setShowDelayedModuleSkeleton,
         grantNotified, setGrantNotified, selectedQuota, setSelectedQuota, handleGoogleLogin, isLoggingIn,
         checkUrl, handleUrlChange, handleUrlPaste, handleCopy, handleReset, handleShorten, router,
-        isStrictlyLoading, heroCardBase, statusPillBase, premiumInputClass, premiumFieldShellBase, premiumPrimaryButtonClass
+        isStrictlyLoading, heroCardBase, statusPillBase, premiumInputClass, premiumFieldShellBase, premiumPrimaryButtonClass,
+        setGuestLoading, isDisabled
     };
 }

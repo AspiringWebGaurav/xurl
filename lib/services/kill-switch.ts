@@ -1,5 +1,5 @@
 import { adminDb } from "@/lib/firebase/admin";
-import { getRedisClient, safeRedis } from "@/lib/redis/client";
+import { safeRedis } from "@/lib/redis/client";
 import { logger } from "@/lib/utils/logger";
 
 const REDIS_KILL_SWITCH_KEY = "system:kill_switch";

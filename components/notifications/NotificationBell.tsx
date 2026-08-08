@@ -17,6 +17,7 @@ export function NotificationBell({ unreadCount, isShaking, isOpen, onClick }: No
             onClick={onClick}
             className={cn(
                 "relative p-1.5 text-slate-600 transition-all duration-150 hover:bg-slate-100/60 hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-1",
+                isOpen && "bg-slate-100/80",
                 isShaking && "animate-notification-shake"
             )}
             aria-label="Notifications"

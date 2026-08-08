@@ -86,7 +86,7 @@ export function NotificationDropdown({
                 <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
                     <Bell className="h-4 w-4 text-slate-400" />
                     <div className="space-y-1">
-                        <p className="text-sm font-semibold text-slate-700">You're all caught up</p>
+                        <p className="text-sm font-semibold text-slate-700">You&apos;re all caught up</p>
                         <p className="text-xs text-slate-500">{emptyMessage ?? "No new notifications right now."}</p>
                     </div>
                 </div>

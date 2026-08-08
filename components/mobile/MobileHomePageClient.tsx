@@ -60,13 +60,12 @@ export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps
     const resultRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const [pageTheme, setPageTheme] = useState<"light" | "dark">("light");
+    const [pageTheme, setPageTheme] = useState<"light" | "dark">(() =>
+        typeof window !== "undefined" && document.documentElement.classList.contains("dark") ? "dark" : "light"
+    );
+    const [nowTimestamp] = useState<number>(() => (typeof window !== "undefined" ? Date.now() : 0));
 
     useEffect(() => {
-        if (typeof window !== "undefined") {
-            const isDark = document.documentElement.classList.contains("dark");
-            setPageTheme(isDark ? "dark" : "light");
-        }
         return () => {
             if (typeof window !== "undefined") {
                 document.documentElement.classList.remove("dark");
@@ -206,7 +205,7 @@ export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps
                                                             let expiryText = "Expiring";
                                                             if (!isPermanent && quota.activeGiftQuotas!.length > 0) {
                                                                 const earliestExpiry = Math.min(...quota.activeGiftQuotas!.map((g: any) => g.expiresAt));
-                                                                const hoursLeft = Math.max(0, (earliestExpiry - Date.now()) / (1000 * 60 * 60));
+                                                                const hoursLeft = Math.max(0, (earliestExpiry - (nowTimestamp || earliestExpiry)) / (1000 * 60 * 60));
                                                                 if (hoursLeft > 48) {
                                                                     expiryText = `Expires in ${Math.ceil(hoursLeft / 24)}d`;
                                                                 } else if (hoursLeft > 0) {

@@ -14,7 +14,7 @@ export function emitAdminRefresh(router?: { refresh: () => void }) {
             const bc = new BroadcastChannel('xurl-admin-channel');
             bc.postMessage({ type: 'REFRESH' });
             bc.close();
-        } catch(e) {}
+        } catch {}
     }
     // Globally invalidate any active SWR caches
     mutate(() => true, undefined, { revalidate: true });
@@ -52,7 +52,7 @@ export function useAdminLiveRefresh(onRefresh?: () => void) {
                         handleRefresh();
                     }
                 };
-            } catch(e) {}
+            } catch {}
         }
 
         return () => {

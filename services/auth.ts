@@ -32,7 +32,7 @@ export const releasePopupLock = () => {
 };
 
 export const signInWithGoogle = async (options?: SignInOptions): Promise<SignInResult> => {
-    const { onPopupOpen, onPopupClose, pollInterval = 50 } = options || {};
+    const { onPopupOpen, onPopupClose } = options || {};
 
     if (isPopupOpen) {
         return { user: null, error: "auth/cancelled-popup-request" };
@@ -42,24 +42,15 @@ export const signInWithGoogle = async (options?: SignInOptions): Promise<SignInR
 
     // Cancel flag for UI-Auth decoupling
     let userCancelled = false;
-    let pollTimer: ReturnType<typeof setInterval> | null = null;
 
     // Deadlock protection: auto-release lock after 10s if promise hangs
     deadlockTimer = setTimeout(() => {
         isPopupOpen = false;
         deadlockTimer = null;
-        if (pollTimer) {
-            clearInterval(pollTimer);
-            pollTimer = null;
-        }
     }, 10000);
 
     // Cleanup function
     const cleanup = () => {
-        if (pollTimer) {
-            clearInterval(pollTimer);
-            pollTimer = null;
-        }
         releasePopupLock();
     };
 

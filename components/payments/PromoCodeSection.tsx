@@ -49,12 +49,13 @@ export function PromoCodeSection({ planId, onPromoChange, variant = "default" }:
                 if (!mounted || !data.config) return;
                 const config = data.config;
                 const now = Date.now();
-                const validOffers = (config.offers || []).filter((o: any) => o.isActive && (!o.expiresAt || o.expiresAt > now));
-                let best = null;
+                const validOffers = ((config.offers || []) as Array<{ isActive?: boolean; expiresAt?: number | null; type?: string; value?: number }>).filter((o) => o.isActive && (!o.expiresAt || o.expiresAt > now));
+                let best: { type?: string; value?: number } | null = null;
                 const proxyPrice = PLAN_CONFIGS[resolvedPlan].priceINR;
                 let maxD = 0;
                 for (const o of validOffers) {
-                    const d = o.type === "percentage" ? proxyPrice * (o.value / 100) : o.value;
+                    const val = o.value || 0;
+                    const d = o.type === "percentage" ? proxyPrice * (val / 100) : val;
                     if (d > maxD) { maxD = d; best = o; }
                 }
                 setGlobalOffer(best);
@@ -74,7 +75,7 @@ export function PromoCodeSection({ planId, onPromoChange, variant = "default" }:
                             setPartialOffer(null);
                             return;
                         }
-                        const applicable = data.offers.find((o: any) => 
+                        const applicable = (data.offers as Array<{ plans: string[] }>).find((o) => 
                             o.plans.includes("all") || o.plans.includes(resolvedPlan.toLowerCase())
                         );
                         if (applicable) {

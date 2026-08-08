@@ -19,7 +19,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 if (typeof window !== "undefined") {
-    // @ts-ignore
+    // @ts-expect-error Attach auth to window for dev console access
     window.__FIREBASE_AUTH = auth;
 }
 
