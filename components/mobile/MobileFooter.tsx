@@ -151,46 +151,53 @@ export function MobileFooter() {
                     </div>
                 </div>
 
-                {/* ── Minimal row (always visible at absolute bottom) ── */}
-                <div className="relative flex w-full items-center justify-center px-4 py-4 min-h-[56px] text-[11px] text-muted-foreground bg-background">
-                    
-                    {/* Left — logo */}
-                    <div className="absolute left-2 flex items-center gap-2 opacity-80 transition-opacity hover:opacity-100">
+                {/* ── Minimal row (always visible at absolute bottom — Separate clickable Terms & Privacy links) ── */}
+                <div className="flex w-full items-center justify-between gap-3 px-4 py-3 text-xs text-muted-foreground bg-background/95 backdrop-blur-xl relative z-10 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                    {/* Left — logo & brand */}
+                    <div className="flex items-center gap-2 shrink-0 opacity-90 transition-opacity hover:opacity-100">
                         <Logo size="sm" className="shrink-0" />
+                        <span className="text-[11px] font-semibold tracking-tight text-muted-foreground/80 hidden min-[390px]:inline-block">
+                            XURL
+                        </span>
                     </div>
 
-                    {/* Center — links */}
-                    <nav
-                        aria-label="Footer navigation"
-                        className="flex items-center justify-center gap-1 flex-wrap z-10"
-                    >
-                        {minimalLegalLinks.map((link) => (
+                    {/* Right — Separate clickable Terms & Privacy links + More button */}
+                    <div className="flex items-center gap-1.5 shrink-0 justify-end">
+                        <nav
+                            aria-label="Footer navigation"
+                            className="flex items-center gap-1"
+                        >
                             <Link
-                                key={link.href}
-                                href={link.href}
-                                onClick={(e) => handleLinkClick(e, link.href)}
-                                className="rounded-md px-1.5 py-1 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground no-underline"
+                                href="/terms"
+                                onClick={(e) => handleLinkClick(e, "/terms")}
+                                className="rounded-md px-1.5 py-1 text-xs text-muted-foreground/90 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground no-underline whitespace-nowrap font-medium"
                             >
-                                {link.label}
+                                Terms
                             </Link>
-                        ))}
-                    </nav>
+                            <Link
+                                href="/privacy"
+                                onClick={(e) => handleLinkClick(e, "/privacy")}
+                                className="rounded-md px-1.5 py-1 text-xs text-muted-foreground/90 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground no-underline whitespace-nowrap font-medium"
+                            >
+                                Privacy
+                            </Link>
+                        </nav>
 
-                    {/* Right — expand button */}
-                    <div className="absolute right-2 flex items-center">
+                        <span className="mx-1 h-3.5 w-px bg-border/60 shrink-0" aria-hidden="true" />
+
                         <button
                             type="button"
                             onClick={() => setExpanded((prev) => !prev)}
-                            className="group flex items-center gap-1 rounded-md px-1.5 py-1 text-muted-foreground/70 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground"
+                            className="group flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-semibold text-muted-foreground/80 transition-colors duration-150 hover:bg-muted/70 hover:text-foreground shrink-0 cursor-pointer whitespace-nowrap"
                             aria-expanded={expanded}
                             aria-label={expanded ? "Collapse footer" : "Expand footer"}
                         >
-                            <span className="text-[11px] font-medium leading-none">
+                            <span className="leading-none">
                                 {expanded ? "Less" : "More"}
                             </span>
                             <span
                                 className={cn(
-                                    "h-3 w-3 transition-transform duration-300",
+                                    "h-3.5 w-3.5 transition-transform duration-300",
                                     !expanded && "footer-chevron-idle",
                                     expanded && "rotate-180"
                                 )}

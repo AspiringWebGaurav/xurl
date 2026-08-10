@@ -117,76 +117,150 @@ export function HomeFooter({ className }: { className?: string } = {}) {
                 )}
             >
                 {/* ── Minimal row (always visible) ── */}
-                <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3 px-6 py-4 text-xs text-muted-foreground relative z-10">
-                    {/* Left — tagline */}
-                    <p className={cn("whitespace-nowrap transition-opacity", isLandingPage ? "text-slate-600/70 font-medium" : "opacity-70")}>
-                        Minimal URL Shortener
-                    </p>
+                <div className="w-full px-3.5 py-3 sm:px-6 sm:py-4 text-xs text-muted-foreground relative z-10 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                    {/* Desktop layout (sm and up) */}
+                    <div className="hidden sm:grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3">
+                        {/* Left — tagline */}
+                        <p className={cn("whitespace-nowrap transition-opacity", isLandingPage ? "text-slate-600/70 font-medium" : "opacity-70")}>
+                            Minimal URL Shortener
+                        </p>
 
-                    {/* Center — logo */}
-                    <div className="justify-self-center opacity-80 transition-opacity hover:opacity-100">
-                        <Logo size="sm" className="shrink-0" />
-                    </div>
+                        {/* Center — logo */}
+                        <div className="justify-self-center opacity-80 transition-opacity hover:opacity-100">
+                            <Logo size="sm" className="shrink-0" />
+                        </div>
 
-                    {/* Right — links + expand button */}
-                    <nav
-                        aria-label="Footer navigation"
-                        className="flex items-center justify-end gap-1 flex-wrap"
-                    >
-                        {minimalLegalLinks.map((link) => {
-                            const isLegal = link.href === "/terms" || link.href === "/privacy";
-                            return (
-                                <Link
-                                    key={link.href}
-                                    href={link.href}
-                                    target={isLegal ? "_blank" : undefined}
-                                    onClick={(e) => {
-                                        if (!isLegal) {
-                                            handleLinkClick(e, link.href);
-                                        }
-                                    }}
+                        {/* Right — links + expand button */}
+                        <nav
+                            aria-label="Footer navigation"
+                            className="flex items-center justify-end gap-1 flex-wrap"
+                        >
+                            {minimalLegalLinks.map((link) => {
+                                const isLegal = link.href === "/terms" || link.href === "/privacy";
+                                return (
+                                    <Link
+                                        key={link.href}
+                                        href={link.href}
+                                        target={isLegal ? "_blank" : undefined}
+                                        onClick={(e) => {
+                                            if (!isLegal) {
+                                                handleLinkClick(e, link.href);
+                                            }
+                                        }}
+                                        className={cn(
+                                            "rounded-md px-2 py-1 transition-colors duration-150 no-underline",
+                                            isLandingPage 
+                                                ? "text-slate-600/80 hover:bg-slate-200/50 hover:text-slate-900 font-medium" 
+                                                : "hover:bg-muted/70 hover:text-foreground"
+                                        )}
+                                    >
+                                        {link.label}
+                                    </Link>
+                                );
+                            })}
+
+                            {/* Divider */}
+                            <span className={cn("mx-1 h-3 w-px", isLandingPage ? "bg-slate-300/60" : "bg-border")} aria-hidden="true" />
+
+                            {/* Expand / Collapse button */}
+                            <button
+                                type="button"
+                                onClick={() => setExpanded((prev) => !prev)}
+                                className={cn(
+                                    "group ml-0.5 flex items-center gap-1 rounded-md px-2 py-1 transition-colors duration-150 cursor-pointer",
+                                    isLandingPage 
+                                        ? "text-slate-600/80 hover:bg-slate-200/50 hover:text-slate-900 font-medium" 
+                                        : "text-muted-foreground/70 hover:bg-muted/70 hover:text-foreground"
+                                )}
+                                aria-expanded={expanded}
+                                aria-label={expanded ? "Collapse footer" : "Expand footer"}
+                            >
+                                <span
                                     className={cn(
-                                        "rounded-md px-2 py-1 transition-colors duration-150 no-underline",
-                                        isLandingPage 
-                                            ? "text-slate-600/80 hover:bg-slate-200/50 hover:text-slate-900 font-medium" 
-                                            : "hover:bg-muted/70 hover:text-foreground"
+                                        "h-3.5 w-3.5 transition-transform duration-300",
+                                        !expanded && "footer-chevron-idle",
+                                        expanded && "rotate-180"
                                     )}
                                 >
-                                    {link.label}
-                                </Link>
-                            );
-                        })}
+                                    <ChevronUp className="h-full w-full" />
+                                </span>
+                                <span className="text-[11px] font-medium leading-none">
+                                    {expanded ? "Less" : "More"}
+                                </span>
+                            </button>
+                        </nav>
+                    </div>
 
-                        {/* Divider */}
-                        <span className={cn("mx-1 h-3 w-px", isLandingPage ? "bg-slate-300/60" : "bg-border")} aria-hidden="true" />
+                    {/* Mobile layout (sm:hidden — Separate clickable Terms & Privacy links) */}
+                    <div className="flex sm:hidden items-center justify-between gap-3 w-full px-1">
+                        {/* Mobile Left: Logo & optional tagline */}
+                        <div className="flex items-center gap-2 shrink-0 opacity-90 transition-opacity hover:opacity-100">
+                            <Logo size="sm" className="shrink-0" />
+                            <span className={cn("text-[11px] font-semibold tracking-tight hidden min-[390px]:inline-block", isLandingPage ? "text-slate-600/90" : "text-muted-foreground/80")}>
+                                Minimal URL Shortener
+                            </span>
+                        </div>
 
-                        {/* Expand / Collapse button */}
-                        <button
-                            type="button"
-                            onClick={() => setExpanded((prev) => !prev)}
-                            className={cn(
-                                "group ml-0.5 flex items-center gap-1 rounded-md px-2 py-1 transition-colors duration-150 cursor-pointer",
-                                isLandingPage 
-                                    ? "text-slate-600/80 hover:bg-slate-200/50 hover:text-slate-900 font-medium" 
-                                    : "text-muted-foreground/70 hover:bg-muted/70 hover:text-foreground"
-                            )}
-                            aria-expanded={expanded}
-                            aria-label={expanded ? "Collapse footer" : "Expand footer"}
+                        {/* Mobile Right: Separate clickable Terms & Privacy links + More button */}
+                        <nav
+                            aria-label="Mobile footer navigation"
+                            className="flex items-center gap-1 shrink-0 justify-end"
                         >
-                            <span
+                            <Link
+                                href="/terms"
+                                target="_blank"
                                 className={cn(
-                                    "h-3.5 w-3.5 transition-transform duration-300",
-                                    !expanded && "footer-chevron-idle",
-                                    expanded && "rotate-180"
+                                    "rounded-md px-1.5 py-1 text-xs transition-colors duration-150 no-underline whitespace-nowrap font-medium",
+                                    isLandingPage 
+                                        ? "text-slate-700/80 hover:bg-slate-200/60 hover:text-slate-900" 
+                                        : "text-muted-foreground/90 hover:bg-muted/70 hover:text-foreground"
                                 )}
                             >
-                                <ChevronUp className="h-full w-full" />
-                            </span>
-                            <span className="text-[11px] font-medium leading-none">
-                                {expanded ? "Less" : "More"}
-                            </span>
-                        </button>
-                    </nav>
+                                Terms
+                            </Link>
+
+                            <Link
+                                href="/privacy"
+                                target="_blank"
+                                className={cn(
+                                    "rounded-md px-1.5 py-1 text-xs transition-colors duration-150 no-underline whitespace-nowrap font-medium",
+                                    isLandingPage 
+                                        ? "text-slate-700/80 hover:bg-slate-200/60 hover:text-slate-900" 
+                                        : "text-muted-foreground/90 hover:bg-muted/70 hover:text-foreground"
+                                )}
+                            >
+                                Privacy
+                            </Link>
+
+                            <span className={cn("mx-1 h-3.5 w-px shrink-0 opacity-60", isLandingPage ? "bg-slate-300" : "bg-border")} aria-hidden="true" />
+
+                            <button
+                                type="button"
+                                onClick={() => setExpanded((prev) => !prev)}
+                                className={cn(
+                                    "group flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-semibold transition-colors duration-150 cursor-pointer shrink-0 whitespace-nowrap",
+                                    isLandingPage 
+                                        ? "text-slate-700/80 hover:bg-slate-200/60 hover:text-slate-900" 
+                                        : "text-muted-foreground/80 hover:bg-muted/70 hover:text-foreground"
+                                )}
+                                aria-expanded={expanded}
+                                aria-label={expanded ? "Collapse footer" : "Expand footer"}
+                            >
+                                <span className="leading-none">
+                                    {expanded ? "Less" : "More"}
+                                </span>
+                                <span
+                                    className={cn(
+                                        "h-3.5 w-3.5 transition-transform duration-300",
+                                        !expanded && "footer-chevron-idle",
+                                        expanded && "rotate-180"
+                                    )}
+                                >
+                                    <ChevronUp className="h-full w-full" />
+                                </span>
+                            </button>
+                        </nav>
+                    </div>
                 </div>
 
                 {/* ── Slide-Up Overlay Drawer (Does NOT push middle UI) ── */}
