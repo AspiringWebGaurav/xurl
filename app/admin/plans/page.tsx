@@ -8,6 +8,7 @@ import { PLAN_CONFIGS, PAID_PLAN_ORDER, PlanType } from "@/lib/plans";
 import { auth } from "@/lib/firebase/config";
 import { useRouter } from "next/navigation";
 import { emitAdminRefresh } from "@/lib/admin/admin-events";
+import { toast } from "sonner";
 
 const fetcher = async (url: string) => {
     const user = auth.currentUser;
@@ -56,7 +57,9 @@ export default function PlansConfigPage() {
             });
             
             if (res.ok) {
-                setMessage("Plans configuration saved successfully! Synchronizing system TTLs...");
+                const msg = "Plans configuration saved successfully! Synchronizing system TTLs...";
+                setMessage(msg);
+                toast.success("Plans configuration saved!");
                 mutate(localConfig || undefined); // Update SWR cache locally
                 
                 // Trigger background TTL sync
@@ -69,23 +72,28 @@ export default function PlansConfigPage() {
                     const syncData = await syncRes.json();
                     if (syncRes.ok) {
                         setMessage(`Plans configuration saved! ${syncData.message}`);
+                        toast.success(`TTL Sync: ${syncData.message}`);
                     } else {
                         setMessage("Configuration saved, but TTL sync encountered an error.");
+                        toast.warning("Saved, but TTL sync encountered an error.");
                     }
                     emitAdminRefresh(router);
                 } catch (e) {
                     console.error(e);
                     setMessage("Configuration saved, but TTL sync failed.");
+                    toast.warning("Saved, but TTL sync failed.");
                     emitAdminRefresh(router);
                 } finally {
                     setSyncing(false);
                 }
             } else {
                 setMessage("Failed to save configuration.");
+                toast.error("Failed to save configuration.");
             }
         } catch (e) {
             console.error(e);
             setMessage("An error occurred while saving.");
+            toast.error("An error occurred while saving.");
         } finally {
             setSaving(false);
         }
@@ -96,7 +104,8 @@ export default function PlansConfigPage() {
             if (!prev) return prev;
             const newPlans = { ...prev.plans };
             if (!newPlans[plan]) newPlans[plan] = {};
-            (newPlans[plan] as any)[field] = value;
+            const sanitizedVal = isNaN(value) || value < 0 ? 0 : value;
+            (newPlans[plan] as any)[field] = sanitizedVal;
             return { ...prev, plans: newPlans };
         });
     };

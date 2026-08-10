@@ -23,6 +23,7 @@ import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, runTransac
 import { db } from "@/lib/firebase/config";
 
 import { HistorySidebar } from "./HistorySidebar";
+import { toast } from "sonner";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -78,6 +79,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
     const autoCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const shakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const notificationOpenRef = useRef(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [plan, setPlan] = useState<string>("free");
     const [quota, setQuota] = useState<{ limit: number, currentActive: number, ttlHours: number | "Unlimited" } | null>(null);
     const [pricingLabelIndex, setPricingLabelIndex] = useState(0);
@@ -88,6 +90,35 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
     const pricingLabels = ["Pricing", "Plans"] as const;
     const isDevEnv = process.env.NODE_ENV === "development";
     const isDeveloper = isAdminEmail(user?.email);
+
+    const handleSignOut = useCallback(async () => {
+        if (isLoggingOut) return;
+        setIsLoggingOut(true);
+        toast.loading("Signing out...", { id: "logout-toast" });
+
+        try {
+            // Initiate real Firebase sign-out immediately (0 artificial delay!)
+            await signOut();
+
+            // Coordinate routing: navigate to home if currently on an authenticated-only route
+            if (
+                pathname?.startsWith("/admin") ||
+                pathname?.startsWith("/dashboard") ||
+                pathname === "/profile" ||
+                pathname === "/purchase-history" ||
+                pathname === "/data-export"
+            ) {
+                router.push("/");
+            }
+
+            toast.success("Signed out successfully", { id: "logout-toast" });
+        } catch (err) {
+            console.error("Sign out failed:", err);
+            toast.error("Failed to sign out. Please try again.", { id: "logout-toast" });
+        } finally {
+            setIsLoggingOut(false);
+        }
+    }, [isLoggingOut, pathname, router]);
 
     // Auto-close history sidebar when navigating to admin pages
     useEffect(() => {
@@ -788,14 +819,28 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                         Create link
                     </button>
                 </div>
-                {loading ? (
-                    <>
-                        <Skeleton className="hidden h-8 w-[88px] rounded-md bg-slate-100 sm:block" />
-                        <Skeleton className="h-8 w-8 rounded-full bg-slate-100" />
-                    </>
-                ) : (
-                    user ? (
-                        <>
+                <AnimatePresence mode="wait">
+                    {loading ? (
+                        <motion.div
+                            key="loading"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.15 }}
+                            className="flex items-center gap-2"
+                        >
+                            <Skeleton className="hidden h-8 w-[88px] rounded-md bg-slate-100 sm:block" />
+                            <Skeleton className="h-8 w-8 rounded-full bg-slate-100" />
+                        </motion.div>
+                    ) : user ? (
+                        <motion.div
+                            key="authenticated"
+                            initial={{ opacity: 0, y: -2 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 2 }}
+                            transition={{ duration: 0.15 }}
+                            className="flex items-center gap-2"
+                        >
                                 {/* Desktop History Button (Hidden on Admin routes) */}
                                 {!isAdminPage && (
                                     <button
@@ -1025,25 +1070,37 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
 
                                         {/* Sign Out */}
                                         <DropdownMenuItem
-                                            className="flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 dark:hover:bg-rose-500/20 cursor-pointer transition"
-                                            onClick={async () => {
-                                                await signOut();
-                                                router.push("/");
+                                            disabled={isLoggingOut}
+                                            className="flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 dark:hover:bg-rose-500/20 cursor-pointer transition disabled:opacity-60 disabled:cursor-not-allowed"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                void handleSignOut();
                                             }}
                                         >
                                             <div className="h-7 w-7 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0 border border-rose-500/20">
-                                                <LogOut className="h-3.5 w-3.5" />
+                                                {isLoggingOut ? (
+                                                    <Loader2 className="h-3.5 w-3.5 animate-spin text-rose-500" />
+                                                ) : (
+                                                    <LogOut className="h-3.5 w-3.5" />
+                                                )}
                                             </div>
                                             <div className="flex flex-col leading-tight flex-1">
-                                                <span className="font-bold">Sign Out</span>
+                                                <span className="font-bold">{isLoggingOut ? "Signing out..." : "Sign Out"}</span>
                                                 <span className="text-[10px] text-rose-400 font-normal">End active session safely</span>
                                             </div>
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
-                        </>
+                        </motion.div>
                     ) : (
-                        <>
+                        <motion.div
+                            key="public"
+                            initial={{ opacity: 0, y: -2 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 2 }}
+                            transition={{ duration: 0.15 }}
+                            className="flex items-center gap-2"
+                        >
                             {hasGuestHistory && (
                                 <Button
                                     variant="ghost"
@@ -1083,9 +1140,9 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                             >
                                 {isLoggingIn ? "Connecting..." : "Login"}
                             </Button>
-                        </>
-                    )
-                )}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
             <HistorySidebar
                 isOpen={isHistoryOpen}

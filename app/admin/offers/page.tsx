@@ -7,6 +7,7 @@ import { Loader2, Plus, Save, Trash2, Tag, CalendarClock, PenTool } from "lucide
 import { auth } from "@/lib/firebase/config";
 import { useRouter } from "next/navigation";
 import { emitAdminRefresh } from "@/lib/admin/admin-events";
+import { toast } from "sonner";
 
 const fetcher = async (url: string) => {
     const user = auth.currentUser;
@@ -61,15 +62,19 @@ export default function OffersConfigPage() {
             });
             
             if (res.ok) {
-                setMessage("Global offers published! Changes are now live across all APIs and the pricing page.");
+                const msg = "Global offers published! Changes are now live across all APIs and the pricing page.";
+                setMessage(msg);
+                toast.success("Global offers published successfully!");
                 mutate(localConfig || undefined);
                 emitAdminRefresh(router);
             } else {
                 setMessage("Failed to publish offers.");
+                toast.error("Failed to publish offers.");
             }
         } catch (e) {
             console.error(e);
             setMessage("An error occurred while publishing.");
+            toast.error("An error occurred while publishing.");
         } finally {
             setSaving(false);
         }

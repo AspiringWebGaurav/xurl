@@ -179,6 +179,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         return () => unsub();
     }, []);
 
+    const title = useMemo(() => {
+        return NAV_ITEMS.find((item) => item.href === pathname)?.label || "Admin Console";
+    }, [pathname]);
+
     // 🔒 Glassmorphic Mobile/Tablet Lock Screen for Admin Panel
     if (!isDesktop) {
         return (
@@ -221,10 +225,6 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </div>
         );
     }
-
-    const title = useMemo(() => {
-        return NAV_ITEMS.find((item) => item.href === pathname)?.label || "Admin Console";
-    }, [pathname]);
 
     if (loading) {
         return (

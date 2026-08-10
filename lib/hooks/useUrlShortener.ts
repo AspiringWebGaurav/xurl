@@ -25,6 +25,9 @@ export interface UserQuotaState {
     paidLinksCreated?: number;
     planTtlHours?: number | null;
     expiredLinksCount?: number | null;
+    freeLinksCreated?: number;
+    totalLinksEver?: number;
+    planRenewals?: Array<unknown>;
     [key: string]: any;
 }
 

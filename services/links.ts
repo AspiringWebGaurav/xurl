@@ -455,26 +455,24 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
     }
 
     logger.linkCreated(slug, userId);
-    try {
-        await writeActivityEvent({
-            type: "LINK_CREATED",
-            actor: userId || null,
-            sourceCollection: "links",
-            metadata: {
-                slug,
-                shortUrl: buildShortUrl(slug),
-                originalUrl: urlCheck.url,
-                plan: txResult?.resolvedPlan ?? null,
-            },
-            severity: "INFO",
-        });
-    } catch (error) {
+    void writeActivityEvent({
+        type: "LINK_CREATED",
+        actor: userId || null,
+        sourceCollection: "links",
+        metadata: {
+            slug,
+            shortUrl: buildShortUrl(slug),
+            originalUrl: urlCheck.url,
+            plan: txResult?.resolvedPlan ?? null,
+        },
+        severity: "INFO",
+    }).catch((error) => {
         logger.error("activity_event_write", "Failed to write LINK_CREATED event", {
             slug,
             userId,
             error: String(error),
         });
-    }
+    });
 
     return {
         slug,

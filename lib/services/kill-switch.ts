@@ -1,6 +1,7 @@
 import { adminDb } from "@/lib/firebase/admin";
 import { safeRedis } from "@/lib/redis/client";
 import { logger } from "@/lib/utils/logger";
+import { logAdminAction } from "@/services/admin-logs";
 
 const REDIS_KILL_SWITCH_KEY = "system:kill_switch";
 
@@ -80,14 +81,12 @@ export async function setKillSwitchState(
         // Update Redis cache immediately
         await safeRedis((redis) => redis.set(REDIS_KILL_SWITCH_KEY, JSON.stringify(state)));
 
-        // Audit Log
-        await adminDb.collection("admin_audit_logs").add({
-            action: active ? "KILL_SWITCH_ACTIVATED" : "KILL_SWITCH_DEACTIVATED",
+        // Audit Log to central admin_logs
+        await logAdminAction(
             adminEmail,
-            details: state.reason,
-            timestamp: now,
-            payload: state,
-        });
+            "OTHER",
+            `${active ? "ACTIVATED" : "DEACTIVATED"} emergency kill switch. Reason: ${state.reason}`
+        );
 
         logger.info("kill_switch_toggle", `Kill Switch set to ${active} by ${adminEmail}`);
     } catch (err) {

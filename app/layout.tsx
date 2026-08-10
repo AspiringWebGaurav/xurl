@@ -11,6 +11,7 @@ import { StructuredData } from "@/components/seo/StructuredData";
 import { headers, cookies } from "next/headers";
 import { ConfirmLinkProvider } from "@/components/providers/ConfirmLinkProvider";
 import { RouteLoaderProvider } from "@/components/providers/RouteLoaderProvider";
+import { ClientTelemetryProvider } from "@/components/providers/ClientTelemetryProvider";
 
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
@@ -84,17 +85,19 @@ export default async function RootLayout({
                 <script src="https://switchyy.eu.cc/switchy.js?key=pk_59ca8c1525d7dfebdaf4d2bc&project=rMvXJgJoFGuCTdxDB8jH" async />
             </head>
             <body className={`${inter.className} bg-background text-foreground`} suppressHydrationWarning>
-                <RouteLoaderProvider />
-                <StructuredData />
-                <KillSwitchGuard initialKillSwitchActive={initialKillSwitchActive}>
-                    <ConfirmLinkProvider>
-                        <BanGuard isMobileDevice={isMobileDevice} initiallyBanned={isKnownBanned}>
-                            <PartialOfferNotificationBanner />
-                            {children}
-                        </BanGuard>
-                    </ConfirmLinkProvider>
-                </KillSwitchGuard>
-                <Toaster />
+                <ClientTelemetryProvider>
+                    <RouteLoaderProvider />
+                    <StructuredData />
+                    <KillSwitchGuard initialKillSwitchActive={initialKillSwitchActive}>
+                        <ConfirmLinkProvider>
+                            <BanGuard isMobileDevice={isMobileDevice} initiallyBanned={isKnownBanned}>
+                                <PartialOfferNotificationBanner />
+                                {children}
+                            </BanGuard>
+                        </ConfirmLinkProvider>
+                    </KillSwitchGuard>
+                    <Toaster />
+                </ClientTelemetryProvider>
             </body>
         </html>
     );

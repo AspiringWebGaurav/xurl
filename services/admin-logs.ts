@@ -41,7 +41,7 @@ export async function logAdminAction(adminEmail: string, action: AdminLogAction,
 }
 
 /**
- * Retrieves recent admin logs.
+ * Retrieves recent admin logs safely normalized.
  * @param limitCount Number of logs to retrieve (default 100)
  */
 export async function getAdminLogs(limitCount = 100): Promise<AdminLog[]> {
@@ -52,7 +52,32 @@ export async function getAdminLogs(limitCount = 100): Promise<AdminLog[]> {
             .limit(limitCount)
             .get();
 
-        return snapshot.docs.map(doc => doc.data() as AdminLog);
+        return snapshot.docs.map(doc => {
+            const data = doc.data() || {};
+            
+            // Normalize timestamp
+            const rawCreated = data.createdAt ?? data.timestamp ?? data.created_at;
+            let createdAtNum = Date.now();
+
+            if (typeof rawCreated === "number" && !isNaN(rawCreated)) {
+                createdAtNum = rawCreated;
+            } else if (rawCreated && typeof rawCreated === "object" && typeof rawCreated.toDate === "function") {
+                createdAtNum = rawCreated.toDate().getTime();
+            } else if (rawCreated && typeof rawCreated === "object" && typeof rawCreated._seconds === "number") {
+                createdAtNum = rawCreated._seconds * 1000;
+            } else if (typeof rawCreated === "string") {
+                const parsed = new Date(rawCreated).getTime();
+                if (!isNaN(parsed)) createdAtNum = parsed;
+            }
+
+            return {
+                id: data.id || doc.id,
+                adminEmail: data.adminEmail || data.email || data.userEmail || "System",
+                action: (data.action || "OTHER") as AdminLogAction,
+                details: data.details || data.message || data.reason || "Administrative operation",
+                createdAt: createdAtNum,
+            };
+        });
     } catch (error) {
         console.error("Failed to fetch admin logs:", error);
         return [];

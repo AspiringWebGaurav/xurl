@@ -105,13 +105,14 @@ export async function POST(request: NextRequest) {
         }
 
         // --- Dynamic Pricing & Best Price Wins Logic ---
-        const dynamicPlanConfig = await getComputedPlanConfig(planId);
+        const userEmail = decoded.email || "";
+        const [dynamicPlanConfig, partialOffer] = await Promise.all([
+            getComputedPlanConfig(planId),
+            getApplicablePartialOfferForUser(userEmail, planId)
+        ]);
+
         const dynamicPriceINR = dynamicPlanConfig.priceINR;
         const baseAmountPaise = Math.round(dynamicPriceINR * 100);
-
-        // Check for targeted partial offer for current user email
-        const userEmail = decoded.email || "";
-        const partialOffer = await getApplicablePartialOfferForUser(userEmail, planId);
 
         const globalOffer = await getBestActiveOffer(dynamicPriceINR);
 

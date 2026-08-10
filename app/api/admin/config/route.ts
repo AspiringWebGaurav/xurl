@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDynamicConfig, saveDynamicConfig } from "@/lib/services/dynamic-config";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { isAdminEmail } from "@/lib/admin-config";
+import { logAdminAction } from "@/services/admin-logs";
 
 export async function GET(req: NextRequest) {
     try {
@@ -40,18 +41,15 @@ export async function POST(req: NextRequest) {
 
         const body = await req.json();
         const newConfig = body.config;
-        const oldConfig = await getDynamicConfig();
 
         await saveDynamicConfig(newConfig);
 
-        // Audit Logging
-        await adminDb.collection("admin_audit_logs").add({
-            adminEmail: decoded.email,
-            action: "UPDATE_DYNAMIC_CONFIG",
-            oldConfig: oldConfig,
-            newConfig: newConfig,
-            timestamp: Date.now()
-        });
+        // Audit Logging to central admin_logs
+        await logAdminAction(
+            decoded.email || "admin",
+            "OTHER",
+            "Updated dynamic plan and offer configurations"
+        );
         
         return NextResponse.json({ success: true });
     } catch (e) {

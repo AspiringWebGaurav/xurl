@@ -2,12 +2,10 @@
 
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import { Logo } from "@/components/ui/Logo";
 import { useConfirmLink } from "@/components/providers/ConfirmLinkProvider";
 import { cn } from "@/lib/utils";
-import { ChevronUp, ExternalLink } from "lucide-react";
+import { ChevronUp } from "lucide-react";
 
 const footerColumns = [
     {
@@ -60,7 +58,6 @@ const minimalLegalLinks = [
 ];
 
 export function MobileFooter() {
-    const router = useRouter();
     const [expanded, setExpanded] = useState(false);
     const { handleLinkClick } = useConfirmLink();
     const footerRef = useRef<HTMLDivElement>(null);

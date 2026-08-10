@@ -36,7 +36,7 @@ export default function AdminPurchaseHistoryPage() {
                 await ensureUserDocument(nextUser);
                 try {
                     const token = await nextUser.getIdToken();
-                    const res = await fetch("/api/user/transactions", {
+                    const res = await fetch("/api/admin/transactions", {
                         headers: { Authorization: `Bearer ${token}` },
                     });
                     const data = await res.json();
@@ -46,7 +46,7 @@ export default function AdminPurchaseHistoryPage() {
                     }
                 } catch (loadError) {
                     console.error("Failed to fetch transactions", loadError);
-                    setError("Failed to load your transaction history.");
+                    setError("Failed to load system transaction history.");
                 }
             }
 
@@ -64,7 +64,7 @@ export default function AdminPurchaseHistoryPage() {
         try {
             const lastCursor = transactions[transactions.length - 1].createdAt;
             const token = await user.getIdToken();
-            const res = await fetch(`/api/user/transactions?cursor=${lastCursor}`, {
+            const res = await fetch(`/api/admin/transactions?cursor=${lastCursor}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             const data = await res.json();
