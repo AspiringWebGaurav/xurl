@@ -122,7 +122,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         if (!isAdmin && !loading) {
             const logStrike = async () => {
                 try {
-                    let headers: Record<string, string> = {
+                    const headers: Record<string, string> = {
                         "Content-Type": "application/json"
                     };
                     if (user) {

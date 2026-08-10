@@ -3,6 +3,7 @@ import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { applyPlanUpgrade } from "@/services/plan-upgrade";
 import { resolvePlanType } from "@/lib/plans";
 import { getDevModeForUser, isDevEnvironment, isDeveloperEmail } from "@/lib/dev-mode";
+import { recordPartialOfferRedemption } from "@/services/partial-offers";
 import { logger } from "@/lib/utils/logger";
 import crypto from "crypto";
 
@@ -75,6 +76,12 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json({ code: "INVALID_SIGNATURE", message: "Payment signature verification failed." }, { status: 400 });
             }
 
+            let preUpgradeSnapshot: Record<string, unknown> | null = null;
+            if (orderData.partialOfferId) {
+                const uSnap = await adminDb.collection("users").doc(decoded.uid).get();
+                preUpgradeSnapshot = (uSnap.exists ? uSnap.data() : null) as Record<string, unknown> | null;
+            }
+
             // Verified successfully, perform upgrade immediately
             await applyPlanUpgrade(
                 resolvePlanType(orderData.planId),
@@ -87,6 +94,18 @@ export async function POST(request: NextRequest) {
                     amountPaise: Number(orderData.amount) || undefined,
                 }
             );
+
+            if (orderData.partialOfferId) {
+                await recordPartialOfferRedemption({
+                    offerId: orderData.partialOfferId,
+                    userId: decoded.uid,
+                    userEmail: decoded.email || "",
+                    planId: resolvePlanType(orderData.planId),
+                    orderId,
+                    preUpgradeSnapshot,
+                });
+            }
+
             return NextResponse.json({ success: true, status: "consumed" });
         }
 

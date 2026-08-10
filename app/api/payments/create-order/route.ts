@@ -247,6 +247,12 @@ export async function POST(request: NextRequest) {
 
             await adminDb.collection("orders").doc(syntheticOrderId).set(orderDoc);
 
+            let preUpgradeSnapshot: Record<string, unknown> | null = null;
+            if (partialOffer && partialOffer.id) {
+                const uSnap = await adminDb.collection("users").doc(decoded.uid).get();
+                preUpgradeSnapshot = (uSnap.exists ? uSnap.data() : null) as Record<string, unknown> | null;
+            }
+
             await applyPlanUpgrade(planId, decoded.uid, syntheticOrderId, `free-${now}`, undefined, {
                 source: partialOffer ? "partial_offer" : "promo_free",
                 amountPaise: 0,
@@ -259,6 +265,7 @@ export async function POST(request: NextRequest) {
                     userEmail: userEmail,
                     planId,
                     orderId: syntheticOrderId,
+                    preUpgradeSnapshot,
                 });
             }
 
@@ -311,6 +318,8 @@ export async function POST(request: NextRequest) {
             promoDiscountValue: appliedPromoValue,
             currency: "INR",
             status: "created",
+            source: partialOffer ? "partial_offer" : undefined,
+            partialOfferId: partialOffer?.id || null,
             createdAt: now,
             updatedAt: now
         };

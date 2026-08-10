@@ -69,6 +69,29 @@ function PurchaseHistoryContent() {
         return () => unsubscribe();
     }, []);
 
+    useEffect(() => {
+        const handleProfileUpdated = (e: Event) => {
+            const customEvent = e as CustomEvent;
+            if (customEvent.detail?.plan) {
+                setUserPlan(customEvent.detail.plan);
+            }
+            if (user) {
+                user.getIdToken()
+                    .then(token => fetch("/api/user/transactions", { headers: { "Authorization": `Bearer ${token}` } }))
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.transactions) setTransactions(data.transactions);
+                    })
+                    .catch(console.error);
+            }
+        };
+
+        window.addEventListener("userProfileUpdated", handleProfileUpdated);
+        return () => {
+            window.removeEventListener("userProfileUpdated", handleProfileUpdated);
+        };
+    }, [user]);
+
     const handleLoadMore = async () => {
         if (!user || transactions.length === 0) return;
         setLoadingMore(true);

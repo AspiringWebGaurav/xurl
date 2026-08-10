@@ -192,6 +192,20 @@ export default function MobilePlanClient() {
     }, []);
 
     useEffect(() => {
+        const handleProfileUpdated = (e: Event) => {
+            const customEvent = e as CustomEvent;
+            if (customEvent.detail?.plan) {
+                setCurrentPlan(customEvent.detail.plan);
+            }
+        };
+
+        window.addEventListener("userProfileUpdated", handleProfileUpdated);
+        return () => {
+            window.removeEventListener("userProfileUpdated", handleProfileUpdated);
+        };
+    }, []);
+
+    useEffect(() => {
         let mounted = true;
         fetch("/api/exchange-rates")
             .then((res) => res.json())

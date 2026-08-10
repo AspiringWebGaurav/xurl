@@ -91,6 +91,19 @@ export default function ApiDashboardPage() {
         return () => unsubscribe();
     }, []);
 
+    useEffect(() => {
+        const handleProfileUpdated = () => {
+            if (user) {
+                void loadDashboard(user);
+            }
+        };
+
+        window.addEventListener("userProfileUpdated", handleProfileUpdated);
+        return () => {
+            window.removeEventListener("userProfileUpdated", handleProfileUpdated);
+        };
+    }, [user]);
+
     async function loadDashboard(currentUser: User, cursor?: number, isNext = false) {
         if (!cursor) {
             setDataLoading(true);

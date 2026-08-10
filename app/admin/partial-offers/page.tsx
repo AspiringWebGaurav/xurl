@@ -1049,7 +1049,15 @@ export default function AdminPartialOffersPage() {
                                 <div className="flex items-start gap-2.5 bg-slate-800/50 p-3 rounded-xl border border-slate-800">
                                     <RotateCcw className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                                     <p className="leading-relaxed">
-                                        Target user's plan will be <strong className="text-amber-300">immediately reverted</strong> to Free (or previous plan). Quotas & feature access update instantly.
+                                        {revokeModalOffer.redemptionCount && revokeModalOffer.redemptionCount > 0 ? (
+                                            <>
+                                                Target user's plan & quotas will be <strong className="text-amber-300">immediately reverted</strong> to their exact pre-offer state. A downgrade audit transaction will be recorded.
+                                            </>
+                                        ) : (
+                                            <>
+                                                This offer will be <strong className="text-amber-300">permanently deactivated and marked revoked</strong>. Target user can no longer claim or redeem it.
+                                            </>
+                                        )}
                                     </p>
                                 </div>
                                 <div className="flex items-start gap-2.5 bg-slate-800/50 p-3 rounded-xl border border-slate-800">

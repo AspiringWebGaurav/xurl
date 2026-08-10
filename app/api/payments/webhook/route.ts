@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { razorpayService } from "@/services/payments/razorpay";
 import { PLAN_CONFIGS, resolvePlanType } from "@/lib/plans";
 import { applyPlanUpgrade } from "@/services/plan-upgrade";
+import { recordPartialOfferRedemption } from "@/services/partial-offers";
 import { logger } from "@/lib/utils/logger";
 
 export async function POST(request: NextRequest) {
@@ -79,13 +80,28 @@ export async function POST(request: NextRequest) {
                 }
             }
 
+            let preUpgradeSnapshot: Record<string, unknown> | null = null;
+            if (orderData.partialOfferId) {
+                const uSnap = await adminDb.collection("users").doc(userId).get();
+                preUpgradeSnapshot = (uSnap.exists ? uSnap.data() : null) as Record<string, unknown> | null;
+            }
+
             // Perform idempotent update — mark as "consumed" to prevent double-upgrade
-            // via the /user/upgrade endpoint
-            // The `applyPlanUpgrade` service handles reading the order to prevent double-upgrade and writes the user update.
             await applyPlanUpgrade(planId, userId, orderId, paymentId, undefined, {
                 source: "razorpay",
                 amountPaise: Number(orderData.amount) || undefined,
             });
+
+            if (orderData.partialOfferId) {
+                await recordPartialOfferRedemption({
+                    offerId: orderData.partialOfferId,
+                    userId,
+                    userEmail: (orderData as any).userEmail || "",
+                    planId,
+                    orderId,
+                    preUpgradeSnapshot,
+                });
+            }
 
             logger.info("webhook_processed", `Successfully upgraded user ${userId} to ${planId}`);
         }

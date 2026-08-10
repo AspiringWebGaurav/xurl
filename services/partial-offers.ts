@@ -1,6 +1,7 @@
 import { adminDb } from "@/lib/firebase/admin";
 import { z } from "zod";
 import { logger } from "@/lib/utils/logger";
+import { createTransaction } from "./transactions";
 
 export const DiscountTypeSchema = z.enum(["percentage", "flat", "custom_price"]);
 export type PartialOfferDiscountType = z.infer<typeof DiscountTypeSchema>;
@@ -207,6 +208,9 @@ export async function getApplicablePartialOfferForUser(
     for (const doc of snap.docs) {
         const offer = { id: doc.id, ...doc.data() } as PartialOffer;
 
+        // Check if offer has been revoked
+        if (offer.isRevoked) continue;
+
         // Check start date
         if (offer.startsAt && offer.startsAt > now) continue;
 
@@ -262,7 +266,7 @@ export function calculatePartialOfferPrice(basePriceINR: number, offer: PartialO
 }
 
 /**
- * Increments redemption count when an offer is redeemed, storing previous user plan.
+ * Increments redemption count when an offer is redeemed, capturing complete user state snapshot BEFORE upgrade.
  */
 export async function recordPartialOfferRedemption(params: {
     offerId: string;
@@ -270,6 +274,20 @@ export async function recordPartialOfferRedemption(params: {
     userEmail: string;
     planId: string;
     orderId: string;
+    preUpgradeSnapshot?: {
+        plan?: string;
+        planExpiry?: number | null;
+        planEraStart?: number | null;
+        planStatus?: string;
+        cumulativeQuota?: number;
+        planRenewals?: number;
+        apiEnabled?: boolean;
+        apiQuotaTotal?: number;
+        apiRequestsUsed?: number;
+        apiKeyHash?: string | null;
+        apiKeyEncrypted?: string | null;
+        apiKeyLastRotatedAt?: number | null;
+    } | null;
 }): Promise<void> {
     try {
         const offerRef = adminDb.collection("partial_offers").doc(params.offerId);
@@ -278,12 +296,25 @@ export async function recordPartialOfferRedemption(params: {
 
         const now = Date.now();
 
-        // Get user's plan & quota prior to redemption
-        const userSnap = await userRef.get();
-        const userData = userSnap.exists ? userSnap.data() : null;
+        // Get user's complete plan, quota & API state prior to redemption
+        let userData = params.preUpgradeSnapshot ?? null;
+        if (!userData) {
+            const userSnap = await userRef.get();
+            userData = userSnap.exists ? (userSnap.data() as Record<string, unknown>) : null;
+        }
+
         const previousPlan = userData?.plan || "free";
+        const previousPlanExpiry = userData?.planExpiry ?? null;
+        const previousPlanEraStart = userData?.planEraStart ?? null;
+        const previousPlanStatus = userData?.planStatus || "active";
         const previousCumulativeQuota = userData?.cumulativeQuota || 0;
         const previousPlanRenewals = userData?.planRenewals || 1;
+        const previousApiEnabled = userData?.apiEnabled ?? false;
+        const previousApiQuotaTotal = userData?.apiQuotaTotal ?? 0;
+        const previousApiRequestsUsed = userData?.apiRequestsUsed ?? 0;
+        const previousApiKeyHash = userData?.apiKeyHash ?? null;
+        const previousApiKeyEncrypted = userData?.apiKeyEncrypted ?? null;
+        const previousApiKeyLastRotatedAt = userData?.apiKeyLastRotatedAt ?? null;
 
         await adminDb.runTransaction(async (transaction) => {
             const offerSnap = await transaction.get(offerRef);
@@ -305,8 +336,17 @@ export async function recordPartialOfferRedemption(params: {
                 userEmail: params.userEmail.toLowerCase(),
                 planId: params.planId,
                 previousPlan,
+                previousPlanExpiry,
+                previousPlanEraStart,
+                previousPlanStatus,
                 previousCumulativeQuota,
                 previousPlanRenewals,
+                previousApiEnabled,
+                previousApiQuotaTotal,
+                previousApiRequestsUsed,
+                previousApiKeyHash,
+                previousApiKeyEncrypted,
+                previousApiKeyLastRotatedAt,
                 orderId: params.orderId,
                 status: "active",
                 redeemedAt: now,
@@ -326,8 +366,7 @@ export async function recordPartialOfferRedemption(params: {
 }
 
 /**
- * Revokes a claimed partial offer and reverts the targeted user's account to their previous plan.
- * Existing links remain active until their scheduled creation expiration time!
+ * Revokes a claimed partial offer and transactionally reverts the targeted user's account to their exact pre-offer plan state.
  */
 export async function revokePartialOfferAndRevertUser(
     offerId: string,
@@ -337,98 +376,134 @@ export async function revokePartialOfferAndRevertUser(
     revertedEmails: string[];
 }> {
     const now = Date.now();
-    const offerRef = adminDb.collection("partial_offers").doc(offerId);
-    const offerSnap = await offerRef.get();
-    if (!offerSnap.exists) {
-        throw new Error("Partial offer not found");
-    }
-    const offerData = offerSnap.data() as PartialOffer;
 
-    if (offerData.isRevoked) {
-        return {
-            revokedCount: 0,
-            revertedEmails: [],
-        };
-    }
+    return await adminDb.runTransaction(async (transaction) => {
+        const offerRef = adminDb.collection("partial_offers").doc(offerId);
+        const offerSnap = await transaction.get(offerRef);
+        if (!offerSnap.exists) {
+            throw new Error("Partial offer not found");
+        }
+        const offerData = offerSnap.data() as PartialOffer;
 
-    const redemptionsSnap = await adminDb
-        .collection("partial_offer_redemptions")
-        .where("offerId", "==", offerId)
-        .get();
+        if (offerData.isRevoked) {
+            return {
+                revokedCount: 0,
+                revertedEmails: [],
+            };
+        }
 
-    const revertedEmails: string[] = [];
-    let revokedCount = 0;
+        const redemptionsSnap = await adminDb
+            .collection("partial_offer_redemptions")
+            .where("offerId", "==", offerId)
+            .get();
 
-    for (const rDoc of redemptionsSnap.docs) {
-        const rData = rDoc.data();
-        if (rData.status === "revoked") continue;
+        const activeRedemptions = redemptionsSnap.docs.filter((d) => d.data().status !== "revoked");
 
-        const userEmail = rData.userEmail || offerData.targetEmail;
-        const targetUserId = rData.userId;
-        const previousPlan = rData.previousPlan || "free";
-        const previousCumulativeQuota = previousPlan === "free" ? 0 : (rData.previousCumulativeQuota || 0);
-        const previousPlanRenewals = previousPlan === "free" ? 1 : (rData.previousPlanRenewals || 1);
-
-        if (targetUserId) {
-            const uRef = adminDb.collection("users").doc(targetUserId);
-            const uSnap = await uRef.get();
-            if (uSnap.exists) {
-                await uRef.update({
-                    plan: previousPlan,
-                    planExpiry: null,
-                    cumulativeQuota: previousCumulativeQuota,
-                    planRenewals: previousPlanRenewals,
-                    planStatus: "active",
-                    updatedAt: now,
-                });
-            }
-        } else if (userEmail) {
-            const usersByEmail = await adminDb
-                .collection("users")
-                .where("email", "==", userEmail.toLowerCase())
-                .limit(1)
-                .get();
-
-            if (!usersByEmail.empty) {
-                await usersByEmail.docs[0].ref.update({
-                    plan: previousPlan,
-                    planExpiry: null,
-                    cumulativeQuota: previousCumulativeQuota,
-                    planRenewals: previousPlanRenewals,
-                    planStatus: "active",
-                    updatedAt: now,
-                });
+        // PRE-FETCH ALL USER DOCUMENTS (Strict Firestore Read-Before-Write Rule)
+        const userSnapMap = new Map<string, FirebaseFirestore.DocumentSnapshot>();
+        for (const rDoc of activeRedemptions) {
+            const userId = rDoc.data().userId;
+            if (userId && !userSnapMap.has(userId)) {
+                const uRef = adminDb.collection("users").doc(userId);
+                const uSnap = await transaction.get(uRef);
+                userSnapMap.set(userId, uSnap);
             }
         }
 
-        await rDoc.ref.update({
-            status: "revoked",
+        // PERFORM ALL WRITES (Updates, Sets & Ledger Entries)
+        const revertedEmails: string[] = [];
+        let revokedCount = 0;
+
+        for (const rDoc of activeRedemptions) {
+            const rData = rDoc.data();
+            const userEmail = rData.userEmail || offerData.targetEmail;
+            const targetUserId = rData.userId;
+
+            if (targetUserId) {
+                const uSnap = userSnapMap.get(targetUserId);
+
+                if (uSnap && uSnap.exists) {
+                    const uData = uSnap.data();
+
+                    // Only revert if user is still on the plan granted by this offer
+                    // (prevents accidentally reverting a user who legitimately upgraded later)
+                    if (uData && (!uData.plan || uData.plan === rData.planId)) {
+                        const restoredPlan = rData.previousPlan || "free";
+                        const restoredExpiry = restoredPlan === "free" ? null : (rData.previousPlanExpiry ?? null);
+                        const restoredCumulativeQuota = restoredPlan === "free" ? 0 : (rData.previousCumulativeQuota ?? 0);
+                        const restoredRenewals = restoredPlan === "free" ? 1 : (rData.previousPlanRenewals ?? 1);
+                        const restoredApiEnabled = restoredPlan === "free" ? false : Boolean(rData.previousApiEnabled);
+                        const restoredApiQuotaTotal = restoredPlan === "free" ? 0 : Number(rData.previousApiQuotaTotal || 0);
+
+                        const uRef = adminDb.collection("users").doc(targetUserId);
+                        transaction.update(uRef, {
+                            plan: restoredPlan,
+                            planExpiry: restoredExpiry,
+                            planEraStart: rData.previousPlanEraStart ?? null,
+                            planStatus: rData.previousPlanStatus || "active",
+                            cumulativeQuota: restoredCumulativeQuota,
+                            planRenewals: restoredRenewals,
+                            apiEnabled: restoredApiEnabled,
+                            apiQuotaTotal: restoredApiQuotaTotal,
+                            apiRequestsUsed: restoredPlan === "free" ? 0 : Number(rData.previousApiRequestsUsed || 0),
+                            apiKeyHash: rData.previousApiKeyHash ?? null,
+                            apiKeyEncrypted: rData.previousApiKeyEncrypted ?? null,
+                            apiKeyLastRotatedAt: rData.previousApiKeyLastRotatedAt ?? null,
+                            updatedAt: now,
+                        });
+
+                        // Write transaction ledger entry for auditability
+                        await createTransaction(
+                            {
+                                userId: targetUserId,
+                                planType: restoredPlan,
+                                action: "downgrade",
+                                linksAllocated: 0,
+                                source: "admin_revoke",
+                                amount: 0,
+                                reason: `Partial offer "${offerData.title}" revoked by admin`,
+                                recipientEmail: userEmail,
+                                adminEmail,
+                                previousPlan: uData.plan ?? null,
+                                previousPlanStatus: uData.planStatus ?? null,
+                                previousPlanExpiry: uData.planExpiry ?? null,
+                                previousCumulativeQuota: uData.cumulativeQuota ?? null,
+                            },
+                            transaction
+                        );
+                    }
+                }
+            }
+
+            transaction.update(rDoc.ref, {
+                status: "revoked",
+                revokedAt: now,
+                revokedBy: adminEmail,
+            });
+
+            revokedCount++;
+            if (userEmail && !revertedEmails.includes(userEmail)) {
+                revertedEmails.push(userEmail);
+            }
+        }
+
+        // Mark offer as inactive & revoked
+        transaction.update(offerRef, {
+            isActive: false,
+            isRevoked: true,
             revokedAt: now,
-            revokedBy: adminEmail,
+            updatedAt: now,
         });
 
-        revokedCount++;
-        if (userEmail && !revertedEmails.includes(userEmail)) {
-            revertedEmails.push(userEmail);
-        }
-    }
+        await logPartialOfferAudit({
+            action: "OFFER_REVOKED",
+            offerId,
+            targetEmail: offerData.targetEmail,
+            adminEmail,
+            details: `Revoked offer "${offerData.title}" and reverted ${revokedCount} user plan(s) back to previous plan`,
+            previousValue: offerData as Record<string, unknown>,
+        });
 
-    // Mark offer as inactive & revoked
-    await offerRef.update({
-        isActive: false,
-        isRevoked: true,
-        revokedAt: now,
-        updatedAt: now,
+        return { revokedCount, revertedEmails };
     });
-
-    await logPartialOfferAudit({
-        action: "OFFER_REVOKED",
-        offerId,
-        targetEmail: offerData.targetEmail,
-        adminEmail,
-        details: `Revoked offer "${offerData.title}" and reverted ${revokedCount} user plan(s) back to previous plan`,
-        previousValue: offerData as Record<string, unknown>,
-    });
-
-    return { revokedCount, revertedEmails };
 }

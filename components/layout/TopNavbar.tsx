@@ -313,7 +313,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                 snapshotUnsub = onSnapshot(doc(db, "users", u.uid), (docSnap) => {
                     if (docSnap.exists()) {
                         const userData = docSnap.data();
-                        const newDocSig = `${userData.plan}_${userData.activeLinks}_${JSON.stringify(userData.giftQuotas || [])}_${userData.planExpiry || ""}`;
+                        const newDocSig = `${userData.plan}_${userData.activeLinks}_${JSON.stringify(userData.giftQuotas || [])}_${userData.planExpiry || ""}_${userData.apiEnabled}_${userData.cumulativeQuota}_${userData.updatedAt || ""}`;
                         
                         if (userData.plan) {
                             setPlan(String(userData.plan).toLowerCase());

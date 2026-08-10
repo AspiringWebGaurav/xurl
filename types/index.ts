@@ -86,6 +86,7 @@ export interface OrderDocument {
     currency: string;
     status: "created" | "paid" | "consumed" | "failed";
     source?: "razorpay" | "developer_mode" | "promo_free" | "admin_grant" | "partial_offer";
+    partialOfferId?: string | null;
     createdAt: number;
     updatedAt: number;
 }

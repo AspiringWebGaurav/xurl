@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth, db } from "@/lib/firebase/config";
 import { doc, onSnapshot } from "firebase/firestore";
@@ -102,15 +102,75 @@ export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
         }
     });
 
+    const quotaFetchSeqRef = useRef<number>(0);
+    const quotaAbortControllerRef = useRef<AbortController | null>(null);
+
+    const fetchUserQuota = useCallback((u: User) => {
+        const seq = ++quotaFetchSeqRef.current;
+        if (quotaAbortControllerRef.current) quotaAbortControllerRef.current.abort();
+        const controller = new AbortController();
+        quotaAbortControllerRef.current = controller;
+        const { signal } = controller;
+
+        u.getIdToken()
+            .then(token => fetch("/api/links?pageSize=1", {
+                headers: { "Authorization": `Bearer ${token}` },
+                signal
+            }))
+            .then(r => r.json())
+            .then(d => {
+                if (signal.aborted || seq !== quotaFetchSeqRef.current) return;
+                if (d.limit) {
+                    setQuota({
+                        freeLinksCreated: d.freeLinksCreated,
+                        paidLinksCreated: d.paidLinksCreated,
+                        limit: d.limit,
+                        plan: d.plan || "free",
+                        planRenewals: d.planRenewals,
+                        planTtlHours: d.planTtlHours,
+                        expiredLinksCount: d.expiredLinksCount,
+                        totalLinksEver: d.totalLinksEver,
+                        freeUsageCount: d.freeUsageCount,
+                        freeMaxUses: d.freeMaxUses,
+                        cooldownRemainingMs: d.cooldownRemainingMs,
+                        canCreateFreeLink: d.canCreateFreeLink,
+                        activeGiftQuotas: d.activeGiftQuotas,
+                        giftUsageCount: d.giftUsageCount
+                    });
+
+                    const activeGifts = (d.activeGiftQuotas as Array<{ amount?: number }> | undefined) || [];
+                    const totalGiftBonus = activeGifts.reduce((sum, g) => sum + (g.amount || 0), 0);
+                    const hasGiftsAvailable = totalGiftBonus > (Number(d.giftUsageCount) || 0);
+                    const savedPref = typeof window !== 'undefined' ? localStorage.getItem('xurl_quota_pref') : null;
+
+                    if (hasGiftsAvailable && savedPref !== 'free') {
+                        setSelectedQuotaState('gift');
+                    } else if (d.canCreateFreeLink || savedPref === 'free') {
+                        setSelectedQuotaState('free');
+                    } else if (hasGiftsAvailable) {
+                        setSelectedQuotaState('gift');
+                    } else {
+                        setSelectedQuotaState('free');
+                    }
+                }
+                setQuotaFetched(true);
+            })
+            .catch(err => {
+                if (err?.name === "AbortError" || seq !== quotaFetchSeqRef.current) return;
+                console.error("Quota fetch failed", err);
+                setQuotaFetched(true);
+            })
+            .finally(() => {
+                if (!signal.aborted && seq === quotaFetchSeqRef.current) setQuotaLoading(false);
+            });
+    }, []);
+
     // CRITICAL: Strict loading gate - prevents any render until all data is ready
     useEffect(() => {
-        let quotaAbortController: AbortController | null = null;
-
         const unsubscribe = onAuthStateChanged(auth, (u) => {
-            // Abort any in-flight quota fetch from a previous auth state change
-            if (quotaAbortController) {
-                quotaAbortController.abort();
-                quotaAbortController = null;
+            if (quotaAbortControllerRef.current) {
+                quotaAbortControllerRef.current.abort();
+                quotaAbortControllerRef.current = null;
             }
 
             setUser(u);
@@ -136,62 +196,7 @@ export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
                 setViewingPastLink(false);
                 setCountdown("");
 
-                quotaAbortController = new AbortController();
-                const { signal } = quotaAbortController;
-
-                u.getIdToken()
-                    .then(token => fetch("/api/links?pageSize=1", {
-                        headers: { "Authorization": `Bearer ${token}` },
-                        signal
-                    }))
-                    .then(r => r.json())
-                    .then(d => {
-                        if (signal.aborted) return;
-                        if (d.limit) {
-                            setQuota({
-                                freeLinksCreated: d.freeLinksCreated,
-                                paidLinksCreated: d.paidLinksCreated,
-                                limit: d.limit,
-                                plan: d.plan || "free",
-                                planRenewals: d.planRenewals,
-                                planTtlHours: d.planTtlHours,
-                                expiredLinksCount: d.expiredLinksCount,
-                                totalLinksEver: d.totalLinksEver,
-                                // Free plan specific fields
-                                freeUsageCount: d.freeUsageCount,
-                                freeMaxUses: d.freeMaxUses,
-                                cooldownRemainingMs: d.cooldownRemainingMs,
-                                canCreateFreeLink: d.canCreateFreeLink,
-                                activeGiftQuotas: d.activeGiftQuotas,
-                                giftUsageCount: d.giftUsageCount
-                            });
-
-                            // Initialize selectedQuota (prioritize gift, fallback to free)
-                            const activeGifts = (d.activeGiftQuotas as Array<{ amount?: number }> | undefined) || [];
-                            const totalGiftBonus = activeGifts.reduce((sum, g) => sum + (g.amount || 0), 0);
-                            const hasGiftsAvailable = totalGiftBonus > (Number(d.giftUsageCount) || 0);
-                            const savedPref = typeof window !== 'undefined' ? localStorage.getItem('xurl_quota_pref') : null;
-
-                            if (hasGiftsAvailable && savedPref !== 'free') {
-                                setSelectedQuotaState('gift');
-                            } else if (d.canCreateFreeLink || savedPref === 'free') {
-                                setSelectedQuotaState('free');
-                            } else if (hasGiftsAvailable) {
-                                setSelectedQuotaState('gift');
-                            } else {
-                                setSelectedQuotaState('free');
-                            }
-                        }
-                        setQuotaFetched(true);
-                    })
-                    .catch(err => {
-                        if (err?.name === "AbortError") return;
-                        console.error("Quota fetch failed", err);
-                        setQuotaFetched(true); // Still unblock, but with no quota
-                    })
-                    .finally(() => {
-                        if (!signal.aborted) setQuotaLoading(false);
-                    });
+                fetchUserQuota(u);
             } else {
                 // Guest - no quota needed
                 setQuota(null);
@@ -252,13 +257,26 @@ export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
                 });
             }
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
         return () => {
-            if (quotaAbortController) quotaAbortController.abort();
+            if (quotaAbortControllerRef.current) quotaAbortControllerRef.current.abort();
             if (unsubGuestRef.current) unsubGuestRef.current();
             unsubscribe();
         };
-    }, []);
+    }, [fetchUserQuota]);
+
+    useEffect(() => {
+        const handleProfileUpdated = () => {
+            const currentUser = auth.currentUser;
+            if (currentUser) {
+                fetchUserQuota(currentUser);
+            }
+        };
+
+        window.addEventListener("userProfileUpdated", handleProfileUpdated);
+        return () => {
+            window.removeEventListener("userProfileUpdated", handleProfileUpdated);
+        };
+    }, [fetchUserQuota]);
 
     // Cleanup old legacy localStorage usage
     useEffect(() => {

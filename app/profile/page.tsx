@@ -54,6 +54,20 @@ export default function ProfilePage() {
         return () => unsubscribe();
     }, []);
 
+    useEffect(() => {
+        const handleProfileUpdated = (e: Event) => {
+            const customEvent = e as CustomEvent;
+            if (customEvent.detail?.plan) {
+                setUserPlan(customEvent.detail.plan);
+            }
+        };
+
+        window.addEventListener("userProfileUpdated", handleProfileUpdated);
+        return () => {
+            window.removeEventListener("userProfileUpdated", handleProfileUpdated);
+        };
+    }, []);
+
     const handleSave = async (e: FormEvent) => {
         e.preventDefault();
         const trimmed = displayName.trim();
