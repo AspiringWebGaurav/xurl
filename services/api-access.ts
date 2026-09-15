@@ -40,16 +40,17 @@ export async function ensureApiProvisioning(userId: string): Promise<{
         const entitlement = getApiEntitlement(plan);
 
         if (!entitlement.enabled) {
-            transaction.set(
-                userRef,
-                {
-                    apiEnabled: false,
-                    apiQuotaTotal: 0,
-                    apiRequestsUsed: 0,
-                    updatedAt: now,
-                },
-                { merge: true }
-            );
+            if (user.apiEnabled !== false || user.apiQuotaTotal !== 0) {
+                transaction.set(
+                    userRef,
+                    {
+                        apiEnabled: false,
+                        apiQuotaTotal: 0,
+                        apiRequestsUsed: 0,
+                    },
+                    { merge: true }
+                );
+            }
 
             return {
                 user: {
@@ -65,6 +66,7 @@ export async function ensureApiProvisioning(userId: string): Promise<{
         let apiKey: string | null = null;
         let apiKeyHash = user.apiKeyHash || null;
         let apiKeyEncrypted = user.apiKeyEncrypted || null;
+        const needsKeyGeneration = !apiKeyHash || !apiKeyEncrypted;
 
         if (!apiKeyHash || !apiKeyEncrypted) {
             apiKey = generateApiKey();
@@ -74,15 +76,28 @@ export async function ensureApiProvisioning(userId: string): Promise<{
             apiKey = decryptApiKey(apiKeyEncrypted);
         }
 
+        const targetQuota = user.apiQuotaTotal || entitlement.quotaTotal;
+        const needsProvisioningUpdate =
+            needsKeyGeneration ||
+            !user.apiEnabled ||
+            user.apiQuotaTotal !== targetQuota ||
+            !user.apiKeyLastRotatedAt;
+
+        if (!needsProvisioningUpdate) {
+            return {
+                user,
+                apiKey,
+            };
+        }
+
         const nextUser: UserDocument = {
             ...user,
             apiEnabled: true,
-            apiQuotaTotal: user.apiQuotaTotal || entitlement.quotaTotal,
+            apiQuotaTotal: targetQuota,
             apiRequestsUsed: user.apiRequestsUsed || 0,
             apiKeyHash,
             apiKeyEncrypted,
             apiKeyLastRotatedAt: user.apiKeyLastRotatedAt || now,
-            updatedAt: now,
         };
 
         transaction.set(userRef, nextUser, { merge: true });

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
@@ -69,6 +69,7 @@ export default function ApiDashboardPage() {
     const [nextCursor, setNextCursor] = useState<number | null>(null);
     const [prevCursors, setPrevCursors] = useState<number[]>([]);
 
+    const isFetchingRef = useRef(false);
     const perPage = 6;
 
     const canPrev = useMemo(() => prevCursors.length > 0, [prevCursors]);
@@ -92,21 +93,31 @@ export default function ApiDashboardPage() {
     }, []);
 
     useEffect(() => {
+        let timer: NodeJS.Timeout;
         const handleProfileUpdated = () => {
-            if (user) {
-                void loadDashboard(user);
+            if (user && !isFetchingRef.current) {
+                clearTimeout(timer);
+                timer = setTimeout(() => {
+                    void loadDashboard(user);
+                }, 500);
             }
         };
 
         window.addEventListener("userProfileUpdated", handleProfileUpdated);
         return () => {
+            clearTimeout(timer);
             window.removeEventListener("userProfileUpdated", handleProfileUpdated);
         };
     }, [user]);
 
     async function loadDashboard(currentUser: User, cursor?: number, isNext = false) {
+        if (isFetchingRef.current) return;
+        isFetchingRef.current = true;
+
         if (!cursor) {
-            setDataLoading(true);
+            if (!data) {
+                setDataLoading(true);
+            }
         } else {
             setLogsLoading(true);
         }
@@ -141,6 +152,7 @@ export default function ApiDashboardPage() {
         } finally {
             setDataLoading(false);
             setLogsLoading(false);
+            isFetchingRef.current = false;
         }
     }
 
@@ -211,89 +223,90 @@ export default function ApiDashboardPage() {
     }
 
     return (
-        <div className="h-[100dvh] flex flex-col justify-between bg-background overflow-hidden select-none">
+        <div className="h-[100dvh] flex flex-col justify-between bg-background overflow-x-hidden select-none">
             {/* Header Navbar */}
-            <div className="shrink-0">
+            <div className="shrink-0 z-20">
                 <TopNavbar />
             </div>
 
-            {/* Main Single-Screen Content View (Broad Responsive Enlarge) */}
-            <main className="flex-1 min-h-0 w-full max-w-5xl lg:max-w-6xl mx-auto px-4 sm:px-8 py-3 sm:py-6 flex flex-col justify-center items-center overflow-hidden">
+            {/* Main Single-Screen Content View */}
+            <main className="flex-1 min-h-0 w-full max-w-5xl lg:max-w-6xl mx-auto px-3 sm:px-6 py-2 sm:py-3.5 flex flex-col justify-start lg:justify-between overflow-y-auto lg:overflow-hidden overflow-x-hidden">
                 {!user ? (
-                    <div className="w-full max-w-xl text-center p-8 rounded-3xl border border-border/80 bg-card/80 backdrop-blur-xl shadow-2xl space-y-4">
+                    <div className="w-full max-w-xl mx-auto my-auto text-center p-8 rounded-3xl border border-border/80 bg-card/80 backdrop-blur-xl shadow-2xl space-y-4">
                         <Lock className="h-12 w-12 text-muted-foreground mx-auto" />
                         <h1 className="text-xl font-bold text-foreground">Sign in Required</h1>
                         <p className="text-sm text-muted-foreground">Please sign in to manage your developer API access.</p>
                     </div>
                 ) : (
                     <motion.div 
-                        initial={{ opacity: 0, y: 8 }}
+                        initial={{ opacity: 0, y: 6 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.25 }}
-                        className="w-full space-y-3 sm:space-y-5"
+                        transition={{ duration: 0.2 }}
+                        className="w-full space-y-2 sm:space-y-3"
                     >
                         {/* Header Banner */}
-                        <div className="flex items-center justify-between gap-2 px-1">
-                            <Link href="/" className="inline-flex items-center gap-2 text-xs sm:text-sm font-bold text-muted-foreground hover:text-foreground transition">
-                                <ArrowLeft className="h-4 w-4" />
-                                <span>Back to shortener</span>
-                            </Link>
-
+                        <div className="flex items-center justify-between gap-2 px-1 pt-0.5">
                             <div className="flex items-center gap-2">
                                 <span className="text-[11px] sm:text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 font-mono">
                                     Developer Portal
                                 </span>
-                                <Link href="/documentation/api" className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-primary hover:underline">
-                                    <span>API Documentation</span>
-                                </Link>
+                                <span className="text-xs text-muted-foreground font-medium hidden sm:inline">
+                                    / REST API & Automation
+                                </span>
                             </div>
+
+                            <Link href="/documentation/api" className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-primary hover:underline">
+                                <span>API Documentation &rarr;</span>
+                            </Link>
                         </div>
 
-                        {dataLoading || !data ? (
+                        {dataLoading && !data ? (
+                            <LoadingView />
+                        ) : !data ? (
                             <LoadingView />
                         ) : !data.apiEligible ? (
                             /* Non-Eligible Plan Lock View */
-                            <div className="rounded-3xl border border-border/80 bg-card/80 backdrop-blur-2xl shadow-2xl p-6 sm:p-10 text-center space-y-5 max-w-4xl mx-auto">
+                            <div className="rounded-3xl border border-border/80 bg-card/80 backdrop-blur-2xl shadow-2xl p-5 sm:p-8 text-center space-y-4 max-w-4xl mx-auto">
                                 <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-xs font-bold uppercase tracking-widest">
                                     <Sparkles className="h-4 w-4" />
                                     <span>Unlocks on Business & Enterprise</span>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <h1 className="text-xl sm:text-3xl lg:text-4xl font-black text-foreground tracking-tight">
+                                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-foreground tracking-tight">
                                         REST API & Developer Automation
                                     </h1>
-                                    <p className="text-xs sm:text-base text-muted-foreground max-w-2xl mx-auto">
+                                    <p className="text-xs sm:text-sm text-muted-foreground max-w-2xl mx-auto">
                                         Your current plan is <span className="font-bold text-foreground uppercase">{data.plan}</span>. Upgrade to generate API keys, create short URLs programmatically, and monitor request latency.
                                     </p>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 max-w-3xl mx-auto text-left">
-                                    <div className="p-4 rounded-2xl bg-muted/40 border border-border/50 space-y-1.5">
-                                        <KeyRound className="h-5 w-5 text-indigo-500" />
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl mx-auto text-left">
+                                    <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/50 space-y-1">
+                                        <KeyRound className="h-4.5 w-4.5 text-indigo-500" />
                                         <p className="text-sm font-bold text-foreground">API Key Auth</p>
                                         <p className="text-xs text-muted-foreground">Bearer token authentication for secure endpoints.</p>
                                     </div>
-                                    <div className="p-4 rounded-2xl bg-muted/40 border border-border/50 space-y-1.5">
-                                        <Zap className="h-5 w-5 text-emerald-500" />
+                                    <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/50 space-y-1">
+                                        <Zap className="h-4.5 w-4.5 text-emerald-500" />
                                         <p className="text-sm font-bold text-foreground">High Speed</p>
                                         <p className="text-xs text-muted-foreground">Sub-50ms Edge API request processing.</p>
                                     </div>
-                                    <div className="p-4 rounded-2xl bg-muted/40 border border-border/50 space-y-1.5">
-                                        <ShieldCheck className="h-5 w-5 text-primary" />
+                                    <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/50 space-y-1">
+                                        <ShieldCheck className="h-4.5 w-4.5 text-primary" />
                                         <p className="text-sm font-bold text-foreground">Usage Logs</p>
                                         <p className="text-xs text-muted-foreground">Full request audit trail & quota monitoring.</p>
                                     </div>
                                 </div>
 
-                                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                                <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
                                     <Link href="/pricing?plan=business">
-                                        <Button className="h-11 sm:h-13 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-xs sm:text-base px-6 shadow-xl">
+                                        <Button className="h-10 sm:h-11 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold text-xs sm:text-sm px-6 shadow-xl">
                                             Upgrade to Business
                                         </Button>
                                     </Link>
                                     <Link href="/documentation/api">
-                                        <Button variant="outline" className="h-11 sm:h-13 rounded-2xl text-xs sm:text-base font-bold px-5">
+                                        <Button variant="outline" className="h-10 sm:h-11 rounded-2xl text-xs sm:text-sm font-bold px-5">
                                             Preview API Documentation
                                         </Button>
                                     </Link>
@@ -301,15 +314,15 @@ export default function ApiDashboardPage() {
                             </div>
                         ) : (
                             /* Eligible Plan Developer Console */
-                            <div className="space-y-4">
+                            <div className="space-y-2.5 sm:space-y-3.5">
                                 {/* Stats Cards */}
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                    <div className="p-4 rounded-2xl border border-border/80 bg-card/80 backdrop-blur-xl shadow-sm space-y-1.5">
-                                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Monthly Quota</p>
-                                        <p className="text-xl sm:text-2xl font-black text-foreground font-mono">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+                                    <div className="p-3 sm:p-3.5 rounded-2xl border border-border/80 bg-card/80 backdrop-blur-xl shadow-sm space-y-1">
+                                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Monthly Quota</p>
+                                        <p className="text-lg sm:text-2xl font-black text-foreground font-mono leading-tight">
                                             {data.apiRequestsUsed.toLocaleString()} / {data.apiQuotaTotal.toLocaleString()}
                                         </p>
-                                        <div className="w-full h-2 rounded-full bg-muted overflow-hidden mt-1">
+                                        <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden mt-1">
                                             <div 
                                                 className="h-full bg-primary rounded-full transition-all duration-300"
                                                 style={{ width: `${Math.min(100, Math.round((data.apiRequestsUsed / Math.max(1, data.apiQuotaTotal)) * 100))}%` }}
@@ -317,38 +330,38 @@ export default function ApiDashboardPage() {
                                         </div>
                                     </div>
 
-                                    <div className="p-4 rounded-2xl border border-border/80 bg-card/80 backdrop-blur-xl shadow-sm space-y-1.5">
-                                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Remaining Calls</p>
-                                        <p className="text-xl sm:text-2xl font-black text-emerald-500 font-mono">
+                                    <div className="p-3 sm:p-3.5 rounded-2xl border border-border/80 bg-card/80 backdrop-blur-xl shadow-sm space-y-1">
+                                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Remaining Calls</p>
+                                        <p className="text-lg sm:text-2xl font-black text-emerald-500 font-mono leading-tight">
                                             {data.remainingRequests.toLocaleString()}
                                         </p>
-                                        <p className="text-xs text-muted-foreground">Resets at start of billing cycle</p>
+                                        <p className="text-[11px] text-muted-foreground leading-tight">Resets at start of billing cycle</p>
                                     </div>
 
-                                    <div className="p-4 rounded-2xl border border-border/80 bg-card/80 backdrop-blur-xl shadow-sm space-y-1.5">
-                                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Key Status</p>
-                                        <div className="flex items-center gap-2">
-                                            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                                            <p className="text-base font-bold text-foreground">Active & Healthy</p>
+                                    <div className="p-3 sm:p-3.5 rounded-2xl border border-border/80 bg-card/80 backdrop-blur-xl shadow-sm space-y-1">
+                                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Key Status</p>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                            <p className="text-sm sm:text-base font-bold text-foreground leading-tight">Active & Healthy</p>
                                         </div>
-                                        <p className="text-xs text-muted-foreground font-mono">
+                                        <p className="text-[11px] text-muted-foreground font-mono leading-tight">
                                             {data.apiKeyLastRotatedAt ? `Rotated ${formatDistanceToNow(data.apiKeyLastRotatedAt)} ago` : "Never rotated"}
                                         </p>
                                     </div>
                                 </div>
 
                                 {/* API Key Action Panel */}
-                                <div className="p-5 sm:p-6 rounded-3xl border border-border/80 bg-card/80 backdrop-blur-2xl shadow-xl space-y-3">
+                                <div className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border border-border/80 bg-card/80 backdrop-blur-2xl shadow-xl space-y-2">
                                     <div className="flex items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2.5">
-                                            <KeyRound className="h-5 w-5 text-indigo-500" />
-                                            <h2 className="text-sm sm:text-base font-extrabold text-foreground">Secret API Key</h2>
+                                        <div className="flex items-center gap-2">
+                                            <KeyRound className="h-4 w-4 text-indigo-500" />
+                                            <h2 className="text-xs sm:text-sm font-extrabold text-foreground">Secret API Key</h2>
                                         </div>
 
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-1.5">
                                             <button 
                                                 onClick={() => setShowKey(!showKey)}
-                                                className="text-xs font-bold text-primary hover:underline px-2.5 py-1"
+                                                className="text-xs font-bold text-primary hover:underline px-2 py-0.5 cursor-pointer"
                                             >
                                                 {showKey ? "Hide" : "Reveal"}
                                             </button>
@@ -358,16 +371,16 @@ export default function ApiDashboardPage() {
                                                 variant="outline"
                                                 onClick={handleRegenerate}
                                                 disabled={regenerating}
-                                                className="h-8 sm:h-9 text-xs font-bold px-3 rounded-xl border-border"
+                                                className="h-7 sm:h-8 text-xs font-bold px-2.5 rounded-xl border-border cursor-pointer"
                                             >
-                                                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${regenerating ? "animate-spin" : ""}`} />
+                                                <RefreshCw className={`h-3 w-3 mr-1.5 ${regenerating ? "animate-spin" : ""}`} />
                                                 <span>Rotate Key</span>
                                             </Button>
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-3 p-3 rounded-2xl bg-muted/50 border border-border font-mono text-xs sm:text-sm text-foreground">
-                                        <TerminalSquare className="h-5 w-5 text-muted-foreground shrink-0" />
+                                    <div className="flex items-center gap-2.5 p-2.5 sm:p-3 rounded-xl sm:rounded-2xl bg-muted/50 border border-border font-mono text-xs sm:text-sm text-foreground">
+                                        <TerminalSquare className="h-4 w-4 text-muted-foreground shrink-0" />
                                         <span className="truncate flex-1">
                                             {data.apiKey ? (showKey ? data.apiKey : `${data.apiKey.slice(0, 14)}••••••••••••••••••••`) : "No active API key"}
                                         </span>
@@ -376,36 +389,36 @@ export default function ApiDashboardPage() {
                                             variant="ghost"
                                             onClick={handleCopy}
                                             disabled={!data.apiKey}
-                                            className="h-8 px-3 text-xs hover:bg-muted font-bold cursor-pointer"
+                                            className="h-7 px-2.5 text-xs hover:bg-muted font-bold cursor-pointer"
                                         >
-                                            <Copy className="h-4 w-4 mr-1.5" />
+                                            <Copy className="h-3.5 w-3.5 mr-1.5" />
                                             <span>{copied ? "Copied!" : "Copy"}</span>
                                         </Button>
                                     </div>
                                 </div>
 
                                 {/* Request Audit Logs */}
-                                <div className="p-5 sm:p-6 rounded-3xl border border-border/80 bg-card/80 backdrop-blur-2xl shadow-xl space-y-3">
+                                <div className="p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border border-border/80 bg-card/80 backdrop-blur-2xl shadow-xl space-y-2">
                                     <div className="flex items-center justify-between text-xs sm:text-sm font-bold text-foreground">
                                         <span>Recent Request Audit Logs</span>
-                                        <div className="flex items-center gap-1.5">
-                                            <Button size="sm" variant="ghost" onClick={handlePrevPage} disabled={!canPrev || logsLoading} className="h-7 text-xs px-2.5 font-bold">
+                                        <div className="flex items-center gap-1">
+                                            <Button size="sm" variant="ghost" onClick={handlePrevPage} disabled={!canPrev || logsLoading} className="h-6 sm:h-7 text-xs px-2 font-bold cursor-pointer">
                                                 Prev
                                             </Button>
-                                            <Button size="sm" variant="ghost" onClick={handleNextPage} disabled={!canNext || logsLoading} className="h-7 text-xs px-2.5 font-bold">
+                                            <Button size="sm" variant="ghost" onClick={handleNextPage} disabled={!canNext || logsLoading} className="h-6 sm:h-7 text-xs px-2 font-bold cursor-pointer">
                                                 Next
                                             </Button>
                                         </div>
                                     </div>
 
                                     {data.recentRequests.length === 0 ? (
-                                        <p className="text-center text-xs text-muted-foreground py-6">No API requests recorded yet.</p>
+                                        <p className="text-center text-xs text-muted-foreground py-4">No API requests recorded yet.</p>
                                     ) : (
-                                        <div className="divide-y divide-border/60 max-h-44 overflow-y-auto pr-1">
+                                        <div className="divide-y divide-border/60 max-h-32 sm:max-h-40 overflow-y-auto pr-1">
                                             {data.recentRequests.map((req) => (
-                                                <div key={req.requestId} className="py-2 flex items-center justify-between text-xs">
-                                                    <div className="flex items-center gap-2.5 font-mono">
-                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                                                <div key={req.requestId} className="py-1.5 flex items-center justify-between text-xs">
+                                                    <div className="flex items-center gap-2 font-mono">
+                                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${
                                                             req.method === "POST" ? "bg-emerald-500/10 text-emerald-500" : "bg-primary/10 text-primary"
                                                         }`}>
                                                             {req.method}
@@ -413,7 +426,7 @@ export default function ApiDashboardPage() {
                                                         <span className="text-foreground truncate max-w-[160px] sm:max-w-md">{req.endpoint}</span>
                                                     </div>
 
-                                                    <div className="flex items-center gap-4 font-mono">
+                                                    <div className="flex items-center gap-3 font-mono">
                                                         <span className="text-muted-foreground">{req.responseTimeMs}ms</span>
                                                         <span className={`font-bold ${req.statusCode < 400 ? "text-emerald-500" : "text-rose-500"}`}>
                                                             {req.statusCode}
