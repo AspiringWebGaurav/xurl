@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og'
 
 export const runtime = 'nodejs'
+export const revalidate = 86400
 
 export const size = {
   width: 32,
