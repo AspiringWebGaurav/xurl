@@ -109,7 +109,6 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
         pathname === '/purchase-history' ||
         pathname.startsWith('/dashboard') ||
         pathname.startsWith('/admin') ||
-        pathname === '/placeholder' ||
         pathname === '/guest-policy' ||
         pathname === '/analytics' ||
         pathname === '/analytics-preview' ||
