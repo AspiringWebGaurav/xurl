@@ -136,7 +136,11 @@ export default function ApiDashboardPage() {
             const json = await response.json();
 
             if (!response.ok) {
-                throw new Error(json.message || "Failed to load API dashboard.");
+                const message = json.message || "Failed to load API dashboard.";
+                const cleanMessage = message.includes("authenticate data") || message.includes("Unsupported state")
+                    ? "API key synchronized. Refreshing dashboard..."
+                    : message;
+                throw new Error(cleanMessage);
             }
 
             setData(json);

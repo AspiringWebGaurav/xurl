@@ -66,14 +66,20 @@ export async function ensureApiProvisioning(userId: string): Promise<{
         let apiKey: string | null = null;
         let apiKeyHash = user.apiKeyHash || null;
         let apiKeyEncrypted = user.apiKeyEncrypted || null;
-        const needsKeyGeneration = !apiKeyHash || !apiKeyEncrypted;
+        let needsKeyGeneration = !apiKeyHash || !apiKeyEncrypted;
 
-        if (!apiKeyHash || !apiKeyEncrypted) {
+        if (apiKeyEncrypted) {
+            apiKey = decryptApiKey(apiKeyEncrypted);
+            if (!apiKey) {
+                // Stale encrypted data or rotated secret: automatically re-generate
+                needsKeyGeneration = true;
+            }
+        }
+
+        if (needsKeyGeneration) {
             apiKey = generateApiKey();
             apiKeyHash = hashApiKey(apiKey);
             apiKeyEncrypted = encryptApiKey(apiKey);
-        } else {
-            apiKey = decryptApiKey(apiKeyEncrypted);
         }
 
         const targetQuota = user.apiQuotaTotal || entitlement.quotaTotal;

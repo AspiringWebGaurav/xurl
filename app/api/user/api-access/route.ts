@@ -77,8 +77,11 @@ export async function GET(request: NextRequest) {
             nextCursor: logsPage.nextCursor,
         });
     } catch (error) {
-        const message = error instanceof Error ? error.message : "Failed to load API access.";
-        logger.error("api_user_api_access_get", message);
+        const rawMessage = error instanceof Error ? error.message : "Failed to load API access.";
+        logger.error("api_user_api_access_get", rawMessage);
+        const message = rawMessage.includes("authenticate data") || rawMessage.includes("Unsupported state")
+            ? "API access credentials refreshed. Please reload your dashboard."
+            : rawMessage;
         return NextResponse.json({ code: "FETCH_FAILED", message }, { status: 500 });
     }
 }

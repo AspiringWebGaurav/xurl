@@ -10,6 +10,13 @@
     "deploy:ttl": "firebase deploy --only firestore:indexes --non-interactive",
     "test:api": "npx tsx tests/api.test.ts"
   },
+  "allowScripts": {
+    "@firebase/util": true,
+    "protobufjs": true,
+    "msw": true,
+    "sharp": true,
+    "unrs-resolver": true
+  },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@types/jszip": "^3.4.0",

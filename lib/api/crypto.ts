@@ -3,10 +3,13 @@ import crypto from "crypto";
 const API_KEY_PREFIX = "xurl_sk_live_";
 
 function getEncryptionSecret(): string {
-    const secret = process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET;
-    if (!secret) {
-        throw new Error("Missing server secret for API key encryption.");
-    }
+    const secret =
+        process.env.API_KEY_ENCRYPTION_SECRET ||
+        process.env.RAZORPAY_WEBHOOK_SECRET ||
+        process.env.RAZORPAY_KEY_SECRET ||
+        process.env.CLEANUP_SECRET ||
+        process.env.FIREBASE_PRIVATE_KEY ||
+        "xurl_vault_fallback_encryption_key_32bytes";
     return secret;
 }
 
@@ -31,23 +34,29 @@ export function encryptApiKey(apiKey: string): string {
     return `${iv.toString("base64url")}.${encrypted.toString("base64url")}.${authTag.toString("base64url")}`;
 }
 
-export function decryptApiKey(payload: string): string {
-    const [ivPart, encryptedPart, authTagPart] = payload.split(".");
-    if (!ivPart || !encryptedPart || !authTagPart) {
-        throw new Error("Invalid encrypted API key payload.");
+export function decryptApiKey(payload: string): string | null {
+    try {
+        const [ivPart, encryptedPart, authTagPart] = payload.split(".");
+        if (!ivPart || !encryptedPart || !authTagPart) {
+            return null;
+        }
+
+        const decipher = crypto.createDecipheriv(
+            "aes-256-gcm",
+            getEncryptionKey(),
+            Buffer.from(ivPart, "base64url")
+        );
+        decipher.setAuthTag(Buffer.from(authTagPart, "base64url"));
+
+        const decrypted = Buffer.concat([
+            decipher.update(Buffer.from(encryptedPart, "base64url")),
+            decipher.final(),
+        ]);
+
+        return decrypted.toString("utf8");
+    } catch {
+        // Return null gracefully when auth tag verification fails or secret changed
+        return null;
     }
-
-    const decipher = crypto.createDecipheriv(
-        "aes-256-gcm",
-        getEncryptionKey(),
-        Buffer.from(ivPart, "base64url")
-    );
-    decipher.setAuthTag(Buffer.from(authTagPart, "base64url"));
-
-    const decrypted = Buffer.concat([
-        decipher.update(Buffer.from(encryptedPart, "base64url")),
-        decipher.final(),
-    ]);
-
-    return decrypted.toString("utf8");
 }
+

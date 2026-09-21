@@ -13,13 +13,30 @@ const cyrb53 = (str: string, seed = 0): number => {
     return 4294967296 * (2097151 & h2) + (h1 >>> 0);
 };
 
-// Hashes of the admin emails (to avoid hardcoding the email in plaintext)
-export const ADMIN_HASHES = [7327953269839021, 5930064445747368, 8935716010889362];
+// Hashes of the admin emails (including gauravpatil5737@gmail.com: 6425568986229314)
+export const ADMIN_HASHES = [7327953269839021, 5930064445747368, 6425568986229314];
 
 export function isAdminEmail(email: string | null | undefined): boolean {
     if (!email) {
         return false;
     }
-    const hash = cyrb53(email.toLowerCase());
+    const cleanEmail = email.toLowerCase().trim();
+
+    // Direct check for owner admin email
+    if (cleanEmail === "gauravpatil5737@gmail.com") {
+        return true;
+    }
+
+    // Dynamic environment override support (single or comma-separated emails)
+    const envAdmins = process.env.ADMIN_EMAIL || process.env.ADMIN_EMAILS || "";
+    if (envAdmins) {
+        const allowed = envAdmins.toLowerCase().split(",").map((e) => e.trim());
+        if (allowed.includes(cleanEmail)) {
+            return true;
+        }
+    }
+
+    const hash = cyrb53(cleanEmail);
     return ADMIN_HASHES.includes(hash);
 }
+

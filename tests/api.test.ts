@@ -8,6 +8,7 @@ import { PLAN_CONFIGS, GUEST_CONFIG, resolvePlanType } from "../lib/plans";
 import { razorpayService } from "../services/payments/razorpay";
 import { isAdminEmail } from "../lib/admin-config";
 import { safeRedis } from "../lib/redis/client";
+import { generateApiKey, hashApiKey, encryptApiKey, decryptApiKey } from "../lib/api/crypto";
 import crypto from "crypto";
 
 let passedCount = 0;
@@ -83,7 +84,32 @@ async function runTests() {
         assert(resolvePlanType("unknown_plan" as unknown as "free") === "free", "Falls back to 'free' for unknown plans");
         assert(isAdminEmail(null) === false, "isAdminEmail safely handles null");
         assert(typeof isAdminEmail("test@example.com") === "boolean", "isAdminEmail returns boolean");
+        assert(isAdminEmail("gauravpatil5737@gmail.com") === true, "isAdminEmail recognizes gauravpatil5737@gmail.com as admin");
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // 2.1 API Key Encryption & Self-Healing Decryption
+    // ─────────────────────────────────────────────────────────────
+    console.log("\n▶ 2.1. API Key Encryption & Decryption Resilience");
+    {
+        const rawKey = generateApiKey();
+        assert(rawKey.startsWith("xurl_sk_live_"), "Generates live API key with correct prefix");
+        const hashed = hashApiKey(rawKey);
+        assert(hashed.length === 64, "Hashes API key to 64-char SHA256 hex");
+
+        const encrypted = encryptApiKey(rawKey);
+        assert(encrypted.split(".").length === 3, "Encrypted payload contains IV, ciphertext, and auth tag");
+
+        const decrypted = decryptApiKey(encrypted);
+        assert(decrypted === rawKey, "Decrypted API key matches original key");
+
+        const tamperedDecryption = decryptApiKey("bad.payload.tag");
+        assert(tamperedDecryption === null, "Gracefully returns null on tampered or invalid payload without throwing");
+
+        const corruptedDecryption = decryptApiKey(encrypted.slice(0, -4) + "XXXX");
+        assert(corruptedDecryption === null, "Gracefully returns null on invalid auth tag / stale secret without throwing");
+    }
+
 
     // ─────────────────────────────────────────────────────────────
     // 3. Custom Slug & Reserved Slugs Validation
