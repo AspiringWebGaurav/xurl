@@ -85,6 +85,7 @@ async function runTests() {
         assert(isAdminEmail(null) === false, "isAdminEmail safely handles null");
         assert(typeof isAdminEmail("test@example.com") === "boolean", "isAdminEmail returns boolean");
         assert(isAdminEmail("gauravpatil5737@gmail.com") === true, "isAdminEmail recognizes gauravpatil5737@gmail.com as admin");
+        assert(isAdminEmail("gauravpatil9262@gmail.com") === false, "isAdminEmail rejects gauravpatil9262@gmail.com as admin");
     }
 
     // ─────────────────────────────────────────────────────────────

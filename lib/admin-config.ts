@@ -13,8 +13,8 @@ const cyrb53 = (str: string, seed = 0): number => {
     return 4294967296 * (2097151 & h2) + (h1 >>> 0);
 };
 
-// Hashes of the admin emails (including gauravpatil5737@gmail.com: 6425568986229314)
-export const ADMIN_HASHES = [7327953269839021, 5930064445747368, 6425568986229314];
+// Hashes of admin emails (retaining only gauravpatil5737@gmail.com: 6425568986229314)
+export const ADMIN_HASHES = [6425568986229314];
 
 export function isAdminEmail(email: string | null | undefined): boolean {
     if (!email) {
