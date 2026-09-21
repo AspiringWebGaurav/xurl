@@ -29,6 +29,7 @@ next-env.d.ts
 .env.test.local
 .env.production.local
 .env.local
+!.env.example
 
 # vercel
 .vercel
@@ -104,5 +105,3 @@ playwright/.cache/
 # Local AI Config & Customizations
 .agents/
 .gemini/
-
-.env*
