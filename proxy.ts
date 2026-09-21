@@ -64,6 +64,22 @@ export async function checkIsKillSwitchActive(): Promise<boolean> {
     }
 }
 
+/** Direct Upstash Redis REST read to resolve links at the Edge with ZERO serverless function invocations */
+export async function getRedisCachedUrl(slug: string): Promise<string | null> {
+    if (!REDIS_URL || !REDIS_TOKEN) return null;
+    try {
+        const res = await fetch(`${REDIS_URL}/get/slug:${slug}`, {
+            headers: { Authorization: `Bearer ${REDIS_TOKEN}` },
+            cache: "no-store",
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.result ? String(data.result) : null;
+    } catch {
+        return null;
+    }
+}
+
 export async function proxy(request: NextRequest, event: NextFetchEvent) {
     const { pathname } = request.nextUrl;
 
@@ -155,7 +171,24 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
         }
     }
 
-    // 2) Cache Miss -> Await API fetch to get redirect URL
+    // 2) Check Upstash Redis directly via REST (resolves at edge with 0 serverless function invocations)
+    const redisUrl = await getRedisCachedUrl(slug);
+    if (redisUrl) {
+        if (edgeCache.size >= MAX_EDGE_CACHE_SIZE) {
+            const firstKey = edgeCache.keys().next().value;
+            if (firstKey !== undefined) edgeCache.delete(firstKey);
+        }
+        edgeCache.set(slug, {
+            originalUrl: redisUrl,
+            isActive: true,
+            expiresAt: null,
+            cachedAt: Date.now(),
+        });
+        dispatchAnalytics(event, request, slug);
+        return buildRedirectResponse(request, redisUrl, "HIT");
+    }
+
+    // 3) Cache Miss -> Await API fetch to get redirect URL (handles Firestore lookup & TTL calculation)
     const apiUrl = new URL('/api/redirect/' + slug, request.url);
     try {
         const res = await fetch(apiUrl);
@@ -203,7 +236,7 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
 
 export const config = {
     matcher: [
-        '/((?!_next/static|_next/image|favicon.ico|images).*)',
+        '/((?!_next/static|_next/image|favicon.ico|images|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|eot|css|js)).*)',
     ],
 };
 

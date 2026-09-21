@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Loader2, ArrowRight, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { buildShortUrl } from "@/lib/utils/url-builder";
@@ -11,7 +12,9 @@ const subscribe = () => () => {};
 const getSnapshot = () => true;
 const getServerSnapshot = () => false;
 
-export default function RedirectClient({ dest }: { dest: string }) {
+export default function RedirectClient({ dest: propDest }: { dest?: string }) {
+    const searchParams = useSearchParams();
+    const dest = propDest || searchParams.get("dest") || "";
     const [isRedirecting, setIsRedirecting] = useState(false);
     const mounted = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 

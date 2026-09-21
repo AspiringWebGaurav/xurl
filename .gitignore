@@ -22,6 +22,7 @@ next-env.d.ts
 *.tsbuildinfo
 
 # local env files
+.env*
 .env*.local
 .env
 .env.development.local
@@ -31,6 +32,7 @@ next-env.d.ts
 
 # vercel
 .vercel
+.vercel/
 
 # IDEs
 .idea
@@ -103,3 +105,4 @@ playwright/.cache/
 .agents/
 .gemini/
 
+.env*

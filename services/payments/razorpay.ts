@@ -3,23 +3,23 @@ import { PaymentService, CreateOrderParams, OrderResponse } from "./types";
 import Razorpay from "razorpay";
 
 export class RazorpayService implements PaymentService {
-    private client: InstanceType<typeof Razorpay>;
+    private client: InstanceType<typeof Razorpay> | null = null;
 
-    constructor() {
-        const key_id = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
-        const key_secret = process.env.RAZORPAY_KEY_SECRET;
+    private getClient(): InstanceType<typeof Razorpay> {
+        if (!this.client) {
+            const key_id = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+            const key_secret = process.env.RAZORPAY_KEY_SECRET;
 
-        if (!key_id || !key_secret) {
-            if (process.env.NODE_ENV === "production") {
-                throw new Error("FATAL: NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set in production.");
+            if (!key_id || !key_secret) {
+                throw new Error("Razorpay credentials (NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET) are not configured.");
             }
-            console.warn("⚠️ Razorpay credentials not configured. Payment features will be unavailable.");
-        }
 
-        this.client = new Razorpay({
-            key_id: key_id || "missing_key_id",
-            key_secret: key_secret || "missing_key_secret"
-        });
+            this.client = new Razorpay({
+                key_id,
+                key_secret,
+            });
+        }
+        return this.client;
     }
 
     async createOrder(params: CreateOrderParams): Promise<OrderResponse> {
@@ -36,7 +36,7 @@ export class RazorpayService implements PaymentService {
 
         // 10s timeout to prevent indefinite hangs from slow Razorpay API
         const order = await Promise.race([
-            this.client.orders.create(options),
+            this.getClient().orders.create(options),
             new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error("Razorpay order creation timed out (10s)")), 10_000)
             ),

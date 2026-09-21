@@ -4,11 +4,9 @@ import "./globals.css";
 import { BanGuard } from "@/components/layout/BanGuard";
 import { KillSwitchGuard } from "@/components/layout/KillSwitchGuard";
 import { PartialOfferNotificationBanner } from "@/components/layout/PartialOfferNotificationBanner";
-import { getKillSwitchState } from "@/lib/services/kill-switch";
 import { Toaster } from "@/components/ui/sonner";
 import { seo } from "@/lib/seo";
 import { StructuredData } from "@/components/seo/StructuredData";
-import { headers, cookies } from "next/headers";
 import { ConfirmLinkProvider } from "@/components/providers/ConfirmLinkProvider";
 import { RouteLoaderProvider } from "@/components/providers/RouteLoaderProvider";
 import { ClientTelemetryProvider } from "@/components/providers/ClientTelemetryProvider";
@@ -65,20 +63,11 @@ export const metadata: Metadata = {
     },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
     children,
 }: Readonly<{
     children: React.ReactNode;
 }>) {
-    const headersList = await headers();
-    const isMobileDevice = headersList.get('x-is-mobile-device') === 'true';
-
-    const cookieStore = await cookies();
-    const isKnownBanned = cookieStore.get("xurl_known_banned")?.value === "true";
-
-    const killSwitchState = await getKillSwitchState();
-    const initialKillSwitchActive = Boolean(killSwitchState?.active);
-
     return (
         <html lang="en" suppressHydrationWarning>
             <head>
@@ -88,9 +77,9 @@ export default async function RootLayout({
                 <ClientTelemetryProvider>
                     <RouteLoaderProvider />
                     <StructuredData />
-                    <KillSwitchGuard initialKillSwitchActive={initialKillSwitchActive}>
+                    <KillSwitchGuard>
                         <ConfirmLinkProvider>
-                            <BanGuard isMobileDevice={isMobileDevice} initiallyBanned={isKnownBanned}>
+                            <BanGuard>
                                 <PartialOfferNotificationBanner />
                                 {children}
                             </BanGuard>

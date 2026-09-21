@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { LegalPageShell } from "@/components/layout/LegalPageShell";
 import { seo } from "@/lib/seo";
 import { getAllPolicies } from "@/services/policies";
@@ -16,8 +15,6 @@ export const metadata: Metadata = {
 };
 
 export default async function TotalPolicyPage() {
-    const headersList = await headers();
-    const isMobileDevice = headersList.get("x-is-mobile-device") === "true";
     const policies = await getAllPolicies();
 
     return (
@@ -59,7 +56,12 @@ export default async function TotalPolicyPage() {
                     ))}
                 </div>
             </main>
-            {isMobileDevice ? <MobileFooter /> : <HomeFooter />}
+            <div className="block md:hidden">
+                <MobileFooter />
+            </div>
+            <div className="hidden md:block">
+                <HomeFooter />
+            </div>
         </div>
     );
 }

@@ -17,7 +17,7 @@ interface LegalPageShellProps {
     isMobileDevice?: boolean;
 }
 
-export function LegalPageShell({ title, lastUpdated, sections, isMobileDevice = false }: LegalPageShellProps) {
+export function LegalPageShell({ title, lastUpdated, sections }: LegalPageShellProps) {
     return (
         <div className="flex flex-col min-h-[100dvh] bg-background">
             <TopNavbar isCreateDisabled={false} />
@@ -57,7 +57,12 @@ export function LegalPageShell({ title, lastUpdated, sections, isMobileDevice = 
                     ))}
                 </div>
             </main>
-            {isMobileDevice ? <MobileFooter /> : <HomeFooter />}
+            <div className="block md:hidden">
+                <MobileFooter />
+            </div>
+            <div className="hidden md:block">
+                <HomeFooter />
+            </div>
         </div>
     );
 }

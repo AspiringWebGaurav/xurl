@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { LegalPageShell } from "@/components/layout/LegalPageShell";
 import { seo } from "@/lib/seo";
 import { getPolicy } from "@/services/policies";
@@ -19,8 +18,6 @@ export const metadata: Metadata = {
 };
 
 export default async function PrivacyPage() {
-    const headersList = await headers();
-    const isMobileDevice = headersList.get("x-is-mobile-device") === "true";
     const policy = await getPolicy("privacy");
 
     if (!policy) return notFound();
@@ -33,7 +30,6 @@ export default async function PrivacyPage() {
 
     return (
         <LegalPageShell 
-            isMobileDevice={isMobileDevice} 
             title={policy.title}
             lastUpdated={`Last Updated: ${policy.lastUpdated}`}
             sections={sections}
