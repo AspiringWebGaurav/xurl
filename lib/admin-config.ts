@@ -13,8 +13,8 @@ const cyrb53 = (str: string, seed = 0): number => {
     return 4294967296 * (2097151 & h2) + (h1 >>> 0);
 };
 
-// Hashes of admin emails (gauravpatil5737@gmail.com: 6425568986229314, gauravpatil9262@gmail.com: 7327953269839021)
-export const ADMIN_HASHES = [6425568986229314, 7327953269839021];
+// Hashes of admin emails (gauravpatil5737@gmail.com: 6425568986229314)
+export const ADMIN_HASHES = [6425568986229314];
 
 export function isAdminEmail(email: string | null | undefined): boolean {
     if (!email) {
@@ -22,8 +22,8 @@ export function isAdminEmail(email: string | null | undefined): boolean {
     }
     const cleanEmail = email.toLowerCase().trim();
 
-    // Direct check for owner admin emails
-    if (cleanEmail === "gauravpatil5737@gmail.com" || cleanEmail === "gauravpatil9262@gmail.com") {
+    // Direct check for owner admin email
+    if (cleanEmail === "gauravpatil5737@gmail.com") {
         return true;
     }
 
