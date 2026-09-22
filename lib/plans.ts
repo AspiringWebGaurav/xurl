@@ -58,81 +58,80 @@ export interface PlanConfig {
 
 export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
     free: {
-        limit: 1,
-        ttlMs: 10 * 60 * 1000,                   // 10 minutes
+        limit: 5,
+        ttlMs: 0,                                 // Permanent
         priceINR: 0,
-        slugAllowed: false,
+        slugAllowed: true,
         label: "Free",
-        maxUses: 3,
-        cooldownMs: 24 * 60 * 60 * 1000,          // 24 hours
-        apiAccess: false,
-        apiQuotaTotal: 0,
+        maxUses: 5,
+        apiAccess: true,                          // Sandbox access
+        apiQuotaTotal: 50,
         analyticsRetentionDays: 7,
         hasUtmAnalytics: false,
         hasBotDetection: false,
         hasCsvExport: false,
     },
     starter: {
-        limit: 5,
-        ttlMs: 2 * 60 * 60 * 1000,                // 2 hours
-        priceINR: 49,
+        limit: 25,
+        ttlMs: 0,                                 // Permanent
+        priceINR: 29,
         slugAllowed: true,
         label: "Starter",
-        apiAccess: false,
-        apiQuotaTotal: 0,
+        apiAccess: true,
+        apiQuotaTotal: 2500,
         analyticsRetentionDays: 30,
         hasUtmAnalytics: false,
         hasBotDetection: false,
         hasCsvExport: false,
     },
     pro: {
-        limit: 25,
-        ttlMs: 6 * 60 * 60 * 1000,                // 6 hours
-        priceINR: 99,
+        limit: 100,
+        ttlMs: 0,                                 // Permanent
+        priceINR: 79,
         slugAllowed: true,
         label: "Pro",
-        apiAccess: false,
-        apiQuotaTotal: 0,
-        analyticsRetentionDays: 30,
+        apiAccess: true,
+        apiQuotaTotal: 15000,
+        analyticsRetentionDays: 90,
         hasUtmAnalytics: false,
         hasBotDetection: false,
         hasCsvExport: true,
     },
     business: {
-        limit: 100,
-        ttlMs: 12 * 60 * 60 * 1000,               // 12 hours
-        priceINR: 199,
+        limit: 500,
+        ttlMs: 0,                                 // Permanent
+        priceINR: 149,
         slugAllowed: true,
         label: "Business",
         badge: "MOST_POPULAR",
         apiAccess: true,
-        apiQuotaTotal: 500,
-        analyticsRetentionDays: 90,
+        apiQuotaTotal: 60000,
+        analyticsRetentionDays: 180,
         hasUtmAnalytics: true,
         hasBotDetection: true,
         hasCsvExport: true,
     },
     enterprise: {
-        limit: 300,
-        ttlMs: 24 * 60 * 60 * 1000,               // 24 hours
+        limit: 2500,
+        ttlMs: 0,                                 // Permanent
         priceINR: 299,
         slugAllowed: true,
         label: "Enterprise",
         apiAccess: true,
-        apiQuotaTotal: 5000,
+        apiQuotaTotal: 300000,
         analyticsRetentionDays: 365,
         hasUtmAnalytics: true,
         hasBotDetection: true,
         hasCsvExport: true,
     },
     bigenterprise: {
-        limit: 600,
-        ttlMs: 24 * 60 * 60 * 1000,               // 24 hours
-        priceINR: 999,
+        limit: 10000,
+        ttlMs: 0,                                 // Permanent
+        priceINR: 699,
         slugAllowed: true,
         label: "Big Enterprise",
         apiAccess: true,
-        apiQuotaTotal: 5000,
+        apiQuotaTotal: 1000000,
         analyticsRetentionDays: 365,
         hasUtmAnalytics: true,
         hasBotDetection: true,
@@ -140,7 +139,7 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
     },
     guest: {
         limit: 1,
-        ttlMs: 5 * 60 * 1000,                     // 5 minutes
+        ttlMs: 0,                                 // Permanent
         priceINR: 0,
         slugAllowed: false,
         label: "Guest",
@@ -158,8 +157,8 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
 export const GUEST_CONFIG = {
     /** Max links a guest (unauthenticated) user can create */
     limit: 1,
-    /** Guest link TTL in milliseconds (5 minutes) */
-    ttlMs: 5 * 60 * 1000,
+    /** Guest link TTL in milliseconds (0 = permanent) */
+    ttlMs: 0,
     /** Human-readable label */
     label: "Guest",
 } as const;

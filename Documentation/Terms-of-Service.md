@@ -1,7 +1,7 @@
 # Terms of Service
 
-**Effective Date:** March 13, 2026
-**Last Updated:** March 13, 2026
+**Effective Date:** September 22, 2026
+**Last Updated:** September 22, 2026
 
 Welcome to XURL. By accessing or using our URL shortening platform ("Service"), you agree to be bound by these Terms of Service ("Terms"). Please read them carefully before using the Service.
 
@@ -14,6 +14,7 @@ XURL is a URL shortening and link management platform that allows users to creat
 - **Guest Access** — Create one short-lived link without an account, subject to automatic expiry.
 - **Free Plan** — Limited link creation with Google sign-in, subject to usage caps and cooldown periods.
 - **Paid Plans** — Enhanced link creation quotas, extended TTLs, custom aliases, and analytics dashboards, available through one-time purchases.
+- **Custom Enterprise** — Bespoke link volume and dedicated API quotas provisioned through our Custom Enterprise proposal and curation lifecycle. Proposals are reviewed by administration, dispatched via email, and claimed via 1-click Razorpay checkout.
 
 ## 2. User Responsibilities
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
+import { getRedisClient, safeRedis } from "@/lib/redis/client";
 
 // ─── Rate limiter for slug checks (self-cleaning) ──────────────────────────
 
@@ -63,6 +64,14 @@ export async function GET(request: NextRequest) {
     }
 
     try {
+        const redis = getRedisClient();
+        if (redis) {
+            const existsInRedis = await safeRedis((c) => c.exists(`slug:${slug}`));
+            if (existsInRedis === 1) {
+                return NextResponse.json({ available: false });
+            }
+        }
+
         const snap = await adminDb.collection("links").doc(slug).get();
         return NextResponse.json({ available: !snap.exists });
     } catch (e) {

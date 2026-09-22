@@ -60,8 +60,19 @@ function evictStaleEntries(now: number): void {
 
 // ─── Public API ─────────────────────────────────────────────────────────────
 
-export function rateLimitLinkCreation(userId: string) {
-    return checkLimit(`link_create:${userId}`, MAX_LINK_CREATIONS);
+export function rateLimitLinkCreation(userId: string, isApi?: boolean, plan?: string) {
+    let max = MAX_LINK_CREATIONS;
+    if (isApi) {
+        if (plan === "bigenterprise") max = 5000;
+        else if (plan === "enterprise") max = 2000;
+        else if (plan === "business") max = 600;
+        else if (plan === "pro") max = 300;
+        else if (plan === "starter") max = 120;
+        else max = 30;
+    } else if (plan && plan !== "guest" && plan !== "free") {
+        max = 60;
+    }
+    return checkLimit(`link_create:${userId}`, max);
 }
 
 export function rateLimitAnalyticsWrite(slug: string) {

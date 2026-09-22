@@ -88,15 +88,19 @@ Most URL shorteners are either too simple (no analytics, no auth) or too bloated
 - **Razorpay Integration** — Secure checkout with webhook verification
 - **Idempotent Orders** — No double-charges, ever
 - **Cumulative Quotas** — Each purchase adds to your total permanently
+- **Custom Enterprise Proposals** — Submit custom volume & pricing requirements
+- **Curated Plan Lifecycle** — Real-time rendering of admin-approved custom tiers with 1-click Razorpay claim
 - **Promo Codes** — Percentage, fixed, and free-plan discounts
 - **Plan Grants** — Admin-issued plans with custom durations
 
 </td>
 <td width="50%">
 
-**Developer Experience**
+**Developer Experience & Privacy**
 - **Developer API** — RESTful endpoints with key-based auth
-- **Admin Console** — Promo CRUD, plan grants, user management
+- **Admin Console** — Custom pricing curation, data requests, promo CRUD, plan grants
+- **Data Privacy & GDPR** — Self-service data export portal and Right to Erasure deletion requests
+- **Multi-Tier Anti-Abuse** — Sliding window IP & email rate limiting, duplicate spam prevention
 - **Developer Mode** — Simulated payments for local testing
 - **Full TypeScript** — End-to-end type safety
 - **MDX-Ready Docs** — Modular documentation architecture
@@ -144,7 +148,7 @@ Most URL shorteners are either too simple (no analytics, no auth) or too bloated
 | Tier | Layer | TTL | Latency |
 | :--: | --- | --- | --- |
 | 1 | **Edge in-memory** — Process-local cache | 5 min | < 1 ms |
-| 2 | **Redis** — Distributed via Upstash | 1 hr (positive) · 2 min (negative) | ~ 5 ms |
+| 2 | **Redis** — Distributed via Upstash (Singleton client) | 1 hr (positive) · 2 min (negative) | ~ 5 ms |
 | 3 | **Firestore** — Source of record | Permanent until expiry | ~ 50 ms |
 
 > For the full system design, data flows, and caching strategy, see **[Architecture Documentation](Documentation/Architecture.md)**.
@@ -185,8 +189,10 @@ Most URL shorteners are either too simple (no analytics, no auth) or too bloated
 | **Business** | 199 | 100 | 12 hr | Yes | Yes |
 | **Enterprise** | 299 | 300 | 24 hr | Yes | Yes |
 | **Big Enterprise** | 999 | 600 | 24 hr | Yes | Yes |
+| **Custom Enterprise** | *Proposed* | Up to 500M | Custom | Yes | Dedicated |
 
 > **Cumulative quotas** — Each purchase adds to your total permanently. No subscriptions, no recurring charges.
+> **Custom Enterprise** — Submit custom volume proposals via `/pricing` or `/mobile/plan`. Once curated by administrators, claim via 1-click Razorpay checkout.
 
 ---
 

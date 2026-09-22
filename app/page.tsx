@@ -11,6 +11,8 @@ import { ArrowRight, Check } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { PLAN_CONFIGS, PlanConfig } from "@/lib/plans";
 import { Logo } from "@/components/ui/Logo";
+import { cn } from "@/lib/utils";
+import { usePlansOffer } from "@/lib/hooks/usePlansOffer";
 
 // Hook to detect low-end devices and mobile screens
 function useDeviceCapabilities() {
@@ -97,17 +99,34 @@ export default function LandingPage() {
     const { isMobile, isLowEnd, isMounted } = useDeviceCapabilities();
     const [user, setUser] = useState<User | null>(null);
     const [userPlan, setUserPlan] = useState<string>("guest");
+    const { hasOffer, offer } = usePlansOffer();
 
     useEffect(() => {
         const fetchPlan = async (u: User) => {
             try {
-                const token = await u.getIdToken(true);
+                // Check if already in sessionStorage for instant render
+                if (typeof window !== "undefined") {
+                    const cachedQuotaStr = sessionStorage.getItem("xurl_cached_quota");
+                    const cachedUid = sessionStorage.getItem("xurl_cached_uid");
+                    if (cachedQuotaStr && cachedUid === u.uid) {
+                        try {
+                            const parsed = JSON.parse(cachedQuotaStr);
+                            if (parsed.plan) setUserPlan(parsed.plan.toLowerCase());
+                        } catch {}
+                    }
+                }
+
+                const token = await u.getIdToken();
                 const res = await fetch("/api/links?pageSize=1", { headers: { Authorization: `Bearer ${token}` } });
                 const data = await res.json();
                 if (data.plan) {
                     setUserPlan(data.plan.toLowerCase());
                 } else {
                     setUserPlan("free");
+                }
+                if (typeof window !== "undefined" && data) {
+                    sessionStorage.setItem("xurl_cached_quota", JSON.stringify(data));
+                    sessionStorage.setItem("xurl_cached_uid", u.uid);
                 }
             } catch {
                 setUserPlan("free");
@@ -215,7 +234,7 @@ export default function LandingPage() {
             </div>
 
             {/* Main Hero Area */}
-            <main className="w-full h-[100dvh] pt-14 pb-8 sm:pb-0 relative overflow-hidden flex flex-col items-center justify-between sm:justify-center">
+            <main className="w-full flex-1 min-h-0 pt-14 relative overflow-hidden flex flex-col items-center justify-center">
                 {/* Silent Drifting Animated Background Orbs */}
                 <motion.div
                     animate={{
@@ -245,22 +264,22 @@ export default function LandingPage() {
                 />
 
                 {/* Background 3D Carousel */}
-                <div className="absolute inset-0 z-0 flex items-center justify-center opacity-60 sm:opacity-65">
+                <div className="absolute inset-0 z-0 flex items-center justify-center opacity-20 sm:opacity-65 transition-opacity duration-500">
                     {isMounted && (
                         <TiltedCarousel 
                             className="bg-slate-50" 
                             items={items} 
                             pauseOnHover={false} 
                             speed={45} 
-                            preset={isMobile ? "cinematic" : "isometric"} // Less extreme 3D angle on mobile
+                            preset="isometric" // Angled 3D ribbons so cards don't clash flat against text
                             multiplier={isConstrained ? 4 : 8}            // Half the clones on low-end/mobile
                             rows={isMobile ? 3 : 4}                       // Less rows on mobile
                         />
                     )}
                     {/* Gradient Overlay for readability and premium feel */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-slate-50/80 to-slate-50/40 z-10 pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-slate-50/90 to-slate-50/60 sm:via-slate-50/80 sm:to-slate-50/40 z-10 pointer-events-none" />
                     {/* Radial gradient to focus on the center */}
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0)_0%,rgba(248,250,252,0.95)_100%)] z-10" />
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(248,250,252,0.85)_0%,rgba(248,250,252,0.98)_100%)] sm:bg-[radial-gradient(circle_at_center,rgba(255,255,255,0)_0%,rgba(248,250,252,0.95)_100%)] z-10 pointer-events-none" />
                 </div>
 
                 {/* Desktop Hero Content */}
@@ -299,6 +318,8 @@ export default function LandingPage() {
                             ? { label: "View Pricing", href: "/pricing" }
                             : { label: "View Analytics", href: "/analytics" };
 
+                        const isPricingBtn = secondaryBtn.href === "/pricing";
+
                         return (
                             <div className="flex flex-row items-center gap-4 w-auto justify-center mb-8">
                                 <Link href={primaryBtn.href} onClick={(e) => handleNavigation(e, primaryBtn.href)}>
@@ -321,9 +342,19 @@ export default function LandingPage() {
                                     <Button
                                         size="lg"
                                         variant="outline"
-                                        className="h-14 px-9 text-base font-semibold bg-white/90 text-slate-700 border-slate-200/80 rounded-full shadow-sm hover:shadow-md hover:text-slate-900 hover:bg-white hover:scale-102 transition-all duration-200 active:scale-95"
+                                        className={cn(
+                                            "h-14 px-9 text-base font-semibold rounded-full shadow-sm hover:scale-102 transition-all duration-200 active:scale-95 flex items-center gap-2",
+                                            (isPricingBtn && hasOffer)
+                                                ? "bg-gradient-to-r from-amber-50 via-rose-50 to-orange-50 text-amber-950 border-2 border-amber-400/80 shadow-[0_0_25px_rgba(245,158,11,0.35)] hover:shadow-[0_0_35px_rgba(245,158,11,0.5)] hover:bg-white ring-2 ring-amber-400/30"
+                                                : "bg-white/90 text-slate-700 border-slate-200/80 hover:shadow-md hover:text-slate-900 hover:bg-white"
+                                        )}
                                     >
-                                        {secondaryBtn.label}
+                                        <span>{secondaryBtn.label}</span>
+                                        {isPricingBtn && hasOffer && (
+                                            <span className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[11px] font-extrabold tracking-wide uppercase shadow-xs animate-pulse">
+                                                {offer?.badgeText ? `🔥 ${offer.badgeText}` : "🔥 Offer"}
+                                            </span>
+                                        )}
                                     </Button>
                                 </Link>
                             </div>
@@ -340,28 +371,30 @@ export default function LandingPage() {
                     </div>
                 </div>
 
-                {/* Dedicated Mobile Hero Content */}
-                <div className="flex sm:hidden relative z-20 flex-col items-center justify-center text-center px-4 pt-14 pb-12 w-full h-[calc(100dvh-3.5rem)] gap-4 mx-auto my-auto overflow-hidden">
+                {/* Dedicated Mobile Hero Content - 100% Single View, Natural Cohesive Rhythm, Zero Scroll */}
+                <div className="flex sm:hidden relative z-20 flex-col items-center justify-between text-center px-4 w-full h-full max-w-[380px] mx-auto py-3 min-[390px]:py-5 min-[420px]:py-7 overflow-hidden">
                     {/* Unique Magic Badge */}
-                    <div className="relative inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md border border-emerald-500/30 text-emerald-700 text-[10px] font-semibold shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                        <span className="relative flex h-1.5 w-1.5">
+                    <div className="relative inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-emerald-500/30 text-emerald-700 text-xs font-semibold shadow-[0_0_15px_rgba(16,185,129,0.18)] shrink-0">
+                        <span className="relative flex h-2 w-2">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                         </span>
-                        <span className="relative z-10 tracking-wide">The Ultimate URL Shortener</span>
-                        <ArrowRight className="w-3 h-3 text-emerald-600" />
+                        <span className="relative z-10 tracking-wide font-bold">The Ultimate URL Shortener</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-emerald-600" />
                     </div>
                     
-                    <h1 className="text-2xl min-[375px]:text-3xl font-black text-slate-900 tracking-tighter leading-[1.15]">
-                        Shorten your URL, <br />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600">
-                            Expand your reach.
-                        </span>
-                    </h1>
-                    
-                    <p className="text-xs text-slate-600 font-medium max-w-[270px] leading-relaxed">
-                        Turn long URLs into clean, shareable links with custom aliases and analytics.
-                    </p>
+                    {/* Grand Headline & Statement Subtitle Group */}
+                    <div className="flex flex-col items-center gap-2.5 min-[390px]:gap-3 shrink-0">
+                        <h1 className="text-[34px] min-[390px]:text-[40px] min-[420px]:text-[44px] font-black text-slate-900 tracking-tight leading-[1.08] drop-shadow-sm">
+                            Shorten your URL, <br />
+                            <span className="text-transparent bg-clip-text bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600">
+                                Expand your reach.
+                            </span>
+                        </h1>
+                        <p className="text-[13px] min-[390px]:text-sm text-slate-600 font-medium max-w-[310px] min-[390px]:max-w-[340px] leading-relaxed">
+                            Turn long URLs into clean, shareable links with custom aliases and real-time analytics.
+                        </p>
+                    </div>
 
                     {/* Mobile Action Button Row */}
                     {(() => {
@@ -375,35 +408,63 @@ export default function LandingPage() {
                             ? { label: "View Pricing", href: "/pricing" }
                             : { label: "Analytics", href: "/analytics" };
 
+                        const isPricingBtn = secondaryBtn.href === "/pricing";
+
                         return (
-                            <div className="flex flex-row items-center gap-2 w-full max-w-[320px] justify-center mt-1">
+                            <div className="flex flex-row items-center gap-3 w-full max-w-[330px] min-[390px]:max-w-[350px] justify-center shrink-0">
                                 <Link href={primaryBtn.href} onClick={(e) => handleNavigation(e, primaryBtn.href)} className="flex-1">
                                     <Button
                                         size="sm"
-                                        className="w-full h-10 px-3 text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-full shadow-[0_0_20px_rgba(16,185,129,0.4)] active:scale-95 flex items-center justify-center gap-1"
+                                        className="w-full h-12 min-[390px]:h-13 px-4 text-xs min-[390px]:text-sm font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 text-white rounded-full shadow-[0_0_22px_rgba(16,185,129,0.38)] active:scale-95 flex items-center justify-center gap-2 border border-emerald-400/30"
                                     >
                                         <span>{primaryBtn.labelMobile}</span>
-                                        <ArrowRight className="w-3.5 h-3.5" />
+                                        <ArrowRight className="w-4 h-4" />
                                     </Button>
                                 </Link>
                                 <Link href={secondaryBtn.href} onClick={(e) => handleNavigation(e, secondaryBtn.href)} className="flex-1">
                                     <Button
                                         size="sm"
                                         variant="outline"
-                                        className="w-full h-10 px-3 text-xs font-semibold bg-white/90 text-slate-700 border-slate-200/80 rounded-full shadow-sm active:scale-95"
+                                        className={cn(
+                                            "w-full h-12 min-[390px]:h-13 px-3 text-xs min-[390px]:text-sm font-semibold rounded-full shadow-xs active:scale-95 flex items-center justify-center gap-1.5 transition-all",
+                                            (isPricingBtn && hasOffer)
+                                                ? "bg-gradient-to-r from-amber-50 via-rose-50 to-orange-50 text-amber-950 border-2 border-amber-400/80 shadow-[0_0_15px_rgba(245,158,11,0.25)] ring-1 ring-amber-400/40 font-bold"
+                                                : "bg-white/90 text-slate-700 border-slate-200/90 hover:bg-white"
+                                        )}
                                     >
-                                        {secondaryBtn.label}
+                                        <span>{secondaryBtn.label}</span>
+                                        {isPricingBtn && hasOffer && (
+                                            <span className="px-1.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[9px] font-black uppercase shadow-xs animate-pulse">
+                                                {offer?.badgeText ? offer.badgeText : "Offer"}
+                                            </span>
+                                        )}
                                     </Button>
                                 </Link>
                             </div>
                         );
                     })()}
 
+                    {/* 3-Column Micro Value Props */}
+                    <div className="grid grid-cols-3 gap-2 w-full max-w-[330px] min-[390px]:max-w-[350px] shrink-0">
+                        <div className="flex flex-col items-center justify-center py-2.5 min-[390px]:py-3 px-1.5 bg-white/80 backdrop-blur-md rounded-2xl border border-slate-200/80 text-center shadow-xs">
+                            <span className="text-xs min-[390px]:text-[13px] font-bold text-slate-800">⚡ &lt;15ms</span>
+                            <span className="text-[9px] min-[390px]:text-[10px] text-slate-500 font-medium">Redirects</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center py-2.5 min-[390px]:py-3 px-1.5 bg-white/80 backdrop-blur-md rounded-2xl border border-slate-200/80 text-center shadow-xs">
+                            <span className="text-xs min-[390px]:text-[13px] font-bold text-slate-800">📊 Real-time</span>
+                            <span className="text-[9px] min-[390px]:text-[10px] text-slate-500 font-medium">Analytics</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center py-2.5 min-[390px]:py-3 px-1.5 bg-white/80 backdrop-blur-md rounded-2xl border border-slate-200/80 text-center shadow-xs">
+                            <span className="text-xs min-[390px]:text-[13px] font-bold text-slate-800">🔒 99.99%</span>
+                            <span className="text-[9px] min-[390px]:text-[10px] text-slate-500 font-medium">Uptime</span>
+                        </div>
+                    </div>
+
                     {/* Mobile Live Trust Stats */}
-                    <div className="flex items-center justify-center gap-2 text-[10px] font-semibold text-slate-600 bg-white/80 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-slate-200/70 shadow-sm mt-1">
-                        <span className="flex items-center gap-1"><span className="text-amber-500">⚡</span> 5M+ Shortened</span>
+                    <div className="flex items-center justify-center gap-2.5 text-[11px] font-semibold text-slate-600 bg-white/85 backdrop-blur-md px-4 py-1.5 rounded-full border border-slate-200/80 shadow-xs shrink-0">
+                        <span className="flex items-center gap-1.5"><span className="text-amber-500">⚡</span> 5M+ Shortened</span>
                         <span className="text-slate-300">•</span>
-                        <span className="flex items-center gap-1"><span className="text-emerald-500">🔒</span> 99.99% Uptime</span>
+                        <span className="flex items-center gap-1.5"><span className="text-emerald-500">🔒</span> Enterprise SLA</span>
                     </div>
                 </div>
             </main>

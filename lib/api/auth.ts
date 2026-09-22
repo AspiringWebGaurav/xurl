@@ -8,6 +8,7 @@ export interface ApiAuthSuccess {
     ok: true;
     requestId: string;
     userId: string;
+    apiKeyHash: string;
     plan: ReturnType<typeof resolvePlanType>;
     quotaUsage: number;
     quotaTotal: number;
@@ -85,9 +86,19 @@ export async function authenticateApiRequest(authorizationHeader: string | null)
         const now = Date.now();
         const plan = resolvePlanType(user.plan);
         const isExpired = plan !== "free" && !!user.planExpiry && user.planExpiry < now;
-        const effectivePlan = isExpired ? "free" : plan;
+
+        if (isExpired) {
+            return {
+                ok: false,
+                status: 402,
+                error: "Subscription expired. Your permanent links remain active, but monthly API access is paused. Please renew your subscription to resume API calls.",
+                requestId,
+            } satisfies ApiAuthFailure;
+        }
+
+        const effectivePlan = plan;
         const config = PLAN_CONFIGS[effectivePlan];
-        const apiEnabled = Boolean(!isExpired && user.apiEnabled && config.apiAccess);
+        const apiEnabled = Boolean(user.apiEnabled && config.apiAccess);
         const quotaTotal = user.apiQuotaTotal || config.apiQuotaTotal || 0;
         const quotaUsed = user.apiRequestsUsed || 0;
 
@@ -132,6 +143,7 @@ export async function authenticateApiRequest(authorizationHeader: string | null)
             ok: true,
             requestId,
             userId: user.uid || userRef.id,
+            apiKeyHash,
             plan: effectivePlan,
             quotaUsage,
             quotaTotal,

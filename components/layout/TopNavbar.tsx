@@ -45,6 +45,7 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { NotificationDropdown } from "@/components/notifications/NotificationDropdown";
 import type { NotificationRecord } from "@/components/notifications/NotificationItem";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import { usePlansOffer } from "@/lib/hooks/usePlansOffer";
 
 interface TopNavbarProps {
     isCreateDisabled?: boolean;
@@ -87,7 +88,10 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
     const pathname = usePathname();
     const router = useRouter();
     const isAdminPage = pathname?.startsWith("/admin");
-    const pricingLabels = ["Pricing", "Plans"] as const;
+    const { hasOffer, offer } = usePlansOffer();
+    const pricingLabels = hasOffer
+        ? (["Plans", "Offer 🔥", "Pricing"] as const)
+        : (["Pricing", "Plans"] as const);
     const isDevEnv = process.env.NODE_ENV === "development";
     const isDeveloper = isAdminEmail(user?.email);
 
@@ -323,7 +327,6 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                         if (newDocSig !== prevDocSig) {
                             prevDocSig = newDocSig;
                             window.dispatchEvent(new CustomEvent("userProfileUpdated", { detail: userData }));
-                            window.dispatchEvent(new Event("linkGenerated"));
                         }
                     }
                 }, (error) => {
@@ -607,7 +610,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
     };
 
     const navActionBase =
-        "inline-flex h-9 items-center justify-center rounded-lg px-4 text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.98]";
+        "inline-flex h-8 sm:h-9 items-center justify-center rounded-lg px-2.5 sm:px-4 text-xs sm:text-[13px] font-medium transition-all duration-200 ease-out active:scale-[0.98]";
     
     const isLanding = pathname === "/";
     const primaryAction =
@@ -625,7 +628,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                 ? "bg-transparent border-transparent" 
                 : "border-b border-border/40 bg-background/40 backdrop-blur-xl dark:bg-slate-950/40 dark:border-white/10"
         )}>
-            <div className="flex flex-1 items-center gap-3">
+            <div className="flex sm:flex-1 items-center gap-3 shrink-0">
                 <div className="transition-all duration-300">
                     <Logo 
                         size="md" 
@@ -689,34 +692,44 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                 )}
             </div>
 
-            <div className="flex flex-1 items-center justify-center">
+            <div className="hidden sm:flex flex-1 items-center justify-center">
                 {isDevEnv && isDeveloper && (
                     <DeveloperModeToggle visible={true} />
                 )}
             </div>
 
-            <div className="flex flex-1 items-center justify-end gap-1.5 sm:gap-2.5">
+            <div className="flex sm:flex-1 items-center justify-end gap-1.5 sm:gap-2.5 ml-auto">
                 {pathname === "/" || pathname === "/app" ? (
                     <Link
                         href="/pricing"
                         className={cn(
                             navActionBase,
-                            secondaryAction
+                            hasOffer
+                                ? "border border-amber-400/80 bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-amber-500/15 text-amber-900 dark:text-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.25)] hover:border-amber-400 hover:shadow-[0_0_20px_rgba(245,158,11,0.4)] relative"
+                                : secondaryAction
                         )}
                         onMouseEnter={() => setIsPricingHovered(true)}
                         onMouseLeave={() => setIsPricingHovered(false)}
                     >
-                        <span className="relative inline-flex h-5 w-[44px] items-center justify-center overflow-hidden">
+                        {hasOffer && (
+                            <span className="absolute -top-1.5 -right-1 px-1.5 py-[0.5px] rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[8px] font-black tracking-wider uppercase shadow-xs animate-pulse">
+                                {offer?.badgeText ? offer.badgeText : "Offer"}
+                            </span>
+                        )}
+                        <span className="relative inline-flex h-5 w-[44px] sm:w-[48px] items-center justify-center overflow-hidden">
                             <AnimatePresence mode="wait" initial={false}>
                                 <motion.span
-                                    key={pricingLabels[pricingLabelIndex]}
+                                    key={pricingLabels[pricingLabelIndex % pricingLabels.length]}
                                     initial={{ opacity: 0, y: 6 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -6 }}
                                     transition={{ duration: 0.22, ease: "easeOut" }}
-                                    className="absolute inset-0 inline-flex items-center justify-center"
+                                    className={cn(
+                                        "absolute inset-0 inline-flex items-center justify-center",
+                                        hasOffer && "font-bold text-amber-900 dark:text-amber-200"
+                                    )}
                                 >
-                                    {pricingLabels[pricingLabelIndex]}
+                                    {pricingLabels[pricingLabelIndex % pricingLabels.length]}
                                 </motion.span>
                             </AnimatePresence>
                         </span>
@@ -759,7 +772,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                         )}
                     >
                         <BarChart3 className="w-3.5 h-3.5" />
-                        <span className="text-[13px] font-medium hidden min-[360px]:inline">Stats</span>
+                        <span className="text-xs font-medium hidden min-[360px]:inline">Stats</span>
                     </Link>
                 )}
 
@@ -865,7 +878,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                                                 </motion.div>
                                             )}
                                         </AnimatePresence>
-                                        {hasNewHistory && (
+                                        {hasNewHistory && linkCount !== null && linkCount > 0 && (
                                             <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
                                         )}
                                     </button>
@@ -1135,7 +1148,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                                 className={cn(
                                     navActionBase,
                                     primaryAction,
-                                    "min-w-[96px] px-4 disabled:opacity-80 disabled:hover:shadow-sm"
+                                    "min-w-[76px] sm:min-w-[96px] px-3 sm:px-4 disabled:opacity-80 disabled:hover:shadow-sm"
                                 )}
                             >
                                 {isLoggingIn ? "Connecting..." : "Login"}

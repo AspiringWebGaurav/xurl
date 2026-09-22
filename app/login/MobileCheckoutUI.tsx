@@ -8,6 +8,7 @@ import { PLAN_CONFIGS, resolvePlanType } from "@/lib/plans";
 
 import { useCheckout } from "./useCheckout";
 import { UpgradeNavbar } from "@/components/layout/UpgradeNavbar";
+import { UserAvatar } from "@/components/shared/UserAvatar";
 
 type CheckoutState = ReturnType<typeof useCheckout>;
 
@@ -16,6 +17,10 @@ export function MobileCheckoutUI(props: CheckoutState) {
         user, isUpgrading, paymentState, appliedPromo, setAppliedPromo,
         renewalData, planKey, planContext, planDisplayName, handlePurchase, handleLogin, isLoggingIn, router
     } = props;
+
+    const finalPrice = planKey && planKey !== 'free' 
+        ? (appliedPromo ? appliedPromo.finalAmount / 100 : PLAN_CONFIGS[resolvePlanType(planKey)].priceINR)
+        : 0;
 
     return (
         <div className="flex h-[100dvh] w-full flex-col bg-slate-50 overflow-hidden">
@@ -120,27 +125,53 @@ export function MobileCheckoutUI(props: CheckoutState) {
                 </div>
 
                 {/* Bottom Docked Section */}
-                <div className="w-full shrink-0 flex flex-col gap-3 pt-4 border-t border-slate-200">
+                <div className="w-full shrink-0 flex flex-col gap-3 pt-3 border-t border-slate-200">
                     {user ? (
-                        <Button
-                            onClick={handlePurchase}
-                            disabled={isUpgrading}
-                            className="h-14 w-full rounded-[16px] bg-slate-900 text-base font-semibold text-slate-50 shadow-lg shadow-slate-900/20 active:scale-[0.98]"
-                        >
-                            {isUpgrading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-                            {isUpgrading ? "Processing..." : (planKey === 'free' ? "Claim Free Plan" : (renewalData?.isRenewal ? "Renew Now" : "Complete Purchase"))} 
-                            {!isUpgrading && <ArrowRight className="ml-2 h-5 w-5 opacity-70" />}
-                        </Button>
+                        <>
+                            <div className="flex items-center justify-between px-1">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <UserAvatar user={user} className="h-6 w-6 text-[10px] shrink-0" />
+                                    <p className="text-xs font-semibold text-slate-700 truncate">
+                                        {user.displayName || user.email}
+                                    </p>
+                                </div>
+                                <span className="rounded-full bg-emerald-50 border border-emerald-200/80 px-2 py-0.2 text-[9px] font-bold text-emerald-700 shrink-0">
+                                    Connected
+                                </span>
+                            </div>
+                            <Button
+                                onClick={handlePurchase}
+                                disabled={isUpgrading}
+                                className="h-14 w-full rounded-[16px] bg-slate-900 text-base font-semibold text-slate-50 shadow-lg shadow-slate-900/20 active:scale-[0.98]"
+                            >
+                                {isUpgrading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                                {isUpgrading ? (
+                                    "Processing..."
+                                ) : planKey === 'free' ? (
+                                    "Claim Free Plan"
+                                ) : renewalData?.isRenewal ? (
+                                    `Renew for ₹${finalPrice}`
+                                ) : (
+                                    `Pay ₹${finalPrice} via Razorpay`
+                                )} 
+                                {!isUpgrading && <ArrowRight className="ml-2 h-5 w-5 opacity-70" />}
+                            </Button>
+                        </>
                     ) : (
-                        <Button
-                            onClick={handleLogin}
-                            disabled={isLoggingIn}
-                            className="h-14 w-full rounded-[16px] bg-slate-900 text-base font-semibold text-slate-50 shadow-lg shadow-slate-900/20 active:scale-[0.98]"
-                        >
-                            {isLoggingIn ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-                            {isLoggingIn ? "Connecting..." : "Continue with Google"} 
-                            {!isLoggingIn && <ArrowRight className="ml-2 h-5 w-5 opacity-70" />}
-                        </Button>
+                        <div className="flex flex-col gap-2">
+                            <Button
+                                onClick={handleLogin}
+                                disabled={isLoggingIn}
+                                className="h-14 w-full rounded-[16px] bg-slate-900 text-base font-semibold text-slate-50 shadow-lg shadow-slate-900/20 active:scale-[0.98]"
+                            >
+                                {isLoggingIn ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                                {isLoggingIn ? "Connecting..." : "Sign in with Google to Checkout"} 
+                                {!isLoggingIn && <ArrowRight className="ml-2 h-5 w-5 opacity-70" />}
+                            </Button>
+                            <p className="text-center text-[11px] text-slate-500">
+                                🔒 Sign in required to link plan and open Razorpay payment.
+                            </p>
+                        </div>
                     )}
                     
                     {user && planKey !== 'free' && (

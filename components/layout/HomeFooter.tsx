@@ -8,6 +8,7 @@ import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/utils";
 import { ChevronUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { usePlansOffer } from "@/lib/hooks/usePlansOffer";
 
 /* ------------------------------------------------------------------ */
 /*  Link data                                                           */
@@ -73,6 +74,7 @@ export function HomeFooter({ className }: { className?: string } = {}) {
 
     const [expanded, setExpanded] = useState(false);
     const { handleLinkClick } = useConfirmLink();
+    const { hasOffer, offer } = usePlansOffer();
     const footerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -278,7 +280,7 @@ export function HomeFooter({ className }: { className?: string } = {}) {
                                     : "bg-card dark:bg-slate-900 border-t border-x border-border/80 shadow-[0_-25px_60px_-15px_rgba(0,0,0,0.35)]"
                             )}
                         >
-                            <div className="w-full px-10 xl:px-20 pt-8 pb-6">
+                            <div className="w-full px-6 sm:px-10 xl:px-20 pt-6 sm:pt-8 pb-5 sm:pb-6">
                                 {/* Link columns — 4-equal grid on desktop */}
                                 <div className="grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-4">
                                     {footerColumns.map((col) => (
@@ -293,6 +295,7 @@ export function HomeFooter({ className }: { className?: string } = {}) {
                                             <div className="flex flex-col gap-2">
                                                 {col.links.map((link) => {
                                                     const isLegal = link.href === "/terms" || link.href === "/privacy";
+                                                    const isPricing = link.label === "Pricing";
                                                     return (
                                                         <Link
                                                             key={link.href}
@@ -303,9 +306,14 @@ export function HomeFooter({ className }: { className?: string } = {}) {
                                                                     handleLinkClick(e, link.href);
                                                                 }
                                                             }}
-                                                            className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium no-underline"
+                                                            className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium no-underline flex items-center gap-1.5"
                                                         >
-                                                            {link.label}
+                                                            <span>{link.label}</span>
+                                                            {isPricing && hasOffer && (
+                                                                <span className="px-1.5 py-[1px] rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[9px] font-black uppercase shadow-xs animate-pulse">
+                                                                    {offer?.badgeText || "Offer"}
+                                                                </span>
+                                                            )}
                                                         </Link>
                                                     );
                                                 })}

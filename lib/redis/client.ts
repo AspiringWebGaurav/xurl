@@ -1,6 +1,12 @@
 import { Redis } from "@upstash/redis";
 import { logger } from "../utils/logger";
 
+declare global {
+    var __redisInstance: RedisClientWithCircuitBreaker | undefined;
+    var __redisLoggedInit: boolean | undefined;
+    var __redisWarnedMissing: boolean | undefined;
+}
+
 class RedisClientWithCircuitBreaker {
     private client: Redis | null = null;
     private breakerOpen = false;
@@ -13,20 +19,27 @@ class RedisClientWithCircuitBreaker {
     }
 
     private initClient() {
+        if (this.client) return;
+
         const url = process.env.UPSTASH_REDIS_REST_URL || process.env.REDIS_URL;
         const token = process.env.UPSTASH_REDIS_REST_TOKEN || "";
 
         if (!url) {
-            console.warn("UPSTASH_REDIS_REST_URL not configured. Redis protection gateway will be DISABLED.");
+            if (!globalThis.__redisWarnedMissing) {
+                globalThis.__redisWarnedMissing = true;
+                console.warn("UPSTASH_REDIS_REST_URL not configured. Redis protection gateway will be DISABLED.");
+            }
             return;
         }
 
         try {
-            // Depending on if it's Upstash or standard REST fallback
             const options = token ? { url, token } : { url, token: "placeholder" };
-
             this.client = new Redis(options);
-            logger.info("redis_client", "Initialized Upstash Redis client.");
+
+            if (!globalThis.__redisLoggedInit) {
+                globalThis.__redisLoggedInit = true;
+                logger.info("redis_client", "Initialized Upstash Redis client.");
+            }
         } catch (error) {
             logger.error("redis_client", "Failed to initialize Redis client.", { error: error instanceof Error ? error.message : String(error) });
             this.openBreaker();
@@ -68,11 +81,16 @@ class RedisClientWithCircuitBreaker {
         if (this.breakerOpen) {
             return null;
         }
+        if (!this.client) {
+            this.initClient();
+        }
         return this.client;
     }
 }
 
-export const redisInstance = new RedisClientWithCircuitBreaker();
+// Preserve the singleton on globalThis to prevent repeated instantiation during Next.js HMR/route re-evaluations
+export const redisInstance: RedisClientWithCircuitBreaker =
+    globalThis.__redisInstance ?? (globalThis.__redisInstance = new RedisClientWithCircuitBreaker());
 
 export function getRedisClient(): Redis | null {
     return redisInstance.getClient();

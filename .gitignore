@@ -85,6 +85,11 @@ scripts/
 CLAUDE.md
 .claude/
 screenshot/
+clean.mjs
+clean.sh
+total
+total.sh
+total-clean.sh
 
 # database backups
 db-backup-pre-purge.json
@@ -98,10 +103,17 @@ rebuild_*.js
 inject_*.js
 
 # Testing
+tests/
+test/
+__tests__/
+*.test.*
+*.spec.*
 test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+coverage/
+.nyc_output/
 # Local AI Config & Customizations
 .agents/
 .gemini/

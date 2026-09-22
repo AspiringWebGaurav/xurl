@@ -42,16 +42,30 @@ function initializeFirebaseAdmin(): admin.app.App | null {
 // Initialize on module load if credentials are valid
 const defaultApp = initializeFirebaseAdmin();
 
+let firestoreInstance: admin.firestore.Firestore | null = null;
+
+function getFirestoreDb(): admin.firestore.Firestore {
+    if (firestoreInstance) return firestoreInstance;
+    const app = defaultApp || initializeFirebaseAdmin();
+    if (!app) {
+        throw new Error(
+            "Firebase Admin Firestore is not initialized. Please ensure NEXT_PUBLIC_FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are set."
+        );
+    }
+    const db = app.firestore();
+    try {
+        db.settings({ ignoreUndefinedProperties: true });
+    } catch {
+        // settings already applied
+    }
+    firestoreInstance = db;
+    return db;
+}
+
 // Proxied DB accessor that handles lazy initialization or clear error reporting
 export const adminDb: admin.firestore.Firestore = new Proxy({} as admin.firestore.Firestore, {
     get(_target, prop) {
-        const app = defaultApp || initializeFirebaseAdmin();
-        if (!app) {
-            throw new Error(
-                "Firebase Admin Firestore is not initialized. Please ensure NEXT_PUBLIC_FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are set."
-            );
-        }
-        const db = app.firestore();
+        const db = getFirestoreDb();
         const value = (db as unknown as Record<string | symbol, unknown>)[prop];
         return typeof value === "function" ? value.bind(db) : value;
     },

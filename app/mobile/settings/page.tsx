@@ -114,7 +114,7 @@ export default function MobileSettingsPage() {
                             </div>
 
                             <div className="w-full space-y-2.5">
-                                <Link href="/pricing" className="block w-full">
+                                <Link href="/mobile/plan" className="block w-full">
                                     <div className="w-full py-3 bg-primary text-primary-foreground text-[13px] font-bold rounded-full shadow-lg shadow-primary/20 active:scale-[0.98] transition-all">
                                         Unlock API Access
                                     </div>

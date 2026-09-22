@@ -1,15 +1,25 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, ArrowRight, Link2, Clock, ShieldCheck, Zap, X } from "lucide-react";
+import { Loader2, ArrowRight, Link2, Clock, ShieldCheck, Zap, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PromoCodeSection } from "@/components/payments/PromoCodeSection";
 import { getExpiryDisplay } from "./shared";
 import { PLAN_CONFIGS, resolvePlanType } from "@/lib/plans";
-
 import { useCheckout } from "./useCheckout";
-import Link from "next/link";
+import { UserAvatar } from "@/components/shared/UserAvatar";
 
 type CheckoutState = ReturnType<typeof useCheckout>;
+
+function GoogleGIcon() {
+    return (
+        <svg className="h-4.5 w-4.5 mr-2.5 shrink-0" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"/>
+            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.14-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+        </svg>
+    );
+}
 
 export function DesktopCheckoutUI(props: CheckoutState) {
     const {
@@ -17,191 +27,288 @@ export function DesktopCheckoutUI(props: CheckoutState) {
         planKey, planContext, planDisplayName, handlePurchase, handleLogin, isLoggingIn, router
     } = props;
 
+    const finalPrice = planKey && planKey !== 'free' 
+        ? (appliedPromo ? appliedPromo.finalAmount / 100 : PLAN_CONFIGS[resolvePlanType(planKey)].priceINR)
+        : 0;
+
     return (
-        <div className="flex h-full w-full bg-white">
+        <div className="flex h-full w-full bg-slate-50 overflow-hidden select-none">
             
-            {/* LEFT PANEL (Pitch/Benefits) */}
-            <section className="relative flex w-1/2 flex-col justify-between overflow-hidden bg-slate-950 px-16 py-12 text-slate-50">
-                {/* Immersive glow effects */}
-                <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-indigo-500/20 blur-[120px] pointer-events-none" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-500/20 blur-[120px] pointer-events-none" />
+            {/* LEFT PANEL: Deep Cosmic Pitch with Glass Accents */}
+            <section className="relative flex w-1/2 flex-col justify-between overflow-hidden bg-[#070913] px-10 xl:px-14 py-7 xl:py-9 text-slate-50 border-r border-slate-800/40">
+                {/* Vibrant ambient gradients */}
+                <div className="absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full bg-indigo-600/20 blur-[120px] pointer-events-none" />
+                <div className="absolute top-1/2 -right-20 w-[380px] h-[380px] rounded-full bg-emerald-500/15 blur-[120px] pointer-events-none" />
+                <div className="absolute -bottom-24 left-1/3 w-[350px] h-[350px] rounded-full bg-blue-600/15 blur-[100px] pointer-events-none" />
                 
-                {/* Header (Back & Logo) */}
+                {/* Header (Back & Brand) */}
                 <div className="relative z-10 flex items-center justify-between">
-                    <button onClick={() => router.back()} className="flex items-center gap-2 text-slate-400 transition-colors hover:text-white">
-                        <ArrowRight className="h-5 w-5 rotate-180" />
-                        <span className="text-sm font-medium">Back</span>
+                    <button 
+                        onClick={() => router.back()} 
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-800/80 bg-slate-900/40 px-3 py-1.5 text-xs font-semibold text-slate-300 backdrop-blur-md transition-all hover:border-slate-700 hover:bg-slate-800/60 hover:text-white"
+                    >
+                        <ArrowRight className="h-3.5 w-3.5 rotate-180" />
+                        <span>Back</span>
                     </button>
-                    <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-slate-950">
-                            <span className="text-sm font-black">X</span>
+                    
+                    <div className="flex items-center gap-2.5">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-tr from-indigo-500 to-emerald-400 p-[1px] shadow-sm">
+                            <div className="flex h-full w-full items-center justify-center rounded-[7px] bg-[#070913]">
+                                <span className="text-xs font-black text-white">X</span>
+                            </div>
                         </div>
-                        <span className="text-xl font-bold tracking-tight">URL</span>
+                        <span className="text-base font-extrabold tracking-tight text-white">URL</span>
                     </div>
                 </div>
 
-                {/* Main Pitch */}
-                <div className="relative z-10 my-auto flex w-full max-w-lg flex-col gap-10">
+                {/* Center Pitch Content */}
+                <div className="relative z-10 my-auto flex w-full max-w-lg flex-col gap-5 py-2">
                     <motion.div
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.5, ease: "easeOut" }}
-                        className="space-y-4"
+                        initial={{ opacity: 0, y: -12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.35, ease: "easeOut" }}
+                        className="space-y-2.5"
                     >
                         {planContext && (
-                            <div className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/50 px-4 py-1.5 backdrop-blur-md">
-                                <span className="text-[11px] font-bold uppercase tracking-widest text-slate-300">
+                            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 backdrop-blur-md">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                                </span>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-200">
                                     {renewalData?.isRenewal ? `RENEW ${planContext.badgeName}` : planContext.badgeName}
                                 </span>
                             </div>
                         )}
 
                         {planContext ? (
-                            <h1 className="text-6xl font-black leading-tight tracking-[-0.04em]">
+                            <h1 className="text-4xl xl:text-[44px] font-black leading-[1.1] tracking-[-0.035em] text-white">
                                 {renewalData?.isRenewal ? "Renew " : "Upgrade to "} <br />
-                                <span className="bg-[linear-gradient(90deg,#818cf8,#34d399,#fbbf24)] bg-clip-text text-transparent">
+                                <span className="bg-gradient-to-r from-indigo-300 via-emerald-300 to-amber-200 bg-clip-text text-transparent">
                                     {planDisplayName}
                                 </span>
                             </h1>
                         ) : (
-                            <h1 className="text-6xl font-black leading-tight tracking-[-0.04em]">
+                            <h1 className="text-4xl xl:text-[44px] font-black leading-[1.1] tracking-[-0.035em] text-white">
                                 Welcome back
                             </h1>
                         )}
                         
-                        <p className="max-w-[40ch] text-lg leading-relaxed text-slate-400">
+                        <p className="max-w-[42ch] text-xs xl:text-sm leading-relaxed text-slate-400">
                             {user
-                                ? (renewalData?.isRenewal
-                                    ? "Your current usage stays intact. Review the updated limits before continuing."
-                                    : "You're one step away from unlocking premium analytics and massive capacity.")
-                                : planContext?.description}
+                                ? `Signed in as ${user.displayName || user.email}. Review your plan perks and complete your purchase below.`
+                                : "Everything included with your plan. Instant activation right after checkout."}
                         </p>
                     </motion.div>
 
                     {planContext && (
                         <motion.div
-                            initial={{ opacity: 0, y: 20 }}
+                            initial={{ opacity: 0, y: 12 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
-                            className="space-y-6"
+                            transition={{ duration: 0.35, delay: 0.08, ease: "easeOut" }}
+                            className="space-y-3 pt-1"
                         >
-                            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
                                 {renewalData?.isRenewal ? "Renewal Perks" : "Included Benefits"}
                             </p>
-                            <div className="flex flex-col gap-6">
+                            
+                            <div className="flex flex-col gap-2.5">
                                 {renewalData?.isRenewal ? (
                                     <>
-                                        <div className="flex items-start gap-5">
-                                            <div className="rounded-xl bg-slate-800/50 p-3 text-slate-300 shadow-inner">
-                                                <Link2 className="h-6 w-6" />
+                                        <div className="flex items-center justify-between rounded-xl border border-slate-800/80 bg-slate-900/50 p-3 backdrop-blur-sm">
+                                            <div className="flex items-center gap-3">
+                                                <div className="rounded-lg bg-indigo-500/15 p-2 text-indigo-400 border border-indigo-500/20">
+                                                    <Link2 className="h-4 w-4" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-semibold text-white">Active Links Maintained</p>
+                                                    <p className="text-[11px] text-slate-400">{renewalData.linksUsed} of {renewalData.currentLimit} in use</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-base font-semibold text-white">Active Links Maintained</p>
-                                                <p className="mt-1 text-sm text-slate-400">{renewalData.linksUsed} of {renewalData.currentLimit} in use</p>
-                                            </div>
+                                            <span className="rounded-md bg-slate-800/80 px-2 py-0.5 text-[10px] font-mono font-bold text-slate-300 border border-slate-700/60">
+                                                Maintained
+                                            </span>
                                         </div>
-                                        <div className="flex items-start gap-5">
-                                            <div className="rounded-xl bg-emerald-500/20 p-3 text-emerald-400 shadow-inner">
-                                                <Zap className="h-6 w-6" />
+
+                                        <div className="flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-3 backdrop-blur-sm">
+                                            <div className="flex items-center gap-3">
+                                                <div className="rounded-lg bg-emerald-500/20 p-2 text-emerald-400 border border-emerald-500/30">
+                                                    <Zap className="h-4 w-4" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-semibold text-emerald-300">Instant Capacity Boost</p>
+                                                    <p className="text-[11px] text-emerald-400/80">+{renewalData.newAddition} links added</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="text-base font-semibold text-emerald-400">Instant Capacity Boost</p>
-                                                <p className="mt-1 text-sm text-emerald-400/70">+{renewalData.newAddition} links added</p>
-                                            </div>
+                                            <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-300 border border-emerald-500/40">
+                                                +{renewalData.newAddition}
+                                            </span>
                                         </div>
                                     </>
                                 ) : (
-                                    <div className="flex items-start gap-5">
-                                        <div className="rounded-xl bg-slate-800/50 p-3 text-slate-300 shadow-inner">
-                                            <Link2 className="h-6 w-6" />
+                                    <div className="flex items-center justify-between rounded-xl border border-slate-800/80 bg-slate-900/50 p-3 backdrop-blur-sm transition-all hover:border-slate-700/80">
+                                        <div className="flex items-center gap-3">
+                                            <div className="rounded-lg bg-indigo-500/15 p-2 text-indigo-400 border border-indigo-500/20">
+                                                <Link2 className="h-4 w-4" />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-semibold text-white">Massive Link Capacity</p>
+                                                <p className="text-[11px] text-slate-400">Create up to {planContext.linkCount}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="text-base font-semibold text-white">Massive Link Capacity</p>
-                                            <p className="mt-1 text-sm text-slate-400">Create up to {planContext.linkCount}</p>
-                                        </div>
+                                        <span className="rounded-md bg-indigo-500/15 px-2 py-0.5 text-[10px] font-mono font-bold text-indigo-300 border border-indigo-500/30">
+                                            {planContext.linkCount}
+                                        </span>
                                     </div>
                                 )}
-                                <div className="flex items-start gap-5">
-                                    <div className="rounded-xl bg-slate-800/50 p-3 text-slate-300 shadow-inner">
-                                        <Clock className="h-6 w-6" />
+
+                                <div className="flex items-center justify-between rounded-xl border border-slate-800/80 bg-slate-900/50 p-3 backdrop-blur-sm transition-all hover:border-slate-700/80">
+                                    <div className="flex items-center gap-3">
+                                        <div className="rounded-lg bg-emerald-500/15 p-2 text-emerald-400 border border-emerald-500/20">
+                                            <Clock className="h-4 w-4" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-semibold text-white">Extended Validity</p>
+                                            <p className="text-[11px] text-slate-400">
+                                                {getExpiryDisplay(planKey, renewalData?.isRenewal ?? false, renewalData?.planExpiry ?? null)}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-base font-semibold text-white">Extended Validity</p>
-                                        <p className="mt-1 text-sm text-slate-400">
-                                            {getExpiryDisplay(planKey, renewalData?.isRenewal ?? false, renewalData?.planExpiry ?? null)}
-                                        </p>
-                                    </div>
+                                    <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-300 border border-emerald-500/30">
+                                        30 Days
+                                    </span>
                                 </div>
                             </div>
                         </motion.div>
                     )}
                 </div>
 
-                <div className="relative z-10 flex items-center gap-2 text-sm text-slate-500">
-                    <ShieldCheck className="h-4 w-4" />
-                    <span>Secure Checkout</span>
+                {/* Footer Security Badges */}
+                <div className="relative z-10 flex items-center justify-between pt-2 text-[11px] text-slate-400 border-t border-slate-800/50">
+                    <div className="flex items-center gap-1.5">
+                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                        <span>256-bit SSL Encryption</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-indigo-400" />
+                        <span>Instant Plan Activation</span>
+                    </div>
                 </div>
             </section>
 
 
-            {/* RIGHT PANEL (Action) */}
-            <section className="flex w-1/2 items-center justify-center bg-white px-10 py-12">
+            {/* RIGHT PANEL: Crisp, Focused Checkout Container */}
+            <section className="flex w-1/2 flex-col justify-center items-center bg-slate-50/70 px-8 xl:px-12 py-6 xl:py-8 overflow-hidden">
                 <motion.div
-                    initial={{ opacity: 0, x: 20 }}
+                    initial={{ opacity: 0, x: 16 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
-                    className="w-full max-w-[460px]"
+                    transition={{ duration: 0.35, delay: 0.1, ease: "easeOut" }}
+                    className="w-full max-w-[430px] my-auto flex flex-col justify-center"
                 >
-                    <div className="mb-12 space-y-3">
-                        <h2 className="text-4xl font-extrabold tracking-tight text-slate-900">
+                    {/* Header */}
+                    <div className="mb-3.5 space-y-0.5 text-left">
+                        <h2 className="text-2xl xl:text-[28px] font-extrabold tracking-tight text-slate-900">
                             {user
-                                ? (planContext ? `Checkout` : "Finish setup")
-                                : "Continue securely"}
+                                ? (planContext ? "Checkout" : "Finish Setup")
+                                : "Complete Purchase"}
                         </h2>
-                        <p className="text-lg text-slate-500">
-                            {user ? "Review your total and confirm payment." : "Sign in to apply the selected plan instantly."}
+                        <p className="text-xs text-slate-500">
+                            {user 
+                                ? "Review your total and confirm payment." 
+                                : "Sign in to connect your account and activate your plan."}
                         </p>
                     </div>
 
+                    {/* Dynamic Auth Status Card: Shows "Signed in as [User]" if logged in, or Step 1 guidance if logged out */}
+                    {user ? (
+                        <div className="mb-3 rounded-xl border border-slate-200/90 bg-white p-3 shadow-xs flex items-center justify-between">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <UserAvatar user={user} className="h-8 w-8 text-xs shrink-0" />
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                        <p className="text-xs font-bold text-slate-900 truncate">
+                                            {user.displayName || "Account Connected"}
+                                        </p>
+                                        <span className="rounded-full bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.2 text-[9px] font-bold text-emerald-700 shrink-0">
+                                            Connected
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-500 truncate">
+                                        {user.email}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => handleLogin()}
+                                className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors shrink-0 ml-2"
+                            >
+                                Switch
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="mb-3 rounded-xl border border-indigo-100/90 bg-gradient-to-r from-indigo-50/90 via-white to-blue-50/70 p-3 shadow-xs">
+                            <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-2">
+                                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-black text-white shadow-xs">
+                                        1
+                                    </div>
+                                    <span className="text-xs font-bold text-slate-900">Sign in with Google</span>
+                                </div>
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded-full">
+                                    <span>Next: Razorpay</span>
+                                    <ArrowRight className="h-2.5 w-2.5" />
+                                </span>
+                            </div>
+                            <p className="text-[11.5px] text-slate-600 leading-relaxed pl-7">
+                                You are <strong className="text-slate-900">not logged in</strong>. Signing in connects this plan to your account so Razorpay can immediately process and activate your link limits.
+                            </p>
+                        </div>
+                    )}
 
+                    {/* Selected Plan Summary Card */}
                     {planContext && (
-                        <div className="mb-8 rounded-2xl bg-slate-50 border border-slate-100 p-6">
-                            <div className="flex items-end justify-between">
+                        <div className="mb-2.5 rounded-xl bg-white border border-slate-200/80 p-3.5 shadow-xs transition-shadow hover:shadow-sm">
+                            <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-2.5">Selected Plan</p>
-                                    <span className="text-2xl font-bold text-slate-900">
+                                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-0.5">Selected Plan</p>
+                                    <h3 className="text-base xl:text-lg font-bold text-slate-900">
                                         {renewalData?.isRenewal ? `Renew ${planContext.badgeName}` : planContext.badgeName}
+                                    </h3>
+                                    <span className="text-[11px] font-medium text-slate-500">
+                                        {getExpiryDisplay(planKey, renewalData?.isRenewal ?? false, renewalData?.planExpiry ?? null)}
                                     </span>
                                 </div>
+                                
                                 <div className="flex flex-col items-end">
                                     <AnimatePresence mode="popLayout">
                                         {planKey && planKey !== 'free' && (
                                             appliedPromo ? (
                                                 <motion.div
                                                     key="promo-applied"
-                                                    initial={{ opacity: 0, y: -15, filter: "blur(4px)" }}
-                                                    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                                                    exit={{ opacity: 0, y: 15, filter: "blur(4px)" }}
-                                                    transition={{ duration: 0.4, ease: "backOut" }}
-                                                    className="flex flex-col items-end"
+                                                    initial={{ opacity: 0, scale: 0.95 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    exit={{ opacity: 0, scale: 0.95 }}
+                                                    transition={{ duration: 0.25 }}
+                                                    className="flex flex-col items-end leading-none"
                                                 >
-                                                    <span className="text-sm font-semibold text-slate-400 line-through decoration-red-500 decoration-2">
+                                                    <span className="text-xs font-semibold text-slate-400 line-through decoration-red-500 decoration-1.5 mb-0.5">
                                                         ₹{PLAN_CONFIGS[resolvePlanType(planKey)].priceINR}
                                                     </span>
-                                                    <span className="text-3xl font-black text-emerald-600 pb-1 font-mono tracking-tight">
+                                                    <span className="text-2xl font-black text-emerald-600 font-mono tracking-tight">
                                                         ₹{appliedPromo.finalAmount / 100}
                                                     </span>
                                                 </motion.div>
                                             ) : (
                                                 <motion.div
                                                     key="no-promo"
-                                                    initial={{ opacity: 0, y: -15, filter: "blur(4px)" }}
-                                                    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                                                    exit={{ opacity: 0, y: 15, filter: "blur(4px)" }}
-                                                    transition={{ duration: 0.4, ease: "backOut" }}
-                                                    className="flex flex-col items-end"
+                                                    initial={{ opacity: 0, scale: 0.95 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    exit={{ opacity: 0, scale: 0.95 }}
+                                                    transition={{ duration: 0.25 }}
+                                                    className="flex flex-col items-end leading-none"
                                                 >
-                                                    <span className="text-3xl font-black text-slate-900 pb-1 font-mono tracking-tight">
+                                                    <span className="text-2xl font-black text-slate-900 font-mono tracking-tight">
                                                         ₹{PLAN_CONFIGS[resolvePlanType(planKey)].priceINR}
                                                     </span>
                                                 </motion.div>
@@ -212,21 +319,19 @@ export function DesktopCheckoutUI(props: CheckoutState) {
                                                 key="free-plan"
                                                 initial={{ opacity: 0, scale: 0.9 }}
                                                 animate={{ opacity: 1, scale: 1 }}
-                                                className="text-3xl font-black text-slate-900 pb-1 tracking-tight"
+                                                className="text-2xl font-black text-slate-900 tracking-tight"
                                             >
                                                 Free
                                             </motion.span>
                                         )}
                                     </AnimatePresence>
-                                    <span className="text-[15px] font-medium text-slate-500">
-                                        {getExpiryDisplay(planKey, renewalData?.isRenewal ?? false, renewalData?.planExpiry ?? null)}
-                                    </span>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    <div className="mb-10">
+                    {/* Promo Code & Breakdown Section */}
+                    <div className="mb-3">
                         {planKey !== 'free' && (
                             <PromoCodeSection
                                 planId={planKey}
@@ -236,31 +341,46 @@ export function DesktopCheckoutUI(props: CheckoutState) {
                         )}
                     </div>
 
-                    <div>
+                    {/* Action CTA & Trust Footer */}
+                    <div className="space-y-2">
                         {user ? (
                             <Button
                                 onClick={handlePurchase}
                                 disabled={isUpgrading}
-                                className="h-16 w-full rounded-[18px] bg-slate-950 text-[19px] font-semibold text-white shadow-[0_12px_40px_rgba(15,23,42,0.16)] transition-all hover:-translate-y-1 hover:shadow-[0_16px_50px_rgba(15,23,42,0.2)] active:scale-[0.98]"
+                                className="h-12 xl:h-13 w-full rounded-xl bg-slate-950 text-sm xl:text-base font-semibold text-white shadow-[0_8px_20px_-4px_rgba(15,23,42,0.25)] hover:bg-slate-900 hover:shadow-[0_12px_24px_-4px_rgba(15,23,42,0.3)] active:scale-[0.99] transition-all flex items-center justify-center"
                             >
-                                {isUpgrading ? <Loader2 className="mr-3 h-6 w-6 animate-spin" /> : null}
-                                {isUpgrading ? "Processing..." : (planKey === 'free' ? "Claim Free Plan" : (renewalData?.isRenewal ? "Renew Now" : "Complete Purchase"))} 
-                                {!isUpgrading && <ArrowRight className="ml-3 h-6 w-6 opacity-70" />}
+                                {isUpgrading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                {isUpgrading ? (
+                                    "Processing..."
+                                ) : planKey === 'free' ? (
+                                    "Claim Free Plan"
+                                ) : renewalData?.isRenewal ? (
+                                    `Renew for ₹${finalPrice}`
+                                ) : (
+                                    `Pay ₹${finalPrice} via Razorpay`
+                                )} 
+                                {!isUpgrading && <ArrowRight className="ml-2 h-4 w-4 opacity-70" />}
                             </Button>
                         ) : (
                             <Button
                                 onClick={handleLogin}
                                 disabled={isLoggingIn}
-                                className="h-16 w-full rounded-[18px] bg-slate-950 text-[19px] font-semibold text-white shadow-[0_12px_40px_rgba(15,23,42,0.16)] transition-all hover:-translate-y-1 hover:shadow-[0_16px_50px_rgba(15,23,42,0.2)] active:scale-[0.98]"
+                                className="h-12 xl:h-13 w-full rounded-xl bg-slate-950 text-sm xl:text-base font-semibold text-white shadow-[0_8px_20px_-4px_rgba(15,23,42,0.25)] hover:bg-slate-900 hover:shadow-[0_12px_24px_-4px_rgba(15,23,42,0.3)] active:scale-[0.99] transition-all flex items-center justify-center"
                             >
-                                {isLoggingIn ? <Loader2 className="mr-3 h-6 w-6 animate-spin" /> : null}
-                                {isLoggingIn ? "Connecting..." : "Continue with Google"} 
-                                {!isLoggingIn && <ArrowRight className="ml-3 h-6 w-6 opacity-70" />}
+                                {isLoggingIn ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <GoogleGIcon />
+                                )}
+                                {isLoggingIn ? "Connecting to Google..." : "Sign in with Google to Checkout"} 
+                                {!isLoggingIn && <ArrowRight className="ml-2 h-4 w-4 opacity-70" />}
                             </Button>
                         )}
                         
-                        <p className="mt-8 text-center text-sm font-medium text-slate-500">
-                            {user ? "By confirming, you agree to the immediate billing of this tier." : "Subject to our Terms of Service and Privacy Policy."}
+                        <p className="text-center text-[11px] text-slate-500 font-medium">
+                            {user 
+                                ? "🔒 256-bit SSL encrypted • Instant link activation via Razorpay" 
+                                : "🔒 1-click Google sign-in • Direct redirect to Razorpay"}
                         </p>
                     </div>
 

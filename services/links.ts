@@ -45,13 +45,17 @@ export const GUEST_LINK_LIMIT = GUEST_CONFIG.limit;
  * Create a new shortened link.
  * Implements a server-side transactional quota system mapping to the user's plan.
  */
-export async function createLink(userId: string, input: CreateLinkInput): Promise<CreateLinkResponse> {
+export async function createLink(
+    userId: string,
+    input: CreateLinkInput,
+    options?: { isApi?: boolean; plan?: PlanType }
+): Promise<CreateLinkResponse> {
     // Rate limit (skip for test users only in non-production environments)
     const isTestBypass = process.env.NODE_ENV !== "production" && (
         userId === "stress-test-user-123" || userId === "anonymous" || userId.startsWith("test_user_")
     );
     if (!isTestBypass) {
-        const rateCheck = rateLimitLinkCreation(userId);
+        const rateCheck = rateLimitLinkCreation(userId, options?.isApi, options?.plan);
         if (!rateCheck.allowed) {
             logger.rateLimited(userId, "link_create");
             throw new Error(`Rate limit exceeded. Try again in ${Math.ceil(rateCheck.resetMs / 1000)}s.`);
@@ -226,16 +230,20 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                 const config = computedPlans[currentPlan as keyof typeof computedPlans] || computedPlans.free;
 
                 let effectiveLimit: number;
-                if (currentPlan === "free") {
-                    effectiveLimit = config.limit + remainingGiftLinks;
-                } else if (userData.cumulativeQuota && userData.planRenewals && userData.planRenewals > 1) {
+                // Model 2: If user has banked cumulativeQuota from a past purchase, honor their lifetime link bank
+                if (userData.cumulativeQuota && userData.cumulativeQuota > 0) {
                     effectiveLimit = userData.cumulativeQuota + remainingGiftLinks;
+                } else if (currentPlan === "free") {
+                    effectiveLimit = config.limit + remainingGiftLinks;
                 } else {
                     effectiveLimit = (userData.cumulativeQuota || config.limit) + remainingGiftLinks;
                 }
 
-                // Count ALL active links belonging to the user across ALL time (infinite accumulation)
-                const linksQuery = adminDb.collection("links").where("userId", "==", userId).where("isActive", "==", true);
+                // Count active links belonging to the user up to effectiveLimit + 1 to prevent unbounded reads in transactions
+                const linksQuery = adminDb.collection("links")
+                    .where("userId", "==", userId)
+                    .where("isActive", "==", true)
+                    .limit(effectiveLimit + 1);
                 const linksSnap = await transaction.get(linksQuery);
 
                 let freeActiveCount = 0;
@@ -278,9 +286,11 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
                     }
                 }
 
-                // Compute TTL for authenticated plan
-                if (consumedQuota === 'gift') {
-                    finalExpiresAt = null; // Gift links are permanent
+                // Compute TTL for authenticated plan (null = permanent by default, or developer custom expiration)
+                if (input.expiresAt !== undefined) {
+                    finalExpiresAt = input.expiresAt;
+                } else if (consumedQuota === 'gift' || !config.ttlMs || config.ttlMs === 0) {
+                    finalExpiresAt = null; // Permanent
                 } else {
                     finalExpiresAt = now + config.ttlMs;
                 }
@@ -479,6 +489,7 @@ export async function createLink(userId: string, input: CreateLinkInput): Promis
         shortUrl: buildShortUrl(slug),
         originalUrl: urlCheck.url,
         createdAt: now,
+        expiresAt: finalExpiresAt,
     };
 }
 

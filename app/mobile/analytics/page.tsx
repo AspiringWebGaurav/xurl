@@ -345,7 +345,7 @@ function MobileFreemiumDashboard({ data }: { data: DashboardData }) {
                         <p className="text-muted-foreground mb-8 text-[15px] leading-relaxed font-medium">
                             Upgrade to any paid plan to access full click timelines, device breakdowns, OS tracking, and more.
                         </p>
-                        <Link href="/pricing" className="w-full">
+                        <Link href="/mobile/plan" className="w-full">
                             <div className="w-full py-4 bg-primary text-primary-foreground text-sm font-bold rounded-full shadow-lg shadow-primary/20 active:scale-[0.98] transition-all">
                                 View Plans & Upgrade
                             </div>

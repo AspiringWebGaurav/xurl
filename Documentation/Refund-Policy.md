@@ -1,7 +1,7 @@
 # Refund Policy
 
-**Effective Date:** March 13, 2026
-**Last Updated:** March 13, 2026
+**Effective Date:** September 22, 2026
+**Last Updated:** September 22, 2026
 
 This Refund Policy explains the terms governing refunds for purchases made on the XURL URL shortening platform ("Service").
 
@@ -18,6 +18,7 @@ XURL operates on a one-time purchase model. Paid plans are not subscriptions and
 | Business | 199 | 100 |
 | Enterprise | 299 | 300 |
 | Big Enterprise | 999 | 600 |
+| Custom Enterprise | Custom | Bespoke (up to 500M) |
 
 All prices are in Indian Rupees (INR) and are inclusive of applicable taxes.
 

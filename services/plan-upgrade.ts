@@ -138,11 +138,10 @@ export async function applyPlanUpgrade(
             existingUser?.planStatus === "active" &&
             (!existingUser?.planExpiry || existingUser?.planExpiry > now);
 
-        // If user is currently on "free" plan or revoked, carried-over cumulative quota is 0!
+        // Model 2: Lifetime Link Credit Bank
+        // Cumulative quota accumulates on any paid plan purchase or renewal.
         let currentCumulativeQuota = existingUser?.cumulativeQuota || 0;
-        if (!existingUser?.plan || existingUser.plan === "free" || existingUser.planStatus === "revoked") {
-            currentCumulativeQuota = 0;
-        } else if (!existingUser?.cumulativeQuota) {
+        if (!existingUser?.cumulativeQuota && existingUser?.plan && existingUser.plan !== "free") {
             const legacyPlanConfig = PLAN_CONFIGS[existingUser.plan as PlanType];
             if (legacyPlanConfig) {
                 currentCumulativeQuota = legacyPlanConfig.limit * (existingUser.planRenewals || 1);
@@ -150,6 +149,7 @@ export async function applyPlanUpgrade(
         }
 
         const newPlanConfig = PLAN_CONFIGS[planId];
+        const newCumulativeQuota = planId === "free" ? 0 : currentCumulativeQuota + newPlanConfig.limit;
         const apiAccessEnabled = Boolean(newPlanConfig.apiAccess);
         const apiQuotaTotal = apiAccessEnabled ? (newPlanConfig.apiQuotaTotal || 0) : 0;
         let apiKeyHash = existingUser?.apiKeyHash || null;
@@ -193,8 +193,8 @@ export async function applyPlanUpgrade(
             planStart: now,
             planExpiry: effectiveExpiry,
             planRenewals: 1,
-            // Cumulative quota accumulates ONLY on renewals of the same active plan; new grants set limit directly
-            cumulativeQuota: planId === "free" ? 0 : (isRenewal ? currentCumulativeQuota + newPlanConfig.limit : newPlanConfig.limit),
+            // Model 2: Link quota is banked permanently into cumulativeQuota
+            cumulativeQuota: newCumulativeQuota,
             apiEnabled: apiAccessEnabled,
             apiQuotaTotal,
             apiRequestsUsed: 0,

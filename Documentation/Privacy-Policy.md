@@ -1,7 +1,7 @@
 # Privacy Policy
 
-**Effective Date:** March 13, 2026
-**Last Updated:** March 13, 2026
+**Effective Date:** September 22, 2026
+**Last Updated:** September 22, 2026
 
 XURL ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our URL shortening platform ("Service").
 
@@ -86,15 +86,15 @@ We may disclose information if required by law, regulation, legal process, or go
 | Hashed IP/fingerprint data | Cleared with associated guest usage records |
 
 ## 7. Your Rights
-
+ 
 You have the right to:
-
+ 
 - **Access** your personal data by viewing your profile and purchase history in the Service.
 - **Correct** inaccurate information through the profile management page.
-- **Delete** your account and associated data by contacting us.
-- **Export** your link data through the Service interface.
-
-To exercise any of these rights, please contact us through the information provided on our website.
+- **Delete** your account and associated data by submitting a formal deletion request via `/api/user/data-deletion-request` or contacting support.
+- **Export** your complete machine-readable link data and click telemetry via our dedicated Data Portability Portal (`/data-export`).
+ 
+To exercise any of these rights, please use the provided in-app portals or contact us through the information on our website.
 
 ## 8. Security Practices
 

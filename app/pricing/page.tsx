@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, Suspense } from "react";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronLeft, ChevronRight, Lock, ShieldCheck, Zap } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Lock, ShieldCheck, Zap, Building2, Coins, IndianRupee, Sparkles, Send, CheckCircle2, MessageSquare, Loader2, ArrowRight, Clock, XCircle, Mail, CreditCard } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
@@ -12,6 +12,7 @@ import { AnimatePresence, motion, Variants } from "framer-motion";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { formatTTLToText } from "@/lib/utils/format-time";
+import { toast } from "sonner";
 
 import { PLAN_CONFIGS, PAID_PLAN_ORDER } from "@/lib/plans";
 import type { PlanType } from "@/lib/plans";
@@ -35,31 +36,31 @@ const defaultExchangeRates: Record<Currency, number> = {
 };
 
 const getFreeGuestFeatures = (guestTtlMs?: number) => [
-    "1 link",
-    `Expires in ${guestTtlMs ? formatTTLToText(guestTtlMs) : "5 minutes"}`,
+    "1 permanent link",
+    "Never expires (Permanent in DB)",
     "No login required",
-    "Once per IP",
+    "Instant edge redirection",
 ];
 
 const getFreeAccountFeatures = (freeTtlMs?: number) => [
-    "1 link",
-    `Expires in ${freeTtlMs ? formatTTLToText(freeTtlMs) : "10 minutes"}`,
-    "Login required",
-    "24h cooldown",
-    "3 uses max",
+    "5 permanent links (Banked)",
+    "Never expires (Permanent in DB)",
+    "50 Sandbox API calls",
+    "Custom slug / alias allowed",
+    "Real-time analytics dashboard",
 ];
 
 const getFreeFeatureSlides = (freeTtlMs?: number, guestTtlMs?: number) => [
     {
         id: "guest",
         title: "Guest Access",
-        description: "One quick short link without creating an account.",
+        description: "1 permanent short link without creating an account.",
         features: getFreeGuestFeatures(guestTtlMs),
     },
     {
         id: "account",
         title: "Free Account Access",
-        description: "Sign in for a slightly longer expiry with simple usage limits.",
+        description: "Sign in for 5 permanent banked links and developer sandbox API access.",
         features: getFreeAccountFeatures(freeTtlMs),
     },
 ];
@@ -85,14 +86,36 @@ interface PricingTier {
 }
 
 const PLAN_UI_META: Record<string, { description: string; features: string[]; ctaText: string; comparisonHint?: string }> = {
-    starter: { description: "Personal use", features: ["Login required", "Custom aliases", "Analytics Dashboard"], ctaText: "Start" },
-    pro: { description: "For power users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Priority support"], ctaText: "Go Pro" },
-    business: { description: "Best value for heavy users", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "4× more links than Pro"], ctaText: "Get Business", comparisonHint: "Most Popular" },
-    enterprise: { description: "Advanced link management", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "Custom domains integration"], ctaText: "Go Enterprise" },
-    bigenterprise: { description: "Maximum scale", features: ["Login required", "Custom aliases", "Analytics Dashboard", "Developer API access", "Dedicated account manager"], ctaText: "Go Big" },
+    starter: { 
+        description: "Personal & side projects", 
+        features: ["25 Permanent Links (Banked)", "2,500 API calls/mo", "Custom aliases & QR codes", "Real-time analytics"], 
+        ctaText: "Start" 
+    },
+    pro: { 
+        description: "For creators & power users", 
+        features: ["100 Permanent Links (Banked)", "15,000 API calls/mo", "Custom aliases & QR codes", "CSV export & UTM tracking", "Priority support"], 
+        ctaText: "Go Pro" 
+    },
+    business: { 
+        description: "Best value for scaling businesses", 
+        features: ["500 Permanent Links (Banked)", "60,000 API calls/mo", "Full Developer API access", "Advanced UTM & CSV export", "5× more links than Pro"], 
+        ctaText: "Get Business", 
+        comparisonHint: "Most Popular" 
+    },
+    enterprise: { 
+        description: "High-volume link infrastructure", 
+        features: ["2,500 Permanent Links (Banked)", "300,000 API calls/mo", "High-throughput Developer API", "Custom domains integration", "Dedicated support"], 
+        ctaText: "Go Enterprise" 
+    },
+    bigenterprise: { 
+        description: "Massive scale & enterprise workloads", 
+        features: ["10,000 Permanent Links (Banked)", "1,000,000 API calls/mo", "Enterprise API throughput", "Full data export & SLA", "Dedicated account manager"], 
+        ctaText: "Go Big" 
+    },
 };
 
 function formatTtl(ttlMs: number): string {
+    if (!ttlMs || ttlMs <= 0) return "Permanent (Never Expires)";
     const hours = ttlMs / (60 * 60 * 1000);
     if (hours < 1) return `Expires in ${formatTTLToText(ttlMs)}`;
     return `Expires in ${hours} hour${hours > 1 ? "s" : ""}`;
@@ -120,7 +143,7 @@ const generateTiers = (computedPlans?: any, bestOffer?: any): PricingTier[] => {
             description: ui.description,
             priceINR: discountedPrice,
             originalPriceINR: activePrice !== discountedPrice ? activePrice : undefined,
-            links: `${cfg.limit} links`,
+            links: `${cfg.limit.toLocaleString()} permanent links`,
             expiry: formatTtl(cfg.ttlMs),
             isPopular: defaultCfg.badge === "MOST_POPULAR",
             features: ui.features,
@@ -160,14 +183,29 @@ function smoothScrollTo(el: HTMLElement, targetY: number, duration: number) {
     const startY = el.scrollTop;
     const distance = targetY - startY;
     let startTime: number | null = null;
+    let cancelled = false;
+
+    const cancel = () => {
+        cancelled = true;
+        window.removeEventListener("wheel", cancel);
+        window.removeEventListener("touchmove", cancel);
+    };
+
+    window.addEventListener("wheel", cancel, { passive: true });
+    window.addEventListener("touchmove", cancel, { passive: true });
 
     function step(timestamp: number) {
+        if (cancelled) return;
         if (!startTime) startTime = timestamp;
         const elapsed = timestamp - startTime;
         const progress = Math.min(elapsed / duration, 1);
         const eased = easeInOutCubic(progress);
         el.scrollTop = startY + distance * eased;
-        if (progress < 1) requestAnimationFrame(step);
+        if (progress < 1) {
+            requestAnimationFrame(step);
+        } else {
+            cancel();
+        }
     }
 
     requestAnimationFrame(step);
@@ -185,8 +223,119 @@ export default function PricingPage() {
     const [freeTtlMs, setFreeTtlMs] = useState<number | undefined>(PLAN_CONFIGS.free.ttlMs);
     const [guestTtlMs, setGuestTtlMs] = useState<number | undefined>(PLAN_CONFIGS.guest.ttlMs);
     const [activeOffer, setActiveOffer] = useState<any>(null);
-    const [isTourRunning, setIsTourRunning] = useState(false);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+    // Custom Pricing Proposal Presets & State
+    const ENTERPRISE_PRESETS = [
+        {
+            id: "scale",
+            name: "Scale-Up",
+            badge: "Popular",
+            links: 50000,
+            apiCalls: 2000000,
+            price: 1499,
+            description: "50K Links · 2M API",
+        },
+        {
+            id: "growth",
+            name: "Hyper-Growth",
+            badge: "🔥 Best Value",
+            links: 200000,
+            apiCalls: 10000000,
+            price: 3999,
+            description: "200K Links · 10M API",
+        },
+        {
+            id: "enterprise",
+            name: "Enterprise",
+            badge: "Custom SLA",
+            links: 1000000,
+            apiCalls: 50000000,
+            price: 9999,
+            description: "1M Links · 50M API",
+        },
+    ];
+
+    const [customEmail, setCustomEmail] = useState("");
+    const [customCompany, setCustomCompany] = useState("");
+    const [customLinks, setCustomLinks] = useState<number | "">(50000);
+    const [customApiCalls, setCustomApiCalls] = useState<number | "">(2000000);
+    const [customProposedPrice, setCustomProposedPrice] = useState<number | "">(1499);
+    const [customNotes, setCustomNotes] = useState("");
+    const [customSubmitting, setCustomSubmitting] = useState(false);
+    const [customSubmitted, setCustomSubmitted] = useState(false);
+    const [activePreset, setActivePreset] = useState<string | null>("scale");
+
+    const applyPreset = (preset: typeof ENTERPRISE_PRESETS[0]) => {
+        setActivePreset(preset.id);
+        setCustomLinks(preset.links);
+        setCustomApiCalls(preset.apiCalls);
+        setCustomProposedPrice(preset.price);
+    };
+
+    const numericLinks = typeof customLinks === "number" ? customLinks : parseInt(String(customLinks), 10) || 0;
+    const numericApiCalls = typeof customApiCalls === "number" ? customApiCalls : parseInt(String(customApiCalls), 10) || 0;
+    const numericPrice = typeof customProposedPrice === "number" ? customProposedPrice : parseInt(String(customProposedPrice), 10) || 0;
+
+    const costPer1k = numericLinks > 0 && numericPrice > 0 ? ((numericPrice / numericLinks) * 1000).toFixed(1) : null;
+    const bitlyEstMonthly = numericLinks > 0 ? Math.max(9999, Math.round((numericLinks / 1000) * 150)) : 9999;
+    const savingsPercent = numericPrice > 0 && bitlyEstMonthly > numericPrice 
+        ? Math.min(95, Math.max(40, Math.round(((bitlyEstMonthly - numericPrice) / bitlyEstMonthly) * 100))) 
+        : 80;
+
+    const handleCustomPricingSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const emailToUse = customEmail.trim() || user?.email || "";
+        if (!emailToUse || !emailToUse.includes("@")) {
+            toast.error("Please enter a valid email address.");
+            return;
+        }
+        if (!numericPrice || numericPrice <= 0) {
+            toast.error("Please provide a valid proposed budget in Rupees (₹).");
+            return;
+        }
+        if (!numericLinks || numericLinks <= 0) {
+            toast.error("Please specify how many permanent links you need.");
+            return;
+        }
+
+        setCustomSubmitting(true);
+        try {
+            let token = "";
+            if (user) {
+                token = await user.getIdToken();
+            }
+            const headers: Record<string, string> = { "Content-Type": "application/json" };
+            if (token) headers["Authorization"] = `Bearer ${token}`;
+
+            const res = await fetch("/api/custom-pricing-request", {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                    email: emailToUse,
+                    companyName: customCompany.trim() || null,
+                    linksNeeded: numericLinks,
+                    apiQuotaNeeded: numericApiCalls || 10000,
+                    proposedPriceINR: numericPrice,
+                    notes: customNotes.trim(),
+                }),
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                toast.success("Custom pricing proposal submitted!", {
+                    description: "Our admin team will review your proposal and curate your plan directly onto your account.",
+                });
+                setCustomSubmitted(true);
+            } else {
+                toast.error(data.message || "Failed to submit proposal.");
+            }
+        } catch {
+            toast.error("Network error while submitting proposal.");
+        } finally {
+            setCustomSubmitting(false);
+        }
+    };
 
     const router = useRouter();
     const [focusPlan, setFocusPlan] = useState<string | null>(null);
@@ -219,89 +368,42 @@ export default function PricingPage() {
         return () => { mounted = false; };
     }, []);
 
-    /* ── Automated Guided Tour ── */
+    /* ── Cinematic intro scroll (smooth scroll to cards on page load) ── */
     useEffect(() => {
-        if (typeof window === "undefined") return;
+        if (isInitialLoading || focusPlan) return;
 
-        let tourAborted = false;
-        
-        const abortTour = () => {
-            if (tourAborted) return;
-            tourAborted = true;
-            setIsTourRunning(false);
-        };
-
-        const handleInteraction = () => {
-            abortTour();
-        };
-
-        window.addEventListener("wheel", handleInteraction, { passive: true });
-        window.addEventListener("touchmove", handleInteraction, { passive: true });
-        window.addEventListener("keydown", handleInteraction, { passive: true });
-
-        const runSequence = async () => {
-            if (tourAborted) return;
+        const timer = setTimeout(() => {
             const root = document.getElementById("pricing-root");
             const cardsEl = document.getElementById("pricing-cards-grid");
             if (!root || !cardsEl) return;
 
-            const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+            // Only auto-scroll if user hasn't already scrolled deep down
+            if (root.scrollTop > 120) return;
 
-            setIsTourRunning(true);
+            const target = cardsEl.offsetTop - 30;
+            if (target <= 0) return;
+            smoothScrollTo(root, target, 1400);
+        }, 500);
 
-            // 1. Scroll to Top Row
-            const targetRow1 = cardsEl.offsetTop - 30;
-            smoothScrollTo(root, targetRow1, 1000);
-            await sleep(1800);
-            if (tourAborted) return;
+        return () => clearTimeout(timer);
+    }, [isInitialLoading, focusPlan]);
 
-            // 2. Scroll to Bottom Row
-            const entCard = document.getElementById("plan-business") || document.getElementById("plan-enterprise");
-            if (entCard) {
-                const targetRow2 = entCard.offsetTop - 30;
-                smoothScrollTo(root, targetRow2, 1000);
-                await sleep(1800);
-            }
-            if (tourAborted) return;
+    /* ── Replay tour / manual scroll from navbar ── */
+    const handleReplayTour = useCallback(() => {
+        const root = document.getElementById("pricing-root");
+        const cardsEl = document.getElementById("pricing-cards-grid");
+        if (!root || !cardsEl) return;
 
-            // 3. Scroll to Feature Comparison
-            const featureComp = document.getElementById("feature-comparison");
-            if (featureComp) {
-                const targetRow3 = featureComp.offsetTop - 30;
-                smoothScrollTo(root, targetRow3, 1000);
-                await sleep(1800);
-            }
-            if (tourAborted) return;
-
-            // 4. Scroll back to top
-            smoothScrollTo(root, 0, 1400);
-            await sleep(1400);
-
-            abortTour();
-        };
-
-        const handleManualReplay = () => {
-            tourAborted = false;
-            runSequence();
-        };
-
-        window.addEventListener("replay-pricing-tour", handleManualReplay);
-
-        // Auto-play on first load
-        const hasShownTour = sessionStorage.getItem('pricingTourShown');
-        if (!hasShownTour) {
-            sessionStorage.setItem('pricingTourShown', 'true');
-            setTimeout(runSequence, 1000);
-        }
-
-        return () => {
-            tourAborted = true;
-            window.removeEventListener("wheel", handleInteraction);
-            window.removeEventListener("touchmove", handleInteraction);
-            window.removeEventListener("keydown", handleInteraction);
-            window.removeEventListener("replay-pricing-tour", handleManualReplay);
-        };
+        const target = cardsEl.offsetTop - 30;
+        smoothScrollTo(root, target, 1200);
     }, []);
+
+    useEffect(() => {
+        window.addEventListener("replay-pricing-tour", handleReplayTour);
+        return () => {
+            window.removeEventListener("replay-pricing-tour", handleReplayTour);
+        };
+    }, [handleReplayTour]);
 
     /* ── focusPlan scroll ── */
     useEffect(() => {
@@ -319,14 +421,16 @@ export default function PricingPage() {
     }, [focusPlan]);
 
     const [targetedOffer, setTargetedOffer] = useState<PartialOffer | null>(null);
+    const [userCustomRequest, setUserCustomRequest] = useState<any>(null);
 
     useEffect(() => {
         const fetchUserState = async (u: User) => {
             try {
                 const token = await u.getIdToken(true);
-                const [resLinks, resOffers] = await Promise.all([
+                const [resLinks, resOffers, resCustom] = await Promise.all([
                     fetch("/api/links?pageSize=1", { headers: { "Authorization": `Bearer ${token}` } }),
                     fetch("/api/user/partial-offers", { headers: { "Authorization": `Bearer ${token}` } }),
+                    fetch("/api/custom-pricing-request", { headers: { "Authorization": `Bearer ${token}` } }).catch(() => null),
                 ]);
                 const dataLinks = await resLinks.json();
                 if (dataLinks.plan) {
@@ -337,6 +441,14 @@ export default function PricingPage() {
                     setTargetedOffer(dataOffers.offers[0]);
                 } else {
                     setTargetedOffer(null);
+                }
+                if (resCustom && resCustom.ok) {
+                    const dataCustom = await resCustom.json();
+                    if (Array.isArray(dataCustom.requests) && dataCustom.requests.length > 0) {
+                        setUserCustomRequest(dataCustom.requests[0]);
+                    } else {
+                        setUserCustomRequest(null);
+                    }
                 }
             } catch (err) {
                 console.error("Failed to fetch user state", err);
@@ -483,28 +595,7 @@ export default function PricingPage() {
                 className="absolute bottom-[10%] left-[-5%] w-[500px] h-[500px] bg-gradient-to-tr from-amber-500/15 via-teal-500/15 to-indigo-500/15 rounded-full blur-[110px] pointer-events-none z-0"
             />
 
-            {/* Automated Tour Indicator */}
-            <AnimatePresence>
-                {isTourRunning && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -20, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                        className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] pointer-events-none"
-                    >
-                        <div className="flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-slate-900/90 px-6 py-3 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.6)] backdrop-blur-xl border border-slate-700/60 ring-1 ring-white/10">
-                            <div className="flex items-center gap-3">
-                                <div className="relative flex h-3 w-3">
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></span>
-                                </div>
-                                <span className="text-base font-bold tracking-tight text-white drop-shadow-md">Showing you our plans</span>
-                            </div>
-                            <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-300">Scroll to take control</span>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+
 
             <Suspense fallback={null}>
                 <SearchParamsReader onPlan={setFocusPlan} />
@@ -661,10 +752,7 @@ export default function PricingPage() {
                     <motion.div
                         id="plan-free"
                         variants={cardVariants}
-                        onMouseEnter={() => {
-                            setIsFreeCardHovered(true);
-                            if (isTourRunning) setIsTourRunning(false);
-                        }}
+                        onMouseEnter={() => setIsFreeCardHovered(true)}
                         onMouseLeave={() => setIsFreeCardHovered(false)}
                         className={cn(
                             cardBase,
@@ -816,7 +904,7 @@ export default function PricingPage() {
                                 key={tier.planId}
                                 id={`plan-${tier.planId}`}
                                 variants={cardVariants}
-                                onMouseEnter={() => { if (isTourRunning) setIsTourRunning(false); }}
+
                                 className={cn(
                                     cardBase,
                                     "group-hover/cards:[&:not(:hover)]:opacity-95 transition-all duration-300",
@@ -984,29 +1072,494 @@ export default function PricingPage() {
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-slate-700">
                                 <tr>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">Price (INR)</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">₹0</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">₹29/mo</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">₹79/mo</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">₹149/mo</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">₹299/mo</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">₹699/mo</td>
+                                </tr>
+                                <tr>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">Permanent Banked Links</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-700">5 links</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-700">25 links</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-700">100 links</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-700">500 links</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-700">2,500 links</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-700">10,000 links</td>
+                                </tr>
+                                <tr>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">Link Lifespan</td>
+                                    <td className="px-4 py-4 font-semibold text-emerald-600">Permanent (Never Expires)</td>
+                                    <td className="px-4 py-4 font-semibold text-emerald-600">Permanent (Never Expires)</td>
+                                    <td className="px-4 py-4 font-semibold text-emerald-600">Permanent (Never Expires)</td>
+                                    <td className="px-4 py-4 font-semibold text-emerald-600">Permanent (Never Expires)</td>
+                                    <td className="px-4 py-4 font-semibold text-emerald-600">Permanent (Never Expires)</td>
+                                    <td className="px-4 py-4 font-semibold text-emerald-600">Permanent (Never Expires)</td>
+                                </tr>
+                                <tr>
                                     <td className="px-4 py-4 font-semibold text-slate-900">
                                         <Link href="/documentation/api" className="underline decoration-slate-300 underline-offset-4 hover:text-slate-700">
-                                            API Access
+                                            Developer API Access
                                         </Link>
                                     </td>
-                                    <td className="px-4 py-4 text-slate-400">No</td>
-                                    <td className="px-4 py-4 text-slate-400">No</td>
-                                    <td className="px-4 py-4 text-slate-400">No</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-600">Sandbox</td>
+                                    <td className="px-4 py-4 font-semibold text-emerald-600">Yes</td>
+                                    <td className="px-4 py-4 font-semibold text-emerald-600">Yes</td>
                                     <td className="px-4 py-4 font-semibold text-emerald-600">Yes</td>
                                     <td className="px-4 py-4 font-semibold text-emerald-600">Yes</td>
                                     <td className="px-4 py-4 font-semibold text-emerald-600">Yes</td>
                                 </tr>
                                 <tr>
-                                    <td className="px-4 py-4 font-semibold text-slate-900">Included API quota</td>
-                                    <td className="px-4 py-4 text-slate-400">-</td>
-                                    <td className="px-4 py-4 text-slate-400">-</td>
-                                    <td className="px-4 py-4 text-slate-400">-</td>
-                                    <td className="px-4 py-4 text-slate-700">500 requests</td>
-                                    <td className="px-4 py-4 text-slate-700">5000 requests</td>
-                                    <td className="px-4 py-4 text-slate-700">5000 requests</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">Monthly API Quota</td>
+                                    <td className="px-4 py-4 text-slate-700">50 calls (Sandbox)</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">2,500 calls/mo</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">15,000 calls/mo</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">60,000 calls/mo</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">300,000 calls/mo</td>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">1,000,000 calls/mo</td>
+                                </tr>
+                                <tr>
+                                    <td className="px-4 py-4 font-semibold text-slate-900">CSV Export & UTM Tracking</td>
+                                    <td className="px-4 py-4 text-slate-400">No</td>
+                                    <td className="px-4 py-4 text-slate-400">No</td>
+                                    <td className="px-4 py-4 font-semibold text-emerald-600">Yes</td>
+                                    <td className="px-4 py-4 font-semibold text-emerald-600">Yes</td>
+                                    <td className="px-4 py-4 font-semibold text-emerald-600">Yes</td>
+                                    <td className="px-4 py-4 font-semibold text-emerald-600">Yes</td>
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                {/* Custom Pricing Proposal Section */}
+                <div id="custom-pricing-section" className="mt-12 w-full max-w-7xl rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-white via-slate-50/90 to-emerald-50/30 p-6 sm:p-10 shadow-xl relative overflow-hidden backdrop-blur-xl">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+                        {/* Left Info Column */}
+                        <div className="lg:col-span-5 space-y-4">
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 text-xs font-bold">
+                                <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+                                <span>Custom Enterprise Packages</span>
+                            </div>
+                            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 leading-tight">
+                                Want custom scale or tailored pricing?
+                            </h2>
+                            <p className="text-sm text-slate-600 leading-relaxed">
+                                Need higher link limits, massive API throughput, or want to propose a tailored budget in Rupees (₹)? Tell us what you need. Our team will review your proposal, curate a custom plan, and render it directly onto your account for instant one-click checkout.
+                            </p>
+
+                            <div className="space-y-2.5 pt-2 text-xs sm:text-sm text-slate-700 font-medium">
+                                <div className="flex items-center gap-2.5">
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                                    <span>Lifetime banked permanent links</span>
+                                </div>
+                                <div className="flex items-center gap-2.5">
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                                    <span>Dedicated high-concurrency API quota</span>
+                                </div>
+                                <div className="flex items-center gap-2.5">
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                                    <span>Rendered directly on your account&apos;s billing console</span>
+                                </div>
+                                <div className="flex items-center gap-2.5">
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                                    <span>Transparent one-time monthly payments in INR (₹)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Form Column */}
+                        <div className="lg:col-span-7 rounded-2xl border border-slate-200/80 bg-white/95 p-6 sm:p-8 shadow-sm">
+                            {customSubmitted ? (
+                                <motion.div 
+                                    initial={{ opacity: 0, scale: 0.95, y: 12 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    transition={{ duration: 0.45, ease: "easeOut" }}
+                                    className="p-6 sm:p-8 text-center space-y-6"
+                                >
+                                    {/* Animated Celebratory Icon Badge */}
+                                    <div className="relative mx-auto w-20 h-20 flex items-center justify-center">
+                                        <motion.div
+                                            initial={{ scale: 0.8, opacity: 0.5 }}
+                                            animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0.2, 0.5] }}
+                                            transition={{ repeat: Infinity, duration: 2.4, ease: "easeInOut" }}
+                                            className="absolute inset-0 rounded-full bg-emerald-500/25 blur-xl pointer-events-none"
+                                        />
+                                        <div className="relative h-16 w-16 rounded-3xl bg-gradient-to-tr from-emerald-600 via-teal-600 to-emerald-500 text-white shadow-xl shadow-emerald-600/30 flex items-center justify-center ring-4 ring-emerald-500/20">
+                                            <CheckCircle2 className="h-9 w-9 text-white" />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 text-xs font-bold">
+                                            <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+                                            <span>Proposal Received & Logged</span>
+                                        </div>
+                                        <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+                                            Proposal Submitted! 🎉
+                                        </h3>
+                                        <p className="text-xs sm:text-sm text-slate-600 max-w-lg mx-auto leading-relaxed">
+                                            Thank you! Our administrative team has received your request for <strong className="text-slate-900">{numericLinks.toLocaleString()} links</strong> at <strong className="text-emerald-700 font-bold">₹{numericPrice.toLocaleString()}/mo</strong>.
+                                        </p>
+                                    </div>
+
+                                    {/* 3-Step Lifecycle Workflow Card */}
+                                    <div className="p-5 rounded-2xl border border-slate-200/90 bg-slate-50/80 text-left space-y-4 shadow-inner">
+                                        <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                                            <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                                            <span>What Happens Next (Lifecycle)</span>
+                                        </h4>
+
+                                        <div className="space-y-3.5">
+                                            {/* Step 1 */}
+                                            <div className="flex items-start gap-3">
+                                                <div className="h-7 w-7 rounded-xl bg-emerald-500/15 text-emerald-700 font-black text-xs flex items-center justify-center shrink-0 border border-emerald-500/30 mt-0.5">
+                                                    1
+                                                </div>
+                                                <div className="space-y-0.5 min-w-0">
+                                                    <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                                        <Mail className="w-3.5 h-3.5 text-indigo-600" />
+                                                        <span>Email Approval Notification</span>
+                                                    </div>
+                                                    <p className="text-[11px] text-slate-600 leading-normal">
+                                                        Once approved by our team, an official confirmation email will be dispatched to <strong className="text-slate-900 font-mono">{customEmail || user?.email}</strong>.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Step 2 */}
+                                            <div className="flex items-start gap-3">
+                                                <div className="h-7 w-7 rounded-xl bg-indigo-500/15 text-indigo-700 font-black text-xs flex items-center justify-center shrink-0 border border-indigo-500/30 mt-0.5">
+                                                    2
+                                                </div>
+                                                <div className="space-y-0.5 min-w-0">
+                                                    <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                                        <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                                                        <span>Curated Plan Rendered on Plan Page</span>
+                                                    </div>
+                                                    <p className="text-[11px] text-slate-600 leading-normal">
+                                                        Your curated custom tier will automatically render right here on this <strong className="text-slate-900">Pricing Page</strong> and in your <strong className="text-slate-900">Dashboard</strong> with an <strong className="text-emerald-700 font-bold">&apos;Approved&apos;</strong> deal tag.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Step 3 */}
+                                            <div className="flex items-start gap-3">
+                                                <div className="h-7 w-7 rounded-xl bg-amber-500/15 text-amber-800 font-black text-xs flex items-center justify-center shrink-0 border border-amber-500/30 mt-0.5">
+                                                    3
+                                                </div>
+                                                <div className="space-y-0.5 min-w-0">
+                                                    <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                                        <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
+                                                        <span>1-Click Buy via Razorpay as Usual</span>
+                                                    </div>
+                                                    <p className="text-[11px] text-slate-600 leading-normal">
+                                                        Simply click <strong className="text-slate-900">&apos;Claim Plan&apos;</strong> or <strong className="text-slate-900">&apos;Buy Now&apos;</strong> to complete standard checkout via Razorpay as usual to instantly unlock your permanent links and dedicated API credentials.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => setCustomSubmitted(false)}
+                                            className="w-full sm:w-auto text-xs h-10 px-5 rounded-xl font-bold cursor-pointer"
+                                        >
+                                            Submit Another Proposal
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            onClick={() => {
+                                                const grid = document.getElementById("pricing-cards-grid");
+                                                if (grid) grid.scrollIntoView({ behavior: "smooth", block: "start" });
+                                            }}
+                                            className="w-full sm:w-auto text-xs h-10 px-5 rounded-xl font-bold bg-slate-900 text-white hover:bg-slate-800 cursor-pointer"
+                                        >
+                                            Browse Standard Plans ↑
+                                        </Button>
+                                    </div>
+                                </motion.div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {/* Existing User Proposal Lifecycle Status Banner */}
+                                    {userCustomRequest && (
+                                        <div className="mb-2">
+                                            {userCustomRequest.status === "curated" && (
+                                                <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-xs sm:text-sm space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-extrabold text-slate-900 flex items-center gap-1.5 text-emerald-800">
+                                                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                                            <span>Proposal Approved & Curated!</span>
+                                                        </span>
+                                                        <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-extrabold uppercase">
+                                                            Ready to Claim
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-slate-600">
+                                                        Admin approved your proposal at <strong className="text-emerald-700 font-bold">₹{(userCustomRequest.curatedPriceINR || userCustomRequest.proposedPriceINR)?.toLocaleString()}/mo</strong> for <strong className="text-slate-900">{(userCustomRequest.curatedLinks || userCustomRequest.linksNeeded)?.toLocaleString()} permanent links</strong> and <strong className="text-slate-900">{(userCustomRequest.curatedApiQuota || userCustomRequest.apiQuotaNeeded)?.toLocaleString()} API calls/mo</strong>.
+                                                    </p>
+                                                    {userCustomRequest.adminNotes && (
+                                                        <p className="text-[11px] text-slate-600 italic bg-white/80 p-2 rounded-lg border border-emerald-500/20">
+                                                            &ldquo;{userCustomRequest.adminNotes}&rdquo;
+                                                        </p>
+                                                    )}
+                                                    <Button
+                                                        size="sm"
+                                                        type="button"
+                                                        onClick={() => {
+                                                            window.scrollTo({ top: 0, behavior: "smooth" });
+                                                        }}
+                                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-8 rounded-lg cursor-pointer mt-1"
+                                                    >
+                                                        View & Claim Curated Plan Above ↑
+                                                    </Button>
+                                                </div>
+                                            )}
+
+                                            {userCustomRequest.status === "pending" && (
+                                                <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-xs sm:text-sm space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-bold text-slate-900 flex items-center gap-1.5 text-amber-800">
+                                                            <Clock className="h-4 w-4 text-amber-600" />
+                                                            <span>Proposal Under Active Review</span>
+                                                        </span>
+                                                        <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 text-[10px] font-extrabold uppercase">
+                                                            In Progress
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-slate-600">
+                                                        Your request for <strong className="text-slate-900">{userCustomRequest.linksNeeded?.toLocaleString()} links</strong> & <strong className="text-slate-900">{userCustomRequest.apiQuotaNeeded?.toLocaleString()} API calls</strong> at <strong className="text-emerald-700 font-bold">₹{userCustomRequest.proposedPriceINR?.toLocaleString()}/mo</strong> is being reviewed by our team.
+                                                    </p>
+                                                    <p className="text-[11px] text-slate-500">
+                                                        ⚡ We usually respond and render curated plans within 2 hours.
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {userCustomRequest.status === "rejected" && (
+                                                <div className="p-4 rounded-2xl border border-slate-300 bg-slate-100/80 text-xs sm:text-sm space-y-1">
+                                                    <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                                                        <XCircle className="h-4 w-4 text-slate-500" />
+                                                        <span>Previous Proposal Closed</span>
+                                                    </div>
+                                                    <p className="text-slate-600">
+                                                        Admin note: &ldquo;{userCustomRequest.adminNotes || "Proposal could not be accommodated as submitted."}&rdquo;
+                                                    </p>
+                                                    <p className="text-[11px] text-slate-500">
+                                                        You can submit an updated proposal below anytime.
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <form onSubmit={handleCustomPricingSubmit} className="space-y-4">
+                                    {/* Interactive Quick Scale Presets */}
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                                <Zap className="h-3.5 w-3.5 text-amber-500" />
+                                                <span>Quick Enterprise Presets</span>
+                                            </label>
+                                            <span className="text-[11px] font-medium text-slate-400">1-click to auto-fill</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                                            {ENTERPRISE_PRESETS.map((preset) => {
+                                                const isSelected = activePreset === preset.id;
+                                                return (
+                                                    <motion.button
+                                                        key={preset.id}
+                                                        type="button"
+                                                        onClick={() => applyPreset(preset)}
+                                                        whileHover={{ scale: 1.02, y: -1 }}
+                                                        whileTap={{ scale: 0.98 }}
+                                                        className={cn(
+                                                            "relative text-left p-2.5 sm:p-3 rounded-xl border transition-all duration-200 cursor-pointer overflow-hidden",
+                                                            isSelected
+                                                                ? "border-emerald-500 bg-gradient-to-b from-emerald-500/10 to-emerald-500/5 shadow-sm ring-1 ring-emerald-500"
+                                                                : "border-slate-200/80 bg-slate-50/70 hover:border-slate-300 hover:bg-slate-100/60"
+                                                        )}
+                                                    >
+                                                        {preset.badge && (
+                                                            <span className={cn(
+                                                                "inline-block px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider mb-1",
+                                                                isSelected ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700"
+                                                            )}>
+                                                                {preset.badge}
+                                                            </span>
+                                                        )}
+                                                        <div className="font-bold text-xs sm:text-sm text-slate-900">{preset.name}</div>
+                                                        <div className="text-[11px] text-slate-500 mt-0.5 font-medium">{preset.description}</div>
+                                                        <div className="text-xs font-black text-emerald-600 mt-1">₹{preset.price.toLocaleString()}/mo</div>
+                                                    </motion.button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-bold text-slate-900">Your Email Address</label>
+                                            <input
+                                                type="email"
+                                                required
+                                                value={customEmail}
+                                                onChange={(e) => setCustomEmail(e.target.value)}
+                                                placeholder="you@company.com"
+                                                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-bold text-slate-900">Company / Project (Optional)</label>
+                                            <input
+                                                type="text"
+                                                value={customCompany}
+                                                onChange={(e) => setCustomCompany(e.target.value)}
+                                                placeholder="Acme Corp"
+                                                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-bold text-slate-900">Permanent Links</label>
+                                            <input
+                                                type="number"
+                                                required
+                                                min={1}
+                                                placeholder="e.g. 50,000"
+                                                value={customLinks}
+                                                onChange={(e) => {
+                                                    setActivePreset(null);
+                                                    const val = e.target.value;
+                                                    setCustomLinks(val === "" ? "" : Math.max(0, parseInt(val, 10) || 0));
+                                                }}
+                                                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-bold text-slate-900">Monthly API Calls</label>
+                                            <input
+                                                type="number"
+                                                required
+                                                min={1}
+                                                placeholder="e.g. 2,000,000"
+                                                value={customApiCalls}
+                                                onChange={(e) => {
+                                                    setActivePreset(null);
+                                                    const val = e.target.value;
+                                                    setCustomApiCalls(val === "" ? "" : Math.max(0, parseInt(val, 10) || 0));
+                                                }}
+                                                className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs font-bold text-slate-900 flex items-center justify-between">
+                                                <span>Proposed Budget</span>
+                                                <span className="text-emerald-600 font-bold">(₹/mo)</span>
+                                            </label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-2.5 text-xs sm:text-sm font-black text-slate-500">₹</span>
+                                                <input
+                                                    type="number"
+                                                    required
+                                                    min={1}
+                                                    placeholder="e.g. 1,499"
+                                                    value={customProposedPrice}
+                                                    onChange={(e) => {
+                                                        setActivePreset(null);
+                                                        const val = e.target.value;
+                                                        setCustomProposedPrice(val === "" ? "" : Math.max(0, parseInt(val, 10) || 0));
+                                                    }}
+                                                    className="w-full h-10 pl-7 pr-3 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm font-black text-emerald-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Live Deal Value & Savings Calculator Pill */}
+                                    <motion.div
+                                        layout
+                                        initial={{ opacity: 0, y: 4 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="p-3.5 rounded-xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/[0.07] via-emerald-500/[0.03] to-transparent text-xs text-slate-700 flex flex-wrap items-center justify-between gap-2"
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                            <span className="font-semibold text-slate-900">
+                                                {numericLinks > 0 && numericPrice > 0 ? (
+                                                    <>Unit Rate: <span className="font-bold text-emerald-700">~₹{costPer1k} / 1K links</span></>
+                                                ) : (
+                                                    "Enterprise High-Throughput Tier"
+                                                )}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-[11px] font-medium text-slate-600">
+                                            {numericPrice > 0 && (
+                                                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
+                                                    Save ~{savingsPercent}% vs Bitly
+                                                </span>
+                                            )}
+                                            <span className="hidden sm:inline-flex items-center gap-1 text-slate-500">
+                                                ⚡ Fast-track 2h review
+                                            </span>
+                                        </div>
+                                    </motion.div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-slate-900">Use Case / Requirements (Optional)</label>
+                                        <textarea
+                                            rows={2}
+                                            value={customNotes}
+                                            onChange={(e) => setCustomNotes(e.target.value)}
+                                            placeholder="Tell us about your traffic, integration needs, or timeline..."
+                                            className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2 pt-1">
+                                        <motion.button
+                                            whileHover={{ scale: 1.01 }}
+                                            whileTap={{ scale: 0.99 }}
+                                            type="submit"
+                                            disabled={customSubmitting}
+                                            className="w-full h-12 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-700 hover:via-teal-700 hover:to-emerald-700 text-white font-bold text-xs sm:text-sm shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 relative overflow-hidden group"
+                                        >
+                                            {/* Shimmer sweep effect */}
+                                            <span className="absolute inset-0 w-1/2 h-full bg-white/20 skew-x-12 -translate-x-full group-hover:translate-x-[300%] transition-transform duration-1000 ease-out pointer-events-none" />
+                                            
+                                            {customSubmitting ? (
+                                                <>
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                    <span>Submitting Proposal...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Send className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                                                    <span>
+                                                        Submit Proposal · Lock In {numericPrice > 0 ? `₹${numericPrice.toLocaleString()}/mo` : "Custom Rate"}
+                                                    </span>
+                                                </>
+                                            )}
+                                        </motion.button>
+                                        <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-500 font-medium">
+                                            <Lock className="w-3 h-3 text-slate-400" />
+                                            <span>No upfront payment required · Curated directly onto your account</span>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        )}
+                        </div>
                     </div>
                 </div>
 

@@ -7,7 +7,14 @@ export async function GET() {
     try {
         const config = await getDynamicConfig();
         const computedPlans = await getAllComputedPlanConfigs();
-        return NextResponse.json({ config, computedPlans });
+        return NextResponse.json(
+            { config, computedPlans },
+            {
+                headers: {
+                    "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+                },
+            }
+        );
     } catch (e) {
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }

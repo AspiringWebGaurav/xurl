@@ -203,6 +203,7 @@ export interface CreateLinkResponse {
     shortUrl: string;
     originalUrl: string;
     createdAt: number;
+    expiresAt?: number | null;
 }
 
 export interface RedirectResult {

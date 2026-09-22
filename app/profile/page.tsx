@@ -9,7 +9,7 @@ import {
     getPreferredDisplayName,
 } from "@/lib/firebase/user-profile";
 import { TopNavbar } from "@/components/layout/TopNavbar";
-import { Loader2, User as UserIcon, ShieldCheck, Mail, Calendar, CheckCircle2, Sparkles, ArrowLeft } from "lucide-react";
+import { Loader2, User as UserIcon, ShieldCheck, Mail, Calendar, CheckCircle2, Sparkles, ArrowLeft, ArrowRight, Trash2, Clock, AlertTriangle, X } from "lucide-react";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { DesktopGuestLocked } from "@/components/layout/DesktopGuestLocked";
 import { HomeFooter } from "@/components/layout/HomeFooter";
@@ -25,6 +25,45 @@ export default function ProfilePage() {
     const [displayName, setDisplayName] = useState("");
     const [saving, setSaving] = useState(false);
     const [userPlan, setUserPlan] = useState("free");
+    const [curatedOffer, setCuratedOffer] = useState<any>(null);
+    const [deletionRequest, setDeletionRequest] = useState<any>(null);
+    const [showDeletionModal, setShowDeletionModal] = useState(false);
+    const [deletionReason, setDeletionReason] = useState("");
+    const [submittingDeletion, setSubmittingDeletion] = useState(false);
+
+    const fetchDeletionStatus = async (u: User) => {
+        try {
+            const token = await u.getIdToken();
+            const res = await fetch("/api/user/data-deletion-request", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setDeletionRequest(data.request);
+            }
+        } catch (e) {
+            console.error("Failed to fetch deletion status", e);
+        }
+    };
+
+    const fetchCuratedOffer = async (u: User) => {
+        try {
+            const token = await u.getIdToken();
+            const res = await fetch("/api/user/partial-offers", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data.offers) && data.offers.length > 0) {
+                    setCuratedOffer(data.offers[0]);
+                } else {
+                    setCuratedOffer(null);
+                }
+            }
+        } catch (e) {
+            console.error("Failed to fetch curated offer", e);
+        }
+    };
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -44,6 +83,8 @@ export default function ProfilePage() {
                     if (data.plan) {
                         setUserPlan(data.plan);
                     }
+                    await fetchDeletionStatus(u);
+                    await fetchCuratedOffer(u);
                 } catch (e) {
                     console.error("Failed to fetch profile", e);
                 }
@@ -113,6 +154,40 @@ export default function ProfilePage() {
         }
     };
 
+    const handleRequestDeletion = async (e: FormEvent) => {
+        e.preventDefault();
+        if (!user) return;
+        setSubmittingDeletion(true);
+
+        try {
+            const token = await user.getIdToken();
+            const res = await fetch("/api/user/data-deletion-request", {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ reason: deletionReason }),
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                toast.success("Deletion request submitted successfully!", {
+                    description: "Our admin team will review your request to delete your account and links.",
+                });
+                setDeletionRequest(data.request);
+                setShowDeletionModal(false);
+                setDeletionReason("");
+            } else {
+                toast.error(data.message || "Failed to submit deletion request.");
+            }
+        } catch {
+            toast.error("Network error while submitting deletion request.");
+        } finally {
+            setSubmittingDeletion(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="h-[100dvh] flex flex-col items-center justify-center bg-background">
@@ -164,6 +239,31 @@ export default function ProfilePage() {
                             </span>
                         </div>
 
+                        {/* Curated Custom Plan Ready Banner */}
+                        {curatedOffer && (
+                            <div className="p-4 sm:p-5 rounded-3xl border-2 border-indigo-500/50 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 text-white shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/25 px-2.5 py-0.5 text-xs font-black text-amber-300 border border-amber-400/40">
+                                            <Sparkles className="h-3.5 w-3.5 text-amber-300" /> Curated Custom Plan Ready
+                                        </span>
+                                        <span className="text-sm font-black text-emerald-400">₹{curatedOffer.discountValue?.toLocaleString()}/mo</span>
+                                    </div>
+                                    <h4 className="text-sm sm:text-base font-bold text-white">{curatedOffer.title}</h4>
+                                    <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                                        {curatedOffer.description}
+                                    </p>
+                                </div>
+                                <Link
+                                    href="/pricing"
+                                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs px-4 py-2.5 shadow transition active:scale-95 shrink-0"
+                                >
+                                    <span>Claim Curated Plan</span>
+                                    <ArrowRight className="h-4 w-4" />
+                                </Link>
+                            </div>
+                        )}
+
                         {/* Main Glassmorphic Profile Card - Broad Responsive Enlarge */}
                         <div className="rounded-3xl border border-border/80 bg-card/80 backdrop-blur-2xl shadow-2xl p-5 sm:p-8 lg:p-10 overflow-hidden">
                             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 lg:gap-10 items-center">
@@ -203,6 +303,25 @@ export default function ProfilePage() {
                                             <Calendar className="h-3.5 w-3.5" />
                                             {createdDateStr}
                                         </span>
+                                    </div>
+
+                                    {/* Data & Privacy: Request Account & Link Deletion */}
+                                    <div className="w-full pt-3 border-t border-border/40">
+                                        {deletionRequest?.status === "pending" ? (
+                                            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-500 text-xs flex items-center justify-center gap-1.5 font-bold text-center">
+                                                <Clock className="h-3.5 w-3.5 shrink-0" />
+                                                <span>Deletion Request Pending Review</span>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowDeletionModal(true)}
+                                                className="w-full text-xs text-muted-foreground hover:text-rose-500 transition flex items-center justify-center gap-1.5 py-1 font-semibold cursor-pointer"
+                                            >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                                <span>Request Data & Link Deletion</span>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 
@@ -273,6 +392,70 @@ export default function ProfilePage() {
                     </motion.div>
                 )}
             </main>
+
+            {/* Account & Data Deletion Modal */}
+            {showDeletionModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+                        <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-2.5 text-rose-500 font-bold text-lg">
+                                <AlertTriangle className="h-5 w-5" />
+                                <span>Delete Account & Links</span>
+                            </div>
+                            <button
+                                onClick={() => setShowDeletionModal(false)}
+                                className="text-muted-foreground hover:text-foreground transition p-1 rounded-lg cursor-pointer"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        <p className="text-xs sm:text-sm text-muted-foreground">
+                            Per our privacy and data policy, you can request full deletion of your account. If approved by our administration, <strong className="text-foreground">all your permanent short links, analytics, and profile data will be permanently wiped</strong> from our database and edge caches.
+                        </p>
+
+                        <form onSubmit={handleRequestDeletion} className="space-y-4 pt-1">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-foreground">Reason for deletion (optional):</label>
+                                <textarea
+                                    value={deletionReason}
+                                    onChange={(e) => setDeletionReason(e.target.value)}
+                                    placeholder="Please let us know why you are leaving..."
+                                    rows={3}
+                                    className="w-full rounded-xl border border-border bg-background/90 p-3 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2.5 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDeletionModal(false)}
+                                    className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold border border-border text-foreground hover:bg-muted transition cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submittingDeletion}
+                                    className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-rose-500 hover:bg-rose-600 text-white transition flex items-center gap-1.5 shadow-lg cursor-pointer disabled:opacity-50"
+                                >
+                                    {submittingDeletion ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            <span>Submitting...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Trash2 className="h-4 w-4" />
+                                            <span>Submit Deletion Request</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Footer */}
             <div className="shrink-0 hidden md:block">

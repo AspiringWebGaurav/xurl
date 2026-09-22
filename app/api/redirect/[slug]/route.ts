@@ -53,7 +53,7 @@ export async function GET(
                 isActive: true // Assuming active if in cache
             }, {
                 headers: {
-                    "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400"
+                    "Cache-Control": "public, s-maxage=10, stale-while-revalidate=5"
                 }
             });
         }
@@ -69,11 +69,11 @@ export async function GET(
 
         const data = docSnap.data()!;
         const originalUrl = data.originalUrl;
-        let expiresAt = data.expiresAt || null;
+        let expiresAt: number | null = data.expiresAt !== undefined ? data.expiresAt : null;
         const isActive = data.isActive !== false;
 
-        // Dynamic TTL Read-Time Evaluation
-        if (data.createdUnderPlan) {
+        // Dynamic TTL Read-Time Evaluation for legacy documents without explicit expiresAt field
+        if (expiresAt === null && data.expiresAt === undefined && data.createdUnderPlan) {
             const computedConfigs = await getAllComputedPlanConfigs();
             const planConfig = computedConfigs[data.createdUnderPlan as keyof typeof computedConfigs];
             if (planConfig && planConfig.ttlMs) {
@@ -81,21 +81,28 @@ export async function GET(
             }
         }
 
-        const isExpired = expiresAt && expiresAt < Date.now();
+        const now = Date.now();
+        const isExpired = expiresAt !== null && expiresAt < now;
         if (isActive && !isExpired) {
-            // Adaptive TTL based roughly on if it's high traffic or not (could be improved, default 60m for now)
-            setRedirectCache(slug, originalUrl, 3600).catch(console.error);
+            // Adaptive TTL based strictly on remaining time until expiration
+            let ttlSeconds = 3600;
+            if (expiresAt !== null) {
+                const remaining = Math.floor((expiresAt - now) / 1000);
+                ttlSeconds = Math.max(1, remaining);
+            }
+            setRedirectCache(slug, originalUrl, ttlSeconds).catch(console.error);
+
+            const cdnTtl = Math.min(ttlSeconds, 15);
+            return NextResponse.json({ originalUrl, isActive, expiresAt }, {
+                headers: {
+                    "Cache-Control": `public, s-maxage=${cdnTtl}, stale-while-revalidate=5`
+                }
+            });
         } else {
              // Expired/inactive: cache as negative, do not expose originalUrl
              setNegCacheRedis(slug, 120).catch(console.error);
              return NextResponse.json({ error: "expired", isActive, expiresAt }, { status: 410 });
         }
-
-        return NextResponse.json({ originalUrl, isActive, expiresAt }, {
-            headers: {
-                "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400"
-            }
-        });
     } catch (error) {
         console.error("Redirect lookup error:", error);
         return new NextResponse("Internal Server Error", { status: 500 });

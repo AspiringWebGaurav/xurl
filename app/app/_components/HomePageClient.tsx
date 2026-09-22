@@ -149,13 +149,13 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
             </AnimatePresence>
 
             <main
-                className="flex-1 flex flex-col w-full px-4 sm:px-6 md:px-8 overflow-hidden pt-14 pb-12 items-center justify-center"
+                className="flex-1 flex flex-col w-full px-3 sm:px-6 md:px-8 overflow-y-auto sm:overflow-hidden pt-2 sm:pt-10 pb-3 sm:pb-8 items-center justify-center min-h-0"
             >
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, ease: "easeOut" }}
-                    className="w-full max-w-[340px] sm:max-w-xl flex flex-col gap-3 sm:gap-6 mx-auto my-auto"
+                    className="w-full max-w-[360px] sm:max-w-xl flex flex-col gap-2.5 sm:gap-6 mx-auto my-auto py-1 sm:py-0"
                 >
                     <div className="text-center relative">
                         <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-80 h-80 bg-indigo-500/10 dark:bg-indigo-500/20 rounded-full blur-3xl pointer-events-none -z-10" />
@@ -164,7 +164,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                         </h1>
 
                         {!authLoading && (
-                            <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+                            <div className="mt-2.5 sm:mt-5 flex items-center justify-center gap-1.5 sm:gap-2.5 flex-wrap">
                                 {user ? (
                                     quota ? (
                                         <>
@@ -278,31 +278,32 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                         </>
                                     )
                                 ) : (
-                                    <Link href="/guest-policy" onClick={(e) => handleLinkClick(e, "/guest-policy")} className="group relative overflow-hidden flex items-center px-4 py-1.5 rounded-full bg-amber-500/10 dark:bg-amber-500/20 backdrop-blur-md border border-amber-500/30 dark:border-amber-500/40 text-amber-800 dark:text-amber-300 hover:border-amber-400 hover:shadow-[0_8px_20px_-6px_rgba(217,119,6,0.3)] hover:-translate-y-0.5 transition-all duration-300 text-xs font-bold tracking-wide cursor-pointer">
+                                    <Link href="/guest-policy" onClick={(e) => handleLinkClick(e, "/guest-policy")} className="group relative overflow-hidden flex items-center px-3 sm:px-4 py-1 sm:py-1.5 rounded-full bg-amber-500/10 dark:bg-amber-500/20 backdrop-blur-md border border-amber-500/30 dark:border-amber-500/40 text-amber-800 dark:text-amber-300 hover:border-amber-400 hover:shadow-[0_8px_20px_-6px_rgba(217,119,6,0.3)] hover:-translate-y-0.5 transition-all duration-300 text-[11px] sm:text-xs font-bold tracking-wide cursor-pointer">
                                         <div className="absolute inset-0 bg-gradient-to-r from-amber-400/0 via-amber-400/10 to-orange-400/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-md"></div>
-                                        <Lock className="w-3.5 h-3.5 mr-1.5 text-amber-600 dark:text-amber-400 group-hover:text-amber-700 transition-colors relative z-10" />
-                                        <span className="relative z-10">1 free link for no login policy</span>
-                                        <span className="mx-2 text-amber-400/80 relative z-10">—</span>
-                                        <Clock className="w-3.5 h-3.5 mr-1.5 text-amber-600 dark:text-amber-400 group-hover:text-amber-700 transition-colors relative z-10" />
+                                        <Lock className="w-3 sm:w-3.5 h-3 sm:h-3.5 mr-1 sm:mr-1.5 text-amber-600 dark:text-amber-400 group-hover:text-amber-700 transition-colors relative z-10" />
+                                        <span className="relative z-10 hidden sm:inline">1 free link for no login policy</span>
+                                        <span className="relative z-10 sm:hidden">1 free link</span>
+                                        <span className="mx-1.5 sm:mx-2 text-amber-400/80 relative z-10">—</span>
+                                        <Clock className="w-3 sm:w-3.5 h-3 sm:h-3.5 mr-1 sm:mr-1.5 text-amber-600 dark:text-amber-400 group-hover:text-amber-700 transition-colors relative z-10" />
                                         <span className="relative z-10">
                                             Expires in {initialGuestStatus.guestTtlMs ? Math.round(initialGuestStatus.guestTtlMs / 60000) + 'm' : '5m'}
                                         </span>
-                                        <ArrowRight className="w-3.5 h-3.5 ml-1.5 text-amber-500 dark:text-amber-400 group-hover:text-amber-700 group-hover:translate-x-1 transition-all relative z-10" />
+                                        <ArrowRight className="w-3 sm:w-3.5 h-3 sm:h-3.5 ml-1 sm:ml-1.5 text-amber-500 dark:text-amber-400 group-hover:text-amber-700 group-hover:translate-x-1 transition-all relative z-10" />
                                     </Link>
                                 )}
                                 <button
                                     onClick={togglePageTheme}
                                     title={`Switch to ${pageTheme === "light" ? "Dark" : "Light"} theme`}
-                                    className="group relative overflow-hidden flex items-center px-3 py-1.5 rounded-full bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600 hover:-translate-y-0.5 transition-all duration-300 text-xs font-bold tracking-wide cursor-pointer shadow-sm"
+                                    className="group relative overflow-hidden flex items-center px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-600 hover:-translate-y-0.5 transition-all duration-300 text-[11px] sm:text-xs font-bold tracking-wide cursor-pointer shadow-sm"
                                 >
                                     {pageTheme === "light" ? (
                                         <>
-                                            <Moon className="w-3.5 h-3.5 mr-1.5 text-indigo-500 transition-transform group-hover:rotate-12" />
+                                            <Moon className="w-3 sm:w-3.5 h-3 sm:h-3.5 mr-1 sm:mr-1.5 text-indigo-500 transition-transform group-hover:rotate-12" />
                                             <span>Dark</span>
                                         </>
                                     ) : (
                                         <>
-                                            <Sun className="w-3.5 h-3.5 mr-1.5 text-amber-400 transition-transform group-hover:rotate-45" />
+                                            <Sun className="w-3 sm:w-3.5 h-3 sm:h-3.5 mr-1 sm:mr-1.5 text-amber-400 transition-transform group-hover:rotate-45" />
                                             <span>Light</span>
                                         </>
                                     )}
@@ -466,7 +467,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -15, filter: "blur(4px)" }}
                                 transition={{ duration: 0.4, ease: "easeInOut" }}
-                                className={`${heroCardBase} flex flex-col gap-4 min-h-[290px] justify-center`}
+                                className={`${heroCardBase} flex flex-col gap-3 sm:gap-4 min-h-0 sm:min-h-[290px] justify-center p-3.5 sm:p-8`}
                             >
                                 <div className={`flex flex-col gap-1.5 ${isOverQuota ? 'opacity-50 pointer-events-none' : ''}`}>
                                     <div className="flex justify-between items-center px-1">
@@ -477,7 +478,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                                     initial={{ opacity: 0, y: -2 }}
                                                     animate={{ opacity: 1, y: 0 }}
                                                     exit={{ opacity: 0, scale: 0.95 }}
-                                                    className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5"
+                                                    className="text-[11px] text-muted-foreground font-medium items-center gap-1.5 hidden sm:flex"
                                                 >
                                                     Press <kbd className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded border border-border shadow-sm text-foreground">Enter</kbd> to shorten instantly
                                                 </motion.span>
@@ -640,8 +641,11 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                         )}
                                     </Button>
                                 )}
-                                <div className="mt-3 text-center text-[11px] text-muted-foreground/70 leading-relaxed px-4">
-                                    By shortening a URL, you agree to our <a href="/terms" onClick={(e) => handleLinkClick(e, "/terms")} className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Terms of Service <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>, <a href="/acceptable-use" onClick={(e) => handleLinkClick(e, "/acceptable-use")} className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Acceptable Use Policy <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>, and <a href="/code-of-conduct" onClick={(e) => handleLinkClick(e, "/code-of-conduct")} className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Code of Conduct <ExternalLink className="inline-block w-[10px] h-[10px] mb-[2px] opacity-60" /></a>.
+                                <div className="mt-2 sm:mt-3 text-center text-[10px] sm:text-[11px] text-muted-foreground/70 leading-tight sm:leading-relaxed px-1 sm:px-4">
+                                    By shortening a URL, you agree to our{" "}
+                                    <a href="/terms" onClick={(e) => handleLinkClick(e, "/terms")} className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Terms<span className="hidden sm:inline"> of Service</span> <ExternalLink className="inline-block w-[9px] sm:w-[10px] h-[9px] sm:h-[10px] mb-[2px] opacity-60" /></a>,{" "}
+                                    <a href="/acceptable-use" onClick={(e) => handleLinkClick(e, "/acceptable-use")} className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer"><span className="hidden sm:inline">Acceptable Use </span>Policy <ExternalLink className="inline-block w-[9px] sm:w-[10px] h-[9px] sm:h-[10px] mb-[2px] opacity-60" /></a>, and{" "}
+                                    <a href="/code-of-conduct" onClick={(e) => handleLinkClick(e, "/code-of-conduct")} className="font-medium text-muted-foreground/80 hover:text-foreground active:text-emerald-600 transition-colors whitespace-nowrap cursor-pointer">Code of Conduct <ExternalLink className="inline-block w-[9px] sm:w-[10px] h-[9px] sm:h-[10px] mb-[2px] opacity-60" /></a>.
                                 </div>
                             </motion.div>
                         )}

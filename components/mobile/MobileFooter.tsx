@@ -6,6 +6,7 @@ import { Logo } from "@/components/ui/Logo";
 import { useConfirmLink } from "@/components/providers/ConfirmLinkProvider";
 import { cn } from "@/lib/utils";
 import { ChevronUp } from "lucide-react";
+import { usePlansOffer } from "@/lib/hooks/usePlansOffer";
 
 const footerColumns = [
     {
@@ -60,6 +61,7 @@ const minimalLegalLinks = [
 export function MobileFooter() {
     const [expanded, setExpanded] = useState(false);
     const { handleLinkClick } = useConfirmLink();
+    const { hasOffer, offer } = usePlansOffer();
     const footerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -130,16 +132,24 @@ export function MobileFooter() {
                                     </span>
                                     <span className="w-6 h-px bg-foreground/20 -mt-1 mb-0.5" aria-hidden="true" />
                                     <div className="flex flex-col gap-2">
-                                        {col.links.map((link) => (
-                                            <Link
-                                                key={link.href}
-                                                href={link.href}
-                                                onClick={(e) => handleLinkClick(e, link.href)}
-                                                className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium no-underline"
-                                            >
-                                                {link.label}
-                                            </Link>
-                                        ))}
+                                        {col.links.map((link) => {
+                                            const isPricing = link.label === "Pricing";
+                                            return (
+                                                <Link
+                                                    key={link.href}
+                                                    href={link.href}
+                                                    onClick={(e) => handleLinkClick(e, link.href)}
+                                                    className="w-fit text-muted-foreground/80 transition-colors duration-150 hover:text-foreground font-medium no-underline flex items-center gap-1.5"
+                                                >
+                                                    <span>{link.label}</span>
+                                                    {isPricing && hasOffer && (
+                                                        <span className="px-1.5 py-[1px] rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[9px] font-black uppercase shadow-xs animate-pulse">
+                                                            {offer?.badgeText || "Offer"}
+                                                        </span>
+                                                    )}
+                                                </Link>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             ))}

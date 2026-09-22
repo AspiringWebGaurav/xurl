@@ -244,9 +244,11 @@ export async function GET(request: NextRequest) {
         const rawCursor = parseInt(searchParams.get("cursor") || "", 10);
         const cursor = isNaN(rawCursor) ? undefined : rawCursor;
 
-        const result = await getUserLinks(verifiedUid, pageSize, cursor);
+        const [result, userDoc] = await Promise.all([
+            getUserLinks(verifiedUid, pageSize, cursor),
+            adminDb.collection("users").doc(verifiedUid).get()
+        ]);
 
-        const userDoc = await adminDb.collection("users").doc(verifiedUid).get();
         const userData = userDoc.exists ? userDoc.data() : {};
         let plan: PlanType = resolvePlanType(userData?.plan);
         

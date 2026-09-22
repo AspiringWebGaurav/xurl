@@ -148,7 +148,7 @@ export function MobileHomePageClient({ initialGuestStatus }: HomePageClientProps
             </AnimatePresence>
 
             <main
-                className="flex-1 flex flex-col w-full px-4 overflow-hidden pt-14 pb-12 items-center justify-center"
+                className="flex-1 flex flex-col w-full px-3 overflow-y-auto pt-2 pb-3 items-center justify-center min-h-0"
             >
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}

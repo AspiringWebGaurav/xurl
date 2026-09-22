@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { Sparkles, Percent, Gift, ClipboardList, ListChecks, Loader2, ShieldCheck, Link as LinkIcon, ShieldAlert, Ban, Settings, Tag, Power, Lock } from "lucide-react";
+import { Sparkles, Percent, Gift, ClipboardList, ListChecks, Loader2, ShieldCheck, Link as LinkIcon, ShieldAlert, Ban, Settings, Tag, Power, Lock, UserX, Coins } from "lucide-react";
 import { auth } from "@/lib/firebase/config";
 import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { isAdminEmail } from "@/lib/admin-config";
@@ -20,11 +20,13 @@ const NAV_ITEMS = [
     { href: "/admin/plans", label: "Plan Configuration", icon: Settings },
     { href: "/admin/offers", label: "Global Offers", icon: Tag },
     { href: "/admin/partial-offers", label: "Partial Offers", icon: Percent },
+    { href: "/admin/custom-pricing", label: "Custom Pricing", icon: Coins },
     { href: "/admin/promo-codes", label: "Promo Codes", icon: Tag },
     { href: "/admin/grant-plan", label: "Grant Plan", icon: Gift },
     { href: "/admin/bans", label: "Bans & Appeals", icon: ShieldCheck },
     { href: "/admin/system-bans", label: "System Bans", icon: ShieldAlert },
     { href: "/admin/links", label: "Link Management", icon: LinkIcon },
+    { href: "/admin/data-requests", label: "Data Deletions", icon: UserX },
     { href: "/admin/purchase-history", label: "Purchase History", icon: ClipboardList },
     { href: "/admin/logs", label: "Admin Logs", icon: ListChecks },
 ] as const;
@@ -211,12 +213,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                     </p>
 
                     <div className="pt-2 border-t border-white/10 flex flex-col items-center gap-3">
-                        <a
+                        <Link
                             href="/"
                             className="w-full h-11 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 border border-white/10"
                         >
                             Return to Public Application
-                        </a>
+                        </Link>
                         <span className="text-[11px] font-mono text-slate-500">
                             MINIMUM REQUIRED SCREEN WIDTH: 1024px
                         </span>

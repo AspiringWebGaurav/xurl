@@ -15,11 +15,11 @@ export const defaultPolicies: Record<string, Policy> = {
     privacy: {
         id: "privacy",
         title: "Privacy Policy",
-        lastUpdated: "August 7, 2026 (Previously revised: July 22, 2026)",
+        lastUpdated: "September 22, 2026 (Previously revised: August 7, 2026)",
         sections: [
             {
                 title: "Information We Collect",
-                content: "We collect information you provide directly (such as email addresses via Google Auth) and technical information gathered automatically (such as device fingerprints, IP addresses, and click analytics on shortened URLs). IP addresses and device fingerprints are SHA-256 hashed before storage to anonymize users while preventing abuse. We operate a zero-trust architecture, meaning even internal access to this data requires temporary, heavily audited cryptographic grants.",
+                content: "We collect information you provide directly (such as email addresses via Google Auth, and corporate requirements provided in Custom Enterprise proposals) and technical information gathered automatically (such as device fingerprints, IP addresses, and click analytics on shortened URLs). IP addresses and device fingerprints are SHA-256 hashed before storage to anonymize users while preventing abuse. We operate a zero-trust architecture, meaning even internal access to this data requires temporary, heavily audited cryptographic grants.",
             },
             {
                 title: "Mouse Idle & User Engagement Policy",
@@ -40,13 +40,17 @@ export const defaultPolicies: Record<string, Policy> = {
             {
                 title: "Data Portability & User Archive Export Rights (GDPR / CCPA)",
                 content: "All registered XURL accounts (Free, Starter, Pro, Business, and Enterprise) possess the unconditional right to export a machine-readable data archive of their account profile, shortened URL records, click telemetry, and billing history under GDPR Article 20 and CCPA §1798.100. Data exports may be requested at any time via our dedicated Data Portability Portal (/data-export). To prevent distributed denial-of-service (DDoS) attacks, CPU resource exhaustion, and bot scraping, data exports are strictly rate-limited to a maximum of **3 export archives per hour per user account**, with a mandatory 60-second cooldown between downloads. Guest accounts are unauthenticated and ephemeral, and are therefore excluded from data archive exports under our Guest Usage Policy.",
+            },
+            {
+                title: "Right to Erasure & Account Data Deletion (GDPR Art. 17 / CCPA)",
+                content: "Registered users have the right to request complete erasure of their account data, created links, click telemetry, and associated profile information under GDPR Article 17 and CCPA §1798.105. Deletion requests can be initiated securely via the User Profile portal or our dedicated endpoint (/api/user/data-deletion-request). Requests enter a queued verification state and are processed in accordance with legal and financial record-keeping obligations.",
             }
         ]
     },
     terms: {
         id: "terms",
         title: "Terms of Service",
-        lastUpdated: "August 7, 2026 (Previously revised: July 22, 2026)",
+        lastUpdated: "September 22, 2026 (Previously revised: August 7, 2026)",
         sections: [
             {
                 title: "Acceptance of Terms",
@@ -59,6 +63,10 @@ export const defaultPolicies: Record<string, Policy> = {
             {
                 title: "Enterprise Use & E-Policies",
                 content: "Corporate and enterprise users are bound by strict 'E-Policies' governing data scraping, API usage limits, and fair usage parameters. Automated creation of links outside the officially provided and authenticated API interfaces is strictly prohibited. Engaging in any form of distributed denial-of-service (DDoS), or attempting to bypass our rate limits using proxy networks or malicious botnets, will result in immediate termination of service and potential legal action."
+            },
+            {
+                title: "Custom Enterprise Proposals & Curated Plans",
+                content: "Users may submit custom volume and pricing proposals via our Custom Enterprise form (/pricing and /mobile/plan). Submitting a proposal does not guarantee approval or constitute a binding contract. Once reviewed and curated by our administration team, approved terms are dispatched via confirmation email and rendered as an active, personalized tier on the user's Pricing Page and Dashboard. Activation occurs exclusively upon successful 1-click checkout via our integrated Razorpay payment gateway. Proposals are subject to multi-tier anti-abuse rate limits (5 submissions per 15 minutes per IP; 3 submissions per 30 minutes per email)."
             },
             {
                 title: "Prohibited Conduct",
@@ -89,7 +97,7 @@ export const defaultPolicies: Record<string, Policy> = {
     "emergency-policy": {
         id: "emergency-policy",
         title: "Emergency Protocol & Incident Response Policy",
-        lastUpdated: "August 7, 2026 (Effective: August 7, 2026)",
+        lastUpdated: "September 22, 2026 (Effective: September 22, 2026)",
         sections: [
             {
                 title: "1. Global Emergency Kill Switch Protocol",
@@ -112,7 +120,7 @@ export const defaultPolicies: Record<string, Policy> = {
     "guest-policy": {
         id: "guest-policy",
         title: "Guest Usage Policy",
-        lastUpdated: "August 7, 2026 (Previously revised: July 22, 2026)",
+        lastUpdated: "September 22, 2026 (Previously revised: August 7, 2026)",
         sections: [
             {
                 title: "Scope of Guest Access",
@@ -135,7 +143,7 @@ export const defaultPolicies: Record<string, Policy> = {
     "acceptable-use": {
         id: "acceptable-use",
         title: "Acceptable Use Policy",
-        lastUpdated: "August 7, 2026 (Previously revised: July 22, 2026)",
+        lastUpdated: "September 22, 2026 (Previously revised: August 7, 2026)",
         sections: [
             {
                 title: "1. Prohibited Content Categories",
@@ -146,8 +154,8 @@ export const defaultPolicies: Record<string, Policy> = {
                 content: "XURL employs continuous automated threat detection, Google Safe Browsing telemetry, and real-time destination URL inspection. Any shortened link found to resolve to a high-risk or flagged endpoint will be **immediately suspended or permanently deleted without prior notice**. Repeated submission of non-compliant links will result in an immediate account ban."
             },
             {
-                title: "3. Network Exploitation & DDoS Restrictions",
-                content: "Attempting to bypass platform rate limits, probe internal Edge APIs, deploy automated scraping scripts, or participate in distributed denial-of-service (DDoS) attacks against XURL infrastructure—including automated script hammering of our Data Export engine (/api/user/data-export)—is strictly prohibited. Violators will have their IP range and device fingerprints added to our perpetual firewall blocklist."
+                title: "3. Network Exploitation, Anti-Abuse & DDoS Restrictions",
+                content: "Attempting to bypass platform rate limits, probe internal Edge APIs, deploy automated scraping scripts, submit spam custom pricing proposals, or participate in distributed denial-of-service (DDoS) attacks against XURL infrastructure—including automated script hammering of our Data Export engine (/api/user/data-export) or Custom Pricing forms—is strictly prohibited. Submissions to custom pricing endpoints are restricted via sliding-window IP and email rate limits. Violators will have their IP range and device fingerprints added to our perpetual firewall blocklist."
             },
             {
                 title: "4. Ban Enforcement & Loss of Access",
@@ -158,7 +166,7 @@ export const defaultPolicies: Record<string, Policy> = {
     "code-of-conduct": {
         id: "code-of-conduct",
         title: "Code of Conduct",
-        lastUpdated: "August 7, 2026 (Previously revised: July 22, 2026)",
+        lastUpdated: "September 22, 2026 (Previously revised: August 7, 2026)",
         sections: [
             {
                 title: "1. Community & Support Interaction Standards",
@@ -173,7 +181,7 @@ export const defaultPolicies: Record<string, Policy> = {
     "open-source": {
         id: "open-source",
         title: "Open Source Policy",
-        lastUpdated: "August 7, 2026 (Previously revised: July 22, 2026)",
+        lastUpdated: "September 22, 2026 (Previously revised: August 7, 2026)",
         sections: [
             {
                 title: "1. Attribution & Underlying Dependencies",
@@ -188,11 +196,11 @@ export const defaultPolicies: Record<string, Policy> = {
     refund: {
         id: "refund",
         title: "Refund Policy",
-        lastUpdated: "August 7, 2026 (Previously revised: July 22, 2026)",
+        lastUpdated: "September 22, 2026 (Previously revised: August 7, 2026)",
         sections: [
             {
                 title: "1. Digital Service Sales & Immediate Provisioning",
-                content: "XURL subscription upgrades, link package grants, and plan add-ons are digital cloud services that are provisioned immediately upon transaction confirmation. Because infrastructure capacity and Edge routing resources are reserved instantly, all transactions are generally final and non-refundable."
+                content: "XURL subscription upgrades, link package grants, plan add-ons, and Custom Enterprise curated plans are digital cloud services that are provisioned immediately upon transaction confirmation via Razorpay. Because infrastructure capacity, permanent link limits, and Edge routing resources are reserved instantly, all transactions are generally final and non-refundable."
             },
             {
                 title: "2. 7-Day Enterprise Technical Guarantee",

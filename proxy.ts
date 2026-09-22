@@ -3,7 +3,7 @@ import type { NextFetchEvent } from 'next/server';
 
 // Edge in-memory cache
 const edgeCache = new Map<string, { originalUrl: string; isActive: boolean; expiresAt: number | null; cachedAt: number }>();
-const DEFAULT_TTL_MS = 5 * 60 * 1000;
+const DEFAULT_TTL_MS = 10 * 1000; // 10-second edge memory TTL to honor short link expirations
 const MAX_EDGE_CACHE_SIZE = 5_000;
 
 /** Dispatch analytics click recording in a fire-and-forget fashion. */
@@ -30,14 +30,16 @@ function dispatchAnalytics(
 function buildRedirectResponse(
     request: NextRequest,
     redirectUrl: string,
-    cacheStatus: "HIT" | "MISS"
+    cacheStatus: "HIT" | "MISS",
+    maxAgeSec: number = 10
 ): NextResponse {
     const redirectPageUrl = request.nextUrl.clone();
     redirectPageUrl.pathname = '/r';
     redirectPageUrl.searchParams.set("dest", redirectUrl);
 
     const response = NextResponse.redirect(redirectPageUrl, 302);
-    response.headers.set("Cache-Control", "public, max-age=0, s-maxage=300, must-revalidate");
+    const sMaxAge = Math.max(0, Math.min(maxAgeSec, 10));
+    response.headers.set("Cache-Control", `public, max-age=0, s-maxage=${sMaxAge}, must-revalidate`);
     response.headers.set("X-Edge-Cache", cacheStatus);
     return response;
 }
@@ -164,7 +166,8 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
 
         if (!isExpired && cached.isActive && !cacheExpired) {
             dispatchAnalytics(event, request, slug);
-            return buildRedirectResponse(request, cached.originalUrl, "HIT");
+            const remainingSec = cached.expiresAt ? Math.floor((cached.expiresAt - Date.now()) / 1000) : 10;
+            return buildRedirectResponse(request, cached.originalUrl, "HIT", remainingSec);
         } else {
             edgeCache.delete(slug);
         }
@@ -184,7 +187,7 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
             cachedAt: Date.now(),
         });
         dispatchAnalytics(event, request, slug);
-        return buildRedirectResponse(request, redisUrl, "HIT");
+        return buildRedirectResponse(request, redisUrl, "HIT", 10);
     }
 
     // 3) Cache Miss -> Await API fetch to get redirect URL (handles Firestore lookup & TTL calculation)
@@ -211,7 +214,8 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
                 const isExpired = data.expiresAt && data.expiresAt < Date.now();
                 if (data.isActive && !isExpired) {
                     dispatchAnalytics(event, request, slug);
-                    return buildRedirectResponse(request, data.originalUrl, "MISS");
+                    const remainingSec = data.expiresAt ? Math.floor((data.expiresAt - Date.now()) / 1000) : 10;
+                    return buildRedirectResponse(request, data.originalUrl, "MISS", remainingSec);
                 } else {
                     return NextResponse.redirect(new URL('/expired', request.url), 302);
                 }

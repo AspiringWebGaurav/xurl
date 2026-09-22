@@ -35,7 +35,14 @@ export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
     const [user, setUser] = useState<User | null>(null);
     const [authLoading, setAuthLoading] = useState(true);
     const [quotaLoading, setQuotaLoading] = useState(false);
-    const [quotaFetched, setQuotaFetched] = useState(false);
+    const [quotaFetched, setQuotaFetched] = useState(() => {
+        if (typeof window !== "undefined") {
+            try {
+                return Boolean(sessionStorage.getItem("xurl_cached_quota"));
+            } catch {}
+        }
+        return false;
+    });
     const [url, setUrl] = useState("");
     const [isValidUrl, setIsValidUrl] = useState(false);
     const [shortDomain, setShortDomain] = useState("xurl.eu.cc");
@@ -74,7 +81,15 @@ export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
     const resultRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const [highlightInput, setHighlightInput] = useState(false);
-    const [quota, setQuota] = useState<any>(null);
+    const [quota, setQuota] = useState<any>(() => {
+        if (typeof window !== "undefined") {
+            try {
+                const cached = sessionStorage.getItem("xurl_cached_quota");
+                if (cached) return JSON.parse(cached);
+            } catch {}
+        }
+        return null;
+    });
     const [guestExpiresAt, setGuestExpiresAt] = useState<number | null>(initialGuestStatus.expiresIn && initialGuestStatus.expiresIn > 0 ? Date.now() + (initialGuestStatus.expiresIn * 1000) : null);
     const [countdown, setCountdown] = useState<string>("");
     const [viewingPastLink, setViewingPastLink] = useState(false);
@@ -152,6 +167,13 @@ export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
                     } else {
                         setSelectedQuotaState('free');
                     }
+
+                    if (typeof window !== "undefined") {
+                        try {
+                            sessionStorage.setItem("xurl_cached_quota", JSON.stringify(d));
+                            sessionStorage.setItem("xurl_cached_uid", u.uid);
+                        } catch {}
+                    }
                 }
                 setQuotaFetched(true);
             })
@@ -177,9 +199,15 @@ export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
             setAuthLoading(false);
 
             if (u) {
-                // CRITICAL: Block render until quota fetched
-                setQuotaLoading(true);
-                setQuotaFetched(false);
+                // Check if we already have valid cached quota for this user for instant zero-skeleton render
+                const hasCached = typeof window !== "undefined" && sessionStorage.getItem("xurl_cached_uid") === u.uid;
+                if (!hasCached) {
+                    setQuotaLoading(true);
+                    setQuotaFetched(false);
+                } else {
+                    setQuotaFetched(true);
+                    setQuotaLoading(false);
+                }
 
                 void ensureUserDocument(u);
                 // Clear any guest state so logged-in user gets a fresh form
@@ -769,12 +797,11 @@ export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
         }
     };
 
-    // STRICT LOADING GATE - All conditions must pass before rendering
+    // STRICT LOADING GATE - Render instantly if mounted & cached or guest
     const isStrictlyLoading =
-        authLoading ||
-        quotaLoading ||
         !mounted ||
-        (user !== null && !quotaFetched);
+        (user === null && authLoading) ||
+        (user !== null && !quotaFetched && quotaLoading);
 
     useEffect(() => {
         if (!isStrictlyLoading) {
