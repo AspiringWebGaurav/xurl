@@ -23,6 +23,7 @@ import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, runTransac
 import { db } from "@/lib/firebase/config";
 
 import { HistorySidebar } from "./HistorySidebar";
+import { useAuthTransition } from "@/components/providers/AuthTransitionProvider";
 import { toast } from "sonner";
 import {
     DropdownMenu,
@@ -55,8 +56,6 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-    const [showOverlay, setShowOverlay] = useState(false);
-    const [overlayMessage, setOverlayMessage] = useState<React.ReactNode>("Connecting to Google...");
     const [hasNewHistory, setHasNewHistory] = useState(false);
     const [hasGuestHistory, setHasGuestHistory] = useState(false);
     const [linkCount, setLinkCount] = useState<number | null>(null);
@@ -94,35 +93,32 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
         : (["Pricing", "Plans"] as const);
     const isDevEnv = process.env.NODE_ENV === "development";
     const isDeveloper = isAdminEmail(user?.email);
+    const { triggerLoginTransition, triggerLogoutTransition } = useAuthTransition();
 
     const handleSignOut = useCallback(async () => {
         if (isLoggingOut) return;
         setIsLoggingOut(true);
-        toast.loading("Signing out...", { id: "logout-toast" });
 
         try {
-            // Initiate real Firebase sign-out immediately (0 artificial delay!)
-            await signOut();
-
-            // Coordinate routing: navigate to home if currently on an authenticated-only route
-            if (
-                pathname?.startsWith("/admin") ||
-                pathname?.startsWith("/dashboard") ||
-                pathname === "/profile" ||
-                pathname === "/purchase-history" ||
-                pathname === "/data-export"
-            ) {
-                router.push("/");
-            }
-
-            toast.success("Signed out successfully", { id: "logout-toast" });
+            await triggerLogoutTransition(async () => {
+                await signOut();
+                if (
+                    pathname?.startsWith("/admin") ||
+                    pathname?.startsWith("/dashboard") ||
+                    pathname === "/profile" ||
+                    pathname === "/purchase-history" ||
+                    pathname === "/data-export"
+                ) {
+                    router.push("/");
+                }
+            });
         } catch (err) {
             console.error("Sign out failed:", err);
             toast.error("Failed to sign out. Please try again.", { id: "logout-toast" });
         } finally {
             setIsLoggingOut(false);
         }
-    }, [isLoggingOut, pathname, router]);
+    }, [isLoggingOut, pathname, router, triggerLogoutTransition]);
 
     // Auto-close history sidebar when navigating to admin pages
     useEffect(() => {
@@ -238,41 +234,20 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
 
     // Unified Google login hook with instant cancel detection
     const { login: handleGoogleLogin, isLoggingIn } = useGoogleLogin({
-        showToasts: false, // Use custom overlay instead
-        onPopupOpen: () => {
-            setOverlayMessage("Connecting to Google...");
-            setShowOverlay(true);
-        },
-        onCancel: () => {
-            // Instant cancel - UI resets immediately
-            setOverlayMessage("Login cancelled — returning to dashboard...");
-            setTimeout(() => setShowOverlay(false), 500);
-        },
-        onSuccess: () => {
-            setOverlayMessage("Signing in...");
-            setTimeout(() => setShowOverlay(false), 600);
+        showToasts: false,
+        onSuccess: (loggedInUser) => {
+            const userObj = loggedInUser || user;
+            if (userObj) {
+                const isAdmin = isAdminEmail(userObj.email);
+                const targetUrl = isAdmin && !pathname?.startsWith("/admin") ? "/admin" : undefined;
+                void triggerLoginTransition(userObj, targetUrl);
+            }
         },
         onError: (error) => {
             if (error === "auth/popup-blocked") {
-                setOverlayMessage(
-                    <>
-                        Popup blocked — click to retry login
-                        <br />
-                        <span
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setShowOverlay(false);
-                                setTimeout(() => handleGoogleLogin(), 50);
-                            }}
-                            className="underline cursor-pointer hover:text-foreground transition-colors mt-2 inline-block"
-                        >
-                            Open login
-                        </span>
-                    </>
-                );
+                toast.error("Popup blocked. Please allow popups and try again.");
             } else {
-                setOverlayMessage("Unable to sign in. Please try again.");
-                setTimeout(() => setShowOverlay(false), 700);
+                toast.error("Unable to sign in. Please try again.");
             }
         }
     });
@@ -1163,25 +1138,6 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                 userId={user?.uid || ""}
                 onLinksChange={handleHistoryLinksChange}
             />
-
-            <AnimatePresence>
-                {showOverlay && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="fixed inset-0 z-[100] flex items-center justify-center bg-background/40 backdrop-blur-md"
-                    >
-                        <div className="flex flex-col items-center gap-3">
-                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                            <p className="text-sm font-medium text-muted-foreground tracking-tight text-center">
-                                {overlayMessage}
-                            </p>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
         </header>
     );
 }

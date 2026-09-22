@@ -28,6 +28,8 @@ export const PartialOfferSchema = z.object({
     createdBy: z.string().default("system"),
     createdAt: z.number().default(() => Date.now()),
     updatedAt: z.number().default(() => Date.now()),
+    customLinks: z.number().nullable().optional(),
+    customApiQuota: z.number().nullable().optional(),
 });
 
 export type PartialOffer = z.infer<typeof PartialOfferSchema>;
@@ -220,10 +222,20 @@ export async function getApplicablePartialOfferForUser(
         // Check total usage limit
         if (offer.usageLimit !== null && offer.redemptionCount >= offer.usageLimit) continue;
 
-        // Check plan eligibility
-        const planMatch =
-            offer.plans.includes("all") ||
-            offer.plans.includes(planId.toLowerCase());
+        // Check plan eligibility: custom_price offers apply ONLY to enterprise/vip, never smaller standard plans!
+        const isCustomPrice = offer.discountType === "custom_price";
+        let planMatch = false;
+        if (isCustomPrice) {
+            if (offer.plans.includes(planId.toLowerCase())) {
+                planMatch = true;
+            } else if (offer.plans.includes("all")) {
+                planMatch = planId.toLowerCase() === "enterprise" || planId.toLowerCase() === "vip";
+            }
+        } else {
+            planMatch =
+                offer.plans.includes("all") ||
+                offer.plans.includes(planId.toLowerCase());
+        }
 
         if (planMatch) {
             candidateOffers.push(offer);

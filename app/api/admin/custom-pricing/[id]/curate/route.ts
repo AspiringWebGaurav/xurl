@@ -150,7 +150,9 @@ export async function POST(
     const offerDescription = (notes || "").trim() ||
         `Curated custom plan: ${finalLinks.toLocaleString()} permanent links & ${finalApiQuota.toLocaleString()} API calls/mo at ₹${finalPriceINR.toLocaleString()}/mo.`;
 
-    const plansToAssign = Array.isArray(eligiblePlans) && eligiblePlans.length > 0 ? eligiblePlans : ["all"];
+    const plansToAssign = Array.isArray(eligiblePlans) && eligiblePlans.length > 0 && !eligiblePlans.includes("all") 
+        ? eligiblePlans 
+        : ["enterprise"];
     const expiryTimestamp = expiresInDays && Number(expiresInDays) > 0 ? now + Number(expiresInDays) * 24 * 60 * 60 * 1000 : null;
 
     try {
@@ -175,6 +177,8 @@ export async function POST(
                             isActive: true,
                             isRevoked: false,
                             notes: `Curated custom plan: ${finalLinks} links, ${finalApiQuota} API. Notes: ${notes || "None"}`,
+                            customLinks: finalLinks,
+                            customApiQuota: finalApiQuota,
                         },
                         admin.email || "admin"
                     );
@@ -207,6 +211,8 @@ export async function POST(
                     revokedAt: null,
                     notes: `Curated custom plan: ${finalLinks} links, ${finalApiQuota} API. Notes: ${notes || "None"}`,
                     createdBy: admin.email || "admin",
+                    customLinks: finalLinks,
+                    customApiQuota: finalApiQuota,
                 },
                 admin.email || "admin"
             );

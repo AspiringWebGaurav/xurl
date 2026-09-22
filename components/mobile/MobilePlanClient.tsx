@@ -26,7 +26,8 @@ import {
     Clock,
     XCircle,
     Mail,
-    CreditCard
+    CreditCard,
+    Crown
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { PLAN_CONFIGS, PAID_PLAN_ORDER, PlanType } from "@/lib/plans";
@@ -532,40 +533,64 @@ export default function MobilePlanClient() {
                                 {/* Eligible Plan Deals with Price Badges */}
                                 <div className="space-y-1.5 pt-1">
                                     <div className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-200">
-                                        Tap to 1-Click Upgrade:
+                                        {targetedOffer.discountType === "custom_price" ? "Exclusive Proposal Deal:" : "Tap to 1-Click Upgrade:"}
                                     </div>
                                     <div className="flex flex-wrap items-center gap-1.5">
-                                        {PAID_PLAN_ORDER.filter(p => targetedOffer.plans.includes("all") || targetedOffer.plans.includes(p)).map((planKey) => {
-                                            const baseINR = PLAN_CONFIGS[planKey as keyof typeof PLAN_CONFIGS]?.priceINR || 0;
-                                            let finalINR = baseINR;
-                                            if (targetedOffer.discountType === "percentage") {
-                                                finalINR = baseINR * (1 - targetedOffer.discountValue / 100);
-                                            } else if (targetedOffer.discountType === "flat") {
-                                                finalINR = Math.max(0, baseINR - targetedOffer.discountValue);
-                                            } else if (targetedOffer.discountType === "custom_price") {
-                                                finalINR = Math.max(0, targetedOffer.discountValue);
-                                            }
-                                            finalINR = Math.round(finalINR * 100) / 100;
-                                            const planLabel = PLAN_CONFIGS[planKey as keyof typeof PLAN_CONFIGS]?.label || planKey;
+                                        {targetedOffer.discountType === "custom_price" ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    triggerHaptic(30);
+                                                    const element = document.getElementById("plan-vip");
+                                                    if (element && horizontalScrollRef.current) {
+                                                        const target = element.offsetLeft - horizontalScrollRef.current.clientWidth / 2 + element.clientWidth / 2;
+                                                        horizontalScrollRef.current.scrollTo({ left: target, behavior: "smooth" });
+                                                    } else {
+                                                        handleUpgrade("enterprise");
+                                                    }
+                                                }}
+                                                className="flex items-center justify-between w-full rounded-xl bg-gradient-to-r from-amber-500/30 to-emerald-500/30 border border-amber-400/50 p-2.5 active:scale-98"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <Crown className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                                                    <span className="text-xs font-black text-amber-300">Curated VIP Plan:</span>
+                                                    <span className="text-sm font-black text-emerald-300">₹{targetedOffer.discountValue}/mo</span>
+                                                </div>
+                                                <span className="text-[11px] font-bold text-white bg-amber-500/40 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                                                    Claim VIP <ArrowRight className="w-3 h-3" />
+                                                </span>
+                                            </button>
+                                        ) : (
+                                            PAID_PLAN_ORDER.filter(p => targetedOffer.plans.includes("all") || targetedOffer.plans.includes(p)).map((planKey) => {
+                                                const baseINR = PLAN_CONFIGS[planKey as keyof typeof PLAN_CONFIGS]?.priceINR || 0;
+                                                let finalINR = baseINR;
+                                                if (targetedOffer.discountType === "percentage") {
+                                                    finalINR = baseINR * (1 - targetedOffer.discountValue / 100);
+                                                } else if (targetedOffer.discountType === "flat") {
+                                                    finalINR = Math.max(0, baseINR - targetedOffer.discountValue);
+                                                }
+                                                finalINR = Math.round(finalINR * 100) / 100;
+                                                const planLabel = PLAN_CONFIGS[planKey as keyof typeof PLAN_CONFIGS]?.label || planKey;
 
-                                            return (
-                                                <button
-                                                    key={planKey}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        triggerHaptic(30);
-                                                        handleUpgrade(planKey);
-                                                    }}
-                                                    className="flex items-center gap-1.5 rounded-xl bg-indigo-500/30 border border-indigo-400/50 active:scale-95 hover:bg-indigo-500/50 px-2.5 py-1 text-[11px] transition-all"
-                                                >
-                                                    <span className="font-bold text-white">{planLabel}:</span>
-                                                    <span className="text-[10px] text-slate-400 line-through">₹{baseINR}</span>
-                                                    <span className="font-black text-emerald-300">
-                                                        {finalINR === 0 ? "FREE" : `₹${finalINR}`}
-                                                    </span>
-                                                </button>
-                                            );
-                                        })}
+                                                return (
+                                                    <button
+                                                        key={planKey}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            triggerHaptic(30);
+                                                            handleUpgrade(planKey);
+                                                        }}
+                                                        className="flex items-center gap-1.5 rounded-xl bg-indigo-500/30 border border-indigo-400/50 active:scale-95 hover:bg-indigo-500/50 px-2.5 py-1 text-[11px] transition-all"
+                                                    >
+                                                        <span className="font-bold text-white">{planLabel}:</span>
+                                                        <span className="text-[10px] text-slate-400 line-through">₹{baseINR}</span>
+                                                        <span className="font-black text-emerald-300">
+                                                            {finalINR === 0 ? "FREE" : `₹${finalINR}`}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })
+                                        )}
                                     </div>
                                 </div>
 
@@ -641,11 +666,114 @@ export default function MobilePlanClient() {
                         </Button>
                     </div>
 
+                    {/* Curated VIP Plan Card (When approved by admin) */}
+                    {(() => {
+                        const hasCuratedVipOffer = Boolean(
+                            (targetedOffer && targetedOffer.discountType === "custom_price") ||
+                            (userCustomRequest && userCustomRequest.status === "curated")
+                        );
+                        if (!hasCuratedVipOffer) return null;
+
+                        const curatedVipPriceINR = targetedOffer?.discountType === "custom_price"
+                            ? targetedOffer.discountValue
+                            : (userCustomRequest?.curatedPriceINR ?? 1);
+                        const curatedVipLinks = ((userCustomRequest?.curatedLinks || targetedOffer?.customLinks || 50000) as number);
+                        const curatedVipApiQuota = ((userCustomRequest?.curatedApiQuota || targetedOffer?.customApiQuota || 2000000) as number);
+                        const isVipFocused = focusPlan === "vip" || focusPlan === "enterprise";
+
+                        return (
+                            <div id="plan-vip" className={cn(
+                                "snap-center shrink-0 w-[85vw] max-w-[320px] rounded-3xl backdrop-blur-2xl border-2 border-amber-400/80 bg-gradient-to-b from-amber-50/70 via-white to-amber-50/40 dark:from-amber-950/40 dark:via-slate-900 dark:to-amber-950/20 p-6 shadow-2xl flex flex-col relative overflow-hidden transition-all duration-300 ring-2 ring-amber-400/40",
+                                isVipFocused && "ring-4 ring-amber-500"
+                            )}>
+                                {/* Top Badge */}
+                                <div className="absolute top-0 left-0 w-full bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 py-1 text-center">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-950 flex items-center justify-center gap-1">
+                                        <Crown className="w-3 h-3 fill-slate-950" />
+                                        Curated VIP Plan (Approved)
+                                    </span>
+                                </div>
+
+                                <div className="mb-3 mt-3">
+                                    <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-400/40 px-2 py-0.5 text-[9px] font-extrabold text-amber-800 dark:text-amber-300">
+                                        <Sparkles className="w-2.5 h-2.5 text-amber-600" />
+                                        Approved for {user?.email || targetedOffer?.targetEmail || "You"}
+                                    </div>
+                                    <h3 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white flex items-center justify-between">
+                                        <span>VIP Enterprise</span>
+                                        <span className="text-[9px] font-black text-amber-700 dark:text-amber-300 bg-amber-200/60 dark:bg-amber-800/40 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                            Exclusive
+                                        </span>
+                                    </h3>
+                                    <p className="text-xs text-muted-foreground min-h-[28px]">
+                                        Admin approved custom quota & fixed pricing.
+                                    </p>
+                                </div>
+
+                                {/* Price Section */}
+                                <div className="mb-3 flex flex-col gap-1">
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-xl font-bold">{currencySymbols[currency]}</span>
+                                        <span className="text-4xl font-black tracking-tight text-amber-600 dark:text-amber-400">
+                                            {formatPrice(curatedVipPriceINR)}
+                                        </span>
+                                        <span className="text-xs font-semibold text-muted-foreground ml-1">/mo</span>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                        <CheckCircle2 className="w-3 h-3" /> Approved Fixed Deal
+                                    </span>
+                                </div>
+
+                                {/* API Quota Pill */}
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-400/30 text-amber-800 dark:text-amber-300 text-xs font-bold mb-4">
+                                    <Zap className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                                    <span>⚡ {curatedVipApiQuota.toLocaleString()} Dedicated API calls/mo</span>
+                                </div>
+
+                                <ul className="space-y-2.5 mb-6 flex-1">
+                                    <li className="flex items-start gap-2.5">
+                                        <Check className="mt-0.5 w-4 h-4 shrink-0 text-amber-600 font-bold" />
+                                        <span className="text-xs font-bold text-slate-900 dark:text-white">{curatedVipLinks.toLocaleString()} Permanent Links (Banked)</span>
+                                    </li>
+                                    <li className="flex items-start gap-2.5">
+                                        <Check className="mt-0.5 w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                        <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Permanent (Never Expires in DB)</span>
+                                    </li>
+                                    <li className="flex items-start gap-2.5">
+                                        <Check className="mt-0.5 w-4 h-4 shrink-0 text-amber-600" />
+                                        <span className="text-xs text-slate-600 dark:text-slate-300">High-Throughput Dedicated API</span>
+                                    </li>
+                                    <li className="flex items-start gap-2.5">
+                                        <Check className="mt-0.5 w-4 h-4 shrink-0 text-amber-600" />
+                                        <span className="text-xs text-slate-600 dark:text-slate-300">Custom aliases & QR codes</span>
+                                    </li>
+                                    <li className="flex items-start gap-2.5">
+                                        <Check className="mt-0.5 w-4 h-4 shrink-0 text-amber-600" />
+                                        <span className="text-xs text-slate-600 dark:text-slate-300">Dedicated SLA & Priority Support</span>
+                                    </li>
+                                </ul>
+
+                                <Button 
+                                    className="w-full rounded-xl py-5 font-black transition-all text-xs bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 text-slate-950 shadow-lg active:scale-98"
+                                    onClick={() => {
+                                        triggerHaptic(40);
+                                        handleUpgrade("enterprise");
+                                    }}
+                                >
+                                    <Crown className="w-4 h-4 mr-1.5 fill-slate-950" />
+                                    Claim VIP Plan ({currencySymbols[currency]}{formatPrice(curatedVipPriceINR)})
+                                </Button>
+                            </div>
+                        );
+                    })()}
+
                     {/* Paid Plans */}
                     {dynamicTiers.map(tier => {
                         const isFocused = focusPlan === tier.planId;
                         const isTargetedPlan = Boolean(
-                            targetedOffer && (targetedOffer.plans.includes("all") || targetedOffer.plans.includes(tier.planId.toLowerCase()))
+                            targetedOffer &&
+                            targetedOffer.discountType !== "custom_price" &&
+                            (targetedOffer.plans.includes("all") || targetedOffer.plans.includes(tier.planId.toLowerCase()))
                         );
 
                         let displayPriceINR = tier.priceINR;
@@ -657,8 +785,6 @@ export default function MobilePlanClient() {
                                 displayPriceINR = tier.priceINR * (1 - targetedOffer.discountValue / 100);
                             } else if (targetedOffer.discountType === "flat") {
                                 displayPriceINR = Math.max(0, tier.priceINR - targetedOffer.discountValue);
-                            } else if (targetedOffer.discountType === "custom_price") {
-                                displayPriceINR = Math.max(0, targetedOffer.discountValue);
                             }
                             displayPriceINR = Math.round(displayPriceINR * 100) / 100;
                         }

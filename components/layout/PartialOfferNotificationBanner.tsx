@@ -66,7 +66,7 @@ export function PartialOfferNotificationBanner() {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                     <Link
-                        href="/pricing"
+                        href={activeOffer.discountType === "custom_price" ? "/pricing?plan=vip" : "/pricing"}
                         className="inline-flex items-center gap-1 rounded-xl bg-white px-3 py-1 text-xs font-black text-indigo-950 shadow-sm transition hover:bg-amber-300 hover:text-indigo-950 active:scale-95"
                     >
                         Claim Offer <ArrowRight className="h-3.5 w-3.5" />

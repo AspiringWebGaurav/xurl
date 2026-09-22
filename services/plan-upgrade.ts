@@ -19,6 +19,7 @@ import { logger } from "@/lib/utils/logger";
 import { encryptApiKey, generateApiKey, hashApiKey } from "@/lib/api/crypto";
 import type { OrderDocument, PromoCodeDocument, PromoRedemptionDocument } from "@/types";
 import { FieldValue } from "firebase-admin/firestore";
+import type { PartialOffer } from "./partial-offers";
 
 export interface PlanUpgradeResult {
     plan: PlanType;
@@ -130,6 +131,49 @@ export async function applyPlanUpgrade(
             }
         }
 
+        // Check if there is an associated curated custom proposal for links & API quota
+        let customLinkLimit: number | null = null;
+        let customApiQuota: number | null = null;
+        let customReqRef: FirebaseFirestore.DocumentReference | null = null;
+
+        if (orderData?.promoCodeId) {
+            try {
+                const offerRef = adminDb.collection("partial_offers").doc(orderData.promoCodeId);
+                const offerSnap = await transaction.get(offerRef);
+                if (offerSnap.exists) {
+                    const offerData = offerSnap.data() as PartialOffer;
+                    if (offerData.discountType === "custom_price") {
+                        if (offerData.customLinks) customLinkLimit = Number(offerData.customLinks);
+                        if (offerData.customApiQuota) customApiQuota = Number(offerData.customApiQuota);
+                    }
+                }
+            } catch {
+                // Ignore read error in transaction
+            }
+        }
+
+        if (!customLinkLimit) {
+            const userEmail = (existingUser?.email || options?.recipientEmail || "").trim().toLowerCase();
+            if (userEmail) {
+                try {
+                    const customReqQuery = adminDb.collection("custom_pricing_requests")
+                        .where("email", "==", userEmail)
+                        .where("status", "==", "curated")
+                        .limit(1);
+                    const customReqSnap = await transaction.get(customReqQuery);
+                    if (!customReqSnap.empty) {
+                        const reqDoc = customReqSnap.docs[0];
+                        const reqData = reqDoc.data();
+                        customLinkLimit = Number(reqData.curatedLinks) || Number(reqData.linksNeeded) || null;
+                        customApiQuota = Number(reqData.curatedApiQuota) || Number(reqData.apiQuotaNeeded) || null;
+                        customReqRef = reqDoc.ref;
+                    }
+                } catch {
+                    // Ignore query error in transaction
+                }
+            }
+        }
+
         // --- COMPUTATIONS ---
         // Detect renewal (same plan while still active) vs upgrade/new plan
         const isRenewal =
@@ -149,9 +193,10 @@ export async function applyPlanUpgrade(
         }
 
         const newPlanConfig = PLAN_CONFIGS[planId];
-        const newCumulativeQuota = planId === "free" ? 0 : currentCumulativeQuota + newPlanConfig.limit;
-        const apiAccessEnabled = Boolean(newPlanConfig.apiAccess);
-        const apiQuotaTotal = apiAccessEnabled ? (newPlanConfig.apiQuotaTotal || 0) : 0;
+        const allocatedLinks = customLinkLimit ?? newPlanConfig.limit;
+        const newCumulativeQuota = planId === "free" ? 0 : currentCumulativeQuota + allocatedLinks;
+        const apiAccessEnabled = Boolean(newPlanConfig.apiAccess) || Boolean(customApiQuota);
+        const apiQuotaTotal = customApiQuota ?? (apiAccessEnabled ? (newPlanConfig.apiQuotaTotal || 0) : 0);
         let apiKeyHash = existingUser?.apiKeyHash || null;
         let apiKeyEncrypted = existingUser?.apiKeyEncrypted || null;
         let apiKeyLastRotatedAt = existingUser?.apiKeyLastRotatedAt || null;
@@ -224,6 +269,16 @@ export async function applyPlanUpgrade(
         // Apply user updates
         transaction.set(userRef, result, { merge: true });
 
+        // If a curated proposal was redeemed, mark it as redeemed in Firestore
+        if (customReqRef) {
+            transaction.update(customReqRef, {
+                status: "redeemed",
+                redeemedAt: now,
+                redeemedOrderId: orderId || null,
+                updatedAt: now,
+            });
+        }
+
         // Update order status if orderId is provided
         if (orderRef) {
             if (orderSnap && orderSnap.exists) {
@@ -289,7 +344,7 @@ export async function applyPlanUpgrade(
                 userId,
                 planType: planId,
                 action,
-                linksAllocated: planId === "free" ? 0 : newPlanConfig.limit,
+                linksAllocated: planId === "free" ? 0 : allocatedLinks,
                 orderId,
                 paymentId,
                 source: options?.source,

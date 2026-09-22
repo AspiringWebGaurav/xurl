@@ -19,6 +19,7 @@ export type PlanType = "free" | "starter" | "pro" | "business" | "enterprise" | 
  */
 export const LEGACY_PLAN_MAP: Record<string, PlanType> = {
     freebie: "free",
+    vip: "enterprise",
 };
 
 // ─── Plan Config Shape ──────────────────────────────────────────────────────

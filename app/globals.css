@@ -236,3 +236,18 @@
     background-color: rgba(100, 116, 139, 0.7);
   }
 }
+
+/* Move Sonner toast close button from left to top-right */
+[data-sonner-toaster] [data-close-button] {
+  left: auto !important;
+  right: 0 !important;
+  transform: translate(35%, -35%) !important;
+  opacity: 1 !important;
+}
+
+[data-sonner-toaster][dir=ltr],
+html[dir=ltr] {
+  --toast-close-button-start: unset !important;
+  --toast-close-button-end: 0 !important;
+  --toast-close-button-transform: translate(35%, -35%) !important;
+}

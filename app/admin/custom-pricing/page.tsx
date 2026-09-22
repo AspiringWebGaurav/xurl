@@ -123,7 +123,7 @@ export default function AdminCustomPricingPage() {
             req.adminNotes ||
             `Curated custom plan: ${(req.curatedLinks ?? req.linksNeeded ?? 50000).toLocaleString()} permanent links & ${(req.curatedApiQuota ?? req.apiQuotaNeeded ?? 2000000).toLocaleString()} API calls/mo.`
         );
-        setEligiblePlan("all");
+        setEligiblePlan("enterprise");
         setExpiresInDays("none");
     };
 

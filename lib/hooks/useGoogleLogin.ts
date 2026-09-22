@@ -1,9 +1,10 @@
 import { useState, useCallback, useRef } from "react";
 import { signInWithGoogle } from "@/services/auth";
+import type { User } from "firebase/auth";
 import { toast } from "sonner";
 
 export interface UseGoogleLoginOptions {
-    onSuccess?: () => void;
+    onSuccess?: (user?: User) => void;
     onError?: (error: string) => void;
     onCancel?: () => void;          // Called instantly on popup close
     onPopupOpen?: () => void;        // Called when popup confirmed open
@@ -101,7 +102,7 @@ export function useGoogleLogin(options: UseGoogleLoginOptions = {}) {
                 if (showToasts) {
                     toast.success("Signed in successfully!", { id: toastId });
                 }
-                onSuccess?.();
+                onSuccess?.(loggedInUser);
             } else {
                 setIsLoggingIn(false);
                 if (showToasts) {

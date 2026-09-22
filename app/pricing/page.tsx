@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, Suspense } from "react";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronLeft, ChevronRight, Lock, ShieldCheck, Zap, Building2, Coins, IndianRupee, Sparkles, Send, CheckCircle2, MessageSquare, Loader2, ArrowRight, Clock, XCircle, Mail, CreditCard } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Lock, ShieldCheck, Zap, Building2, Coins, IndianRupee, Sparkles, Send, CheckCircle2, MessageSquare, Loader2, ArrowRight, Clock, XCircle, Mail, CreditCard, Crown } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
@@ -667,39 +667,64 @@ export default function PricingPage() {
                             {/* Granted Plan Breakdown Row */}
                             <div className="pt-3 border-t border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-200 mr-1">Eligible Plan Deals:</span>
-                                    {PAID_PLAN_ORDER.filter(p => targetedOffer.plans.includes("all") || targetedOffer.plans.includes(p)).map((planKey) => {
-                                        const baseINR = PLAN_CONFIGS[planKey as keyof typeof PLAN_CONFIGS]?.priceINR || 0;
-                                        let finalINR = baseINR;
-                                        if (targetedOffer.discountType === "percentage") {
-                                            finalINR = baseINR * (1 - targetedOffer.discountValue / 100);
-                                        } else if (targetedOffer.discountType === "flat") {
-                                            finalINR = Math.max(0, baseINR - targetedOffer.discountValue);
-                                        } else if (targetedOffer.discountType === "custom_price") {
-                                            finalINR = Math.max(0, targetedOffer.discountValue);
-                                        }
-                                        finalINR = Math.round(finalINR * 100) / 100;
-                                        const planLabel = PLAN_CONFIGS[planKey as keyof typeof PLAN_CONFIGS]?.label || planKey;
-                                        return (
-                                            <button
-                                                key={planKey}
-                                                type="button"
-                                                onClick={() => {
-                                                    const cardEl = document.getElementById(`plan-${planKey}`);
-                                                    if (cardEl) {
-                                                        cardEl.scrollIntoView({ behavior: "smooth", block: "center" });
-                                                    }
-                                                }}
-                                                className="flex items-center gap-2 rounded-xl bg-indigo-500/25 border border-indigo-400/50 hover:border-amber-400/70 px-3 py-1.5 transition-all hover:scale-105"
-                                            >
-                                                <span className="text-xs font-black text-white">{planLabel}:</span>
-                                                <span className="text-xs font-bold text-slate-400 line-through">₹{baseINR}</span>
-                                                <span className="text-sm font-black text-emerald-400">
-                                                    {finalINR === 0 ? "₹0 FREE" : `₹${finalINR}`}
-                                                </span>
-                                            </button>
-                                        );
-                                    })}
+                                    <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-200 mr-1">
+                                        {targetedOffer.discountType === "custom_price" ? "Exclusive Proposal Deal:" : "Eligible Plan Deals:"}
+                                    </span>
+                                    {targetedOffer.discountType === "custom_price" ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const cardEl = document.getElementById("plan-vip");
+                                                if (cardEl) {
+                                                    cardEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                                                }
+                                            }}
+                                            className="flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-amber-500/30 via-yellow-500/20 to-emerald-500/30 border border-amber-400/60 hover:border-amber-300 px-4 py-2 transition-all hover:scale-105 shadow-md group"
+                                        >
+                                            <Crown className="w-4 h-4 text-amber-300 fill-amber-300 shrink-0" />
+                                            <span className="text-xs font-black text-amber-200">Curated VIP Plan:</span>
+                                            <span className="text-sm font-black text-emerald-300">
+                                                ₹{targetedOffer.discountValue}/mo
+                                            </span>
+                                            <span className="text-xs font-semibold text-slate-300">
+                                                ({((userCustomRequest?.curatedLinks || targetedOffer.customLinks || 50000) as number).toLocaleString()} Links · {((userCustomRequest?.curatedApiQuota || targetedOffer.customApiQuota || 2000000) as number).toLocaleString()} API)
+                                            </span>
+                                            <span className="ml-1 text-[11px] font-bold text-white bg-amber-500/40 px-2 py-0.5 rounded-lg flex items-center gap-1 group-hover:bg-amber-500/60">
+                                                Claim Plan <ArrowRight className="w-3 h-3" />
+                                            </span>
+                                        </button>
+                                    ) : (
+                                        PAID_PLAN_ORDER.filter(p => targetedOffer.plans.includes("all") || targetedOffer.plans.includes(p)).map((planKey) => {
+                                            const baseINR = PLAN_CONFIGS[planKey as keyof typeof PLAN_CONFIGS]?.priceINR || 0;
+                                            let finalINR = baseINR;
+                                            if (targetedOffer.discountType === "percentage") {
+                                                finalINR = baseINR * (1 - targetedOffer.discountValue / 100);
+                                            } else if (targetedOffer.discountType === "flat") {
+                                                finalINR = Math.max(0, baseINR - targetedOffer.discountValue);
+                                            }
+                                            finalINR = Math.round(finalINR * 100) / 100;
+                                            const planLabel = PLAN_CONFIGS[planKey as keyof typeof PLAN_CONFIGS]?.label || planKey;
+                                            return (
+                                                <button
+                                                    key={planKey}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const cardEl = document.getElementById(`plan-${planKey}`);
+                                                        if (cardEl) {
+                                                            cardEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                                                        }
+                                                    }}
+                                                    className="flex items-center gap-2 rounded-xl bg-indigo-500/25 border border-indigo-400/50 hover:border-amber-400/70 px-3 py-1.5 transition-all hover:scale-105"
+                                                >
+                                                    <span className="text-xs font-black text-white">{planLabel}:</span>
+                                                    <span className="text-xs font-bold text-slate-400 line-through">₹{baseINR}</span>
+                                                    <span className="text-sm font-black text-emerald-400">
+                                                        {finalINR === 0 ? "₹0 FREE" : `₹${finalINR}`}
+                                                    </span>
+                                                </button>
+                                            );
+                                        })
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -877,11 +902,138 @@ export default function PricingPage() {
                         </div>
                     </motion.div>
 
+                    {/* Curated VIP Plan (Rendered when custom proposal is approved by admin) */}
+                    {(() => {
+                        const hasCuratedVipOffer = Boolean(
+                            (targetedOffer && targetedOffer.discountType === "custom_price") ||
+                            (userCustomRequest && userCustomRequest.status === "curated")
+                        );
+                        if (!hasCuratedVipOffer) return null;
+
+                        const curatedVipPriceINR = targetedOffer?.discountType === "custom_price"
+                            ? targetedOffer.discountValue
+                            : (userCustomRequest?.curatedPriceINR ?? 1);
+                        const curatedVipLinks = ((userCustomRequest?.curatedLinks || targetedOffer?.customLinks || 50000) as number);
+                        const curatedVipApiQuota = ((userCustomRequest?.curatedApiQuota || targetedOffer?.customApiQuota || 2000000) as number);
+                        const isVipFocused = focusPlan === "vip" || focusPlan === "enterprise";
+
+                        return (
+                            <motion.div
+                                id="plan-vip"
+                                variants={cardVariants}
+                                className={cn(
+                                    cardBase,
+                                    "border-amber-400/80 bg-gradient-to-b from-amber-50/70 via-white to-amber-50/30 ring-2 ring-amber-400/50 shadow-[0_20px_50px_-15px_rgba(245,158,11,0.3)] hover:shadow-[0_25px_60px_-15px_rgba(245,158,11,0.45)] relative overflow-hidden",
+                                    isVipFocused && "ring-4 ring-amber-500 shadow-[0_0_50px_rgba(245,158,11,0.5)]"
+                                )}
+                            >
+                                {/* Top Floating VIP Pill */}
+                                <div className="absolute -top-3.5 left-0 right-0 flex justify-center">
+                                    <span className="rounded-full bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 px-4 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-slate-950 shadow-lg flex items-center gap-1.5 animate-pulse">
+                                        <Crown className="w-3.5 h-3.5 fill-slate-950" />
+                                        Curated VIP Plan (Approved)
+                                    </span>
+                                </div>
+
+                                <div className="mb-4 pt-2">
+                                    <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-800 shadow-xs">
+                                        <Sparkles className="w-3 h-3 text-amber-600" />
+                                        Approved for {user?.email || targetedOffer?.targetEmail || "Your Account"}
+                                    </div>
+                                    <h3 className="mb-1 flex items-center gap-2 text-[26px] font-black tracking-[-0.04em] text-slate-900">
+                                        VIP Enterprise
+                                    </h3>
+                                    <p className="text-[12px] leading-4 text-slate-600 font-medium">
+                                        Admin-curated custom enterprise quota & approved fixed rate.
+                                    </p>
+                                </div>
+
+                                <div className="mb-3 flex flex-col gap-1">
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-xl font-bold text-slate-900">{currencySymbols[currency]}</span>
+                                        <span className={cn(priceValueBase, "text-amber-600 font-black")}>
+                                            {formatPrice(curatedVipPriceINR)}
+                                        </span>
+                                        <span className="text-xs font-semibold text-slate-500 ml-1">/mo</span>
+                                    </div>
+                                    <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                        Admin Approved Fixed Pricing
+                                    </span>
+                                </div>
+
+                                {/* High-visibility dedicated stats */}
+                                <div className="mb-4 space-y-2">
+                                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-400/30 text-amber-900 text-xs font-bold w-full">
+                                        <Zap className="w-4 h-4 text-amber-600 fill-amber-600 shrink-0" />
+                                        <span>⚡ {curatedVipApiQuota.toLocaleString()} High-Speed API calls/mo</span>
+                                    </div>
+                                </div>
+
+                                {/* Features List */}
+                                <div className="flex-1 space-y-3 pt-2 border-t border-amber-200/60">
+                                    <div className={featureItemBase}>
+                                        <Check className="mt-0.5 h-[18px] w-[18px] shrink-0 text-amber-600" />
+                                        <span className="text-[14px] font-black text-slate-900">
+                                            {curatedVipLinks.toLocaleString()} permanent links (Banked)
+                                        </span>
+                                    </div>
+                                    <div className={featureItemBase}>
+                                        <Check className="mt-0.5 h-[18px] w-[18px] shrink-0 text-amber-600" />
+                                        <span className="text-[14px] font-semibold text-slate-800">
+                                            Permanent (Never Expires in DB)
+                                        </span>
+                                    </div>
+                                    <div className={featureItemBase}>
+                                        <Check className="mt-0.5 h-[18px] w-[18px] shrink-0 text-amber-600" />
+                                        <span className="text-[14px] leading-5 text-slate-700">
+                                            {curatedVipApiQuota.toLocaleString()} Developer API calls/mo
+                                        </span>
+                                    </div>
+                                    <div className={featureItemBase}>
+                                        <Check className="mt-0.5 h-[18px] w-[18px] shrink-0 text-amber-600" />
+                                        <span className="text-[14px] leading-5 text-slate-700">
+                                            Dedicated throughput & Webhooks
+                                        </span>
+                                    </div>
+                                    <div className={featureItemBase}>
+                                        <Check className="mt-0.5 h-[18px] w-[18px] shrink-0 text-amber-600" />
+                                        <span className="text-[14px] leading-5 text-slate-700">
+                                            Custom aliases & QR codes
+                                        </span>
+                                    </div>
+                                    <div className={featureItemBase}>
+                                        <Check className="mt-0.5 h-[18px] w-[18px] shrink-0 text-amber-600" />
+                                        <span className="text-[14px] leading-5 text-slate-700">
+                                            Priority VIP SLA & 24/7 Support
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* CTA */}
+                                <div className="mt-6 border-t border-amber-200/60 pt-4">
+                                    <Button
+                                        className={cn(
+                                            ctaBase,
+                                            "bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 text-slate-950 font-black hover:from-amber-400 hover:to-yellow-500 shadow-[0_12px_24px_-10px_rgba(245,158,11,0.5)]"
+                                        )}
+                                        onClick={() => handleUpgrade("enterprise")}
+                                    >
+                                        <Crown className="w-4 h-4 mr-2 fill-slate-950" />
+                                        Claim VIP Plan ({currencySymbols[currency]}{formatPrice(curatedVipPriceINR)})
+                                    </Button>
+                                </div>
+                            </motion.div>
+                        );
+                    })()}
+
                     {/* Paid Plans */}
                     {dynamicTiers.map((tier) => {
                         const isFocused = focusPlan === tier.planId;
                         const isTargetedPlan = Boolean(
-                            targetedOffer && (targetedOffer.plans.includes("all") || targetedOffer.plans.includes(tier.planId.toLowerCase()))
+                            targetedOffer &&
+                            targetedOffer.discountType !== "custom_price" &&
+                            (targetedOffer.plans.includes("all") || targetedOffer.plans.includes(tier.planId.toLowerCase()))
                         );
 
                         let displayPriceINR = tier.priceINR;
@@ -893,8 +1045,6 @@ export default function PricingPage() {
                                 displayPriceINR = tier.priceINR * (1 - targetedOffer.discountValue / 100);
                             } else if (targetedOffer.discountType === "flat") {
                                 displayPriceINR = Math.max(0, tier.priceINR - targetedOffer.discountValue);
-                            } else if (targetedOffer.discountType === "custom_price") {
-                                displayPriceINR = Math.max(0, targetedOffer.discountValue);
                             }
                             displayPriceINR = Math.round(displayPriceINR * 100) / 100;
                         }

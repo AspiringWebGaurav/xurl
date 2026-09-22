@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { type AppliedPromo } from "@/components/payments/PromoCodeSection";
 import { PLAN_DATA } from "./shared";
+import { useAuthTransition } from "@/components/providers/AuthTransitionProvider";
 
 export type PaymentState = "idle" | "upgrading" | "processing" | "success" | "free_success" | "failed" | "cancelled";
 
@@ -42,6 +43,8 @@ export function useCheckout() {
     const planKey = plan ? plan.toLowerCase() : null;
     const planContext = planKey && PLAN_DATA[planKey] ? PLAN_DATA[planKey] : null;
     const planDisplayName = planContext?.badgeName.replace(/\s+Plan$/, "") ?? "";
+    const { triggerLoginTransition } = useAuthTransition();
+    const isTransitioningRedirectRef = useRef(false);
 
     useEffect(() => {
         paymentStateRef.current = paymentState;
@@ -95,12 +98,19 @@ export function useCheckout() {
                 setUser(u);
 
                 if (redirectParam === "/admin" && isAdminEmail(u.email)) {
-                    router.push("/admin");
+                    if (!isTransitioningRedirectRef.current) {
+                        isTransitioningRedirectRef.current = true;
+                        void triggerLoginTransition(u, "/admin");
+                    }
                     return;
                 }
 
                 if (!plan) {
-                    router.push("/");
+                    if (!isTransitioningRedirectRef.current) {
+                        isTransitioningRedirectRef.current = true;
+                        const target = isAdminEmail(u.email) ? "/admin" : "/";
+                        void triggerLoginTransition(u, target);
+                    }
                 } else {
                     setAuthLoading(false);
                     try {
@@ -292,42 +302,24 @@ export function useCheckout() {
             }
         }
     };
-
     const { login: handleLogin, isLoggingIn } = useGoogleLogin({
         showToasts: false,
-        onPopupOpen: () => {
-            setOverlayMessage("Connecting to Google...");
-            setShowLoginOverlay(true);
-        },
-        onCancel: () => {
-            setOverlayMessage("Login cancelled - staying on this page...");
-            setTimeout(() => setShowLoginOverlay(false), 500);
-        },
-        onSuccess: () => {
-            setOverlayMessage("Signing in...");
-            setTimeout(() => setShowLoginOverlay(false), 600);
+        onSuccess: (loggedInUser) => {
+            const userObj = loggedInUser || auth.currentUser;
+            if (userObj) {
+                const isAdmin = isAdminEmail(userObj.email);
+                const target = (redirectParam === "/admin" && isAdmin) || (isAdmin && !plan) ? "/admin" : (plan ? undefined : "/");
+                if (target && !isTransitioningRedirectRef.current) {
+                    isTransitioningRedirectRef.current = true;
+                    void triggerLoginTransition(userObj, target);
+                }
+            }
         },
         onError: (error) => {
             if (error === "auth/popup-blocked") {
-                setOverlayMessage(
-                    <React.Fragment>
-                        Popup blocked - click to retry login
-                        <br />
-                        <span 
-                            onClick={(e) => { 
-                                e.stopPropagation(); 
-                                setShowLoginOverlay(false);
-                                setTimeout(() => handleLogin(), 50); 
-                            }} 
-                            className="mt-2 inline-block cursor-pointer underline transition-colors hover:text-foreground"
-                        >
-                            Open login
-                        </span>
-                    </React.Fragment>
-                );
+                toast.error("Popup blocked. Please allow popups and try again.");
             } else {
-                setOverlayMessage("Unable to sign in. Please try again.");
-                setTimeout(() => setShowLoginOverlay(false), 700);
+                toast.error("Unable to sign in. Please try again.");
             }
         }
     });

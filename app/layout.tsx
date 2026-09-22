@@ -10,6 +10,7 @@ import { StructuredData } from "@/components/seo/StructuredData";
 import { ConfirmLinkProvider } from "@/components/providers/ConfirmLinkProvider";
 import { RouteLoaderProvider } from "@/components/providers/RouteLoaderProvider";
 import { ClientTelemetryProvider } from "@/components/providers/ClientTelemetryProvider";
+import { AuthTransitionProvider } from "@/components/providers/AuthTransitionProvider";
 
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
@@ -72,17 +73,19 @@ export default function RootLayout({
         <html lang="en" suppressHydrationWarning>
             <body className={`${inter.className} bg-background text-foreground`} suppressHydrationWarning>
                 <ClientTelemetryProvider>
-                    <RouteLoaderProvider />
-                    <StructuredData />
-                    <KillSwitchGuard>
-                        <ConfirmLinkProvider>
-                            <BanGuard>
-                                <PartialOfferNotificationBanner />
-                                {children}
-                            </BanGuard>
-                        </ConfirmLinkProvider>
-                    </KillSwitchGuard>
-                    <Toaster />
+                    <AuthTransitionProvider>
+                        <RouteLoaderProvider />
+                        <StructuredData />
+                        <KillSwitchGuard>
+                            <ConfirmLinkProvider>
+                                <BanGuard>
+                                    <PartialOfferNotificationBanner />
+                                    {children}
+                                </BanGuard>
+                            </ConfirmLinkProvider>
+                        </KillSwitchGuard>
+                        <Toaster />
+                    </AuthTransitionProvider>
                 </ClientTelemetryProvider>
             </body>
         </html>

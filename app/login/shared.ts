@@ -81,6 +81,18 @@ export const PLAN_DATA: Record<string, {
         linkBgColor: "bg-slate-200",
         clockIconColor: "text-slate-700",
         clockBgColor: "bg-slate-200",
+    },
+    vip: {
+        badgeName: "VIP Curated Plan",
+        badgeStyle: "bg-amber-50 border-amber-200 text-amber-700",
+        title: "Upgrade to VIP Curated Plan",
+        description: "Admin-Curated custom links & dedicated API quota:",
+        linkCount: "50,000+ Permanent Links",
+        expiryTime: "Permanent Uptime",
+        linkIconColor: "text-amber-600",
+        linkBgColor: "bg-amber-100/50",
+        clockIconColor: "text-purple-600",
+        clockBgColor: "bg-purple-100/50",
     }
 };
 

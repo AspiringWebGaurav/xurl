@@ -5,40 +5,42 @@ import { ArrowLeft, Mail, Loader2, ShieldCheck } from 'lucide-react';
 import { useGoogleLogin } from '@/lib/hooks/useGoogleLogin';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { triggerHaptic } from '@/lib/haptics';
-import { Suspense, useEffect } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { Suspense, useEffect, useRef, useCallback } from 'react';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
+import { useAuthTransition } from '@/components/providers/AuthTransitionProvider';
 
 function MobileLoginContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const planParam = searchParams.get("plan");
     const redirectParam = searchParams.get("redirect") || "/mobile/dashboard";
+    const { triggerLoginTransition } = useAuthTransition();
+    const isRedirectingRef = useRef(false);
+
+    const handleSuccessRedirect = useCallback((u?: User | null) => {
+        if (isRedirectingRef.current) return;
+        isRedirectingRef.current = true;
+        triggerHaptic(40);
+        const target = planParam ? `/login?plan=${planParam}` : redirectParam;
+        void triggerLoginTransition(u || auth.currentUser, target);
+    }, [planParam, redirectParam, triggerLoginTransition]);
 
     const { login, isLoggingIn } = useGoogleLogin({
         toastId: "mobile-login-toast",
-        onSuccess: () => {
-            triggerHaptic(30);
-            if (planParam) {
-                router.push(`/login?plan=${planParam}`);
-            } else {
-                router.push(redirectParam);
-            }
+        onSuccess: (u) => {
+            handleSuccessRedirect(u);
         }
     });
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (u) => {
             if (u) {
-                if (planParam) {
-                    router.push(`/login?plan=${planParam}`);
-                } else {
-                    router.push(redirectParam);
-                }
+                handleSuccessRedirect(u);
             }
         });
         return () => unsubscribe();
-    }, [router, planParam, redirectParam]);
+    }, [handleSuccessRedirect]);
 
     return (
         <div className="flex flex-col flex-1 min-h-[100dvh] px-6 py-8 bg-background">
