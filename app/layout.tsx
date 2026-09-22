@@ -70,9 +70,6 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en" suppressHydrationWarning>
-            <head>
-                <script src="https://switchyy.eu.cc/switchy.js?key=pk_59ca8c1525d7dfebdaf4d2bc&project=rMvXJgJoFGuCTdxDB8jH" async />
-            </head>
             <body className={`${inter.className} bg-background text-foreground`} suppressHydrationWarning>
                 <ClientTelemetryProvider>
                     <RouteLoaderProvider />

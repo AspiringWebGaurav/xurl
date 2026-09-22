@@ -15,11 +15,17 @@ import { env } from "@/lib/env";
 export function buildShortUrl(slug: string): string {
     let domain = env.NEXT_PUBLIC_SHORT_DOMAIN || "xurl.eu.cc";
 
-    // Auto-correct if build baked in localhost or Vercel env is wrong but user is visiting production domain
+    // Server-side guard: In production, or on Vercel deployments, never emit localhost
+    const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL === "1" || process.env.NEXT_PUBLIC_VERCEL_ENV === "production";
+    if (isProduction && domain.includes("localhost")) {
+        domain = "xurl.eu.cc";
+    }
+
+    // Client-side guard: Auto-correct if build baked in localhost or env is wrong
     if (typeof window !== "undefined") {
         if (domain.includes("localhost") && window.location.hostname !== "localhost") {
             domain = window.location.host;
-        } else if (!domain.includes("localhost") && window.location.hostname.includes("xurl")) {
+        } else if (window.location.hostname.includes("xurl")) {
             // Force to current prod domain to be absolutely safe
             domain = window.location.host;
         }

@@ -102,18 +102,28 @@ generate_hook.js
 rebuild_*.js
 inject_*.js
 
-# Testing
+# Testing & Audit
 tests/
 test/
 __tests__/
+e2e/
+audit/
+audit-*.js
+audit-*.ts
+audit-*.json
 *.test.*
 *.spec.*
 test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+playwright/
+.playwright/
 coverage/
 .nyc_output/
+*.temp
+*.tmp
+
 # Local AI Config & Customizations
 .agents/
 .gemini/

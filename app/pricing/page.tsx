@@ -1404,8 +1404,10 @@ export default function PricingPage() {
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
-                                            <label className="text-xs font-bold text-slate-900">Your Email Address</label>
+                                            <label htmlFor="proposal-email" className="text-xs font-bold text-slate-900">Your Email Address</label>
                                             <input
+                                                id="proposal-email"
+                                                name="proposalEmail"
                                                 type="email"
                                                 required
                                                 value={customEmail}
@@ -1416,8 +1418,10 @@ export default function PricingPage() {
                                         </div>
 
                                         <div className="space-y-1.5">
-                                            <label className="text-xs font-bold text-slate-900">Company / Project (Optional)</label>
+                                            <label htmlFor="proposal-company" className="text-xs font-bold text-slate-900">Company / Project (Optional)</label>
                                             <input
+                                                id="proposal-company"
+                                                name="proposalCompany"
                                                 type="text"
                                                 value={customCompany}
                                                 onChange={(e) => setCustomCompany(e.target.value)}
@@ -1429,8 +1433,10 @@ export default function PricingPage() {
 
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                         <div className="space-y-1.5">
-                                            <label className="text-xs font-bold text-slate-900">Permanent Links</label>
+                                            <label htmlFor="proposal-links" className="text-xs font-bold text-slate-900">Permanent Links</label>
                                             <input
+                                                id="proposal-links"
+                                                name="proposalLinks"
                                                 type="number"
                                                 required
                                                 min={1}
@@ -1446,8 +1452,10 @@ export default function PricingPage() {
                                         </div>
 
                                         <div className="space-y-1.5">
-                                            <label className="text-xs font-bold text-slate-900">Monthly API Calls</label>
+                                            <label htmlFor="proposal-api" className="text-xs font-bold text-slate-900">Monthly API Calls</label>
                                             <input
+                                                id="proposal-api"
+                                                name="proposalApi"
                                                 type="number"
                                                 required
                                                 min={1}
@@ -1463,13 +1471,15 @@ export default function PricingPage() {
                                         </div>
 
                                         <div className="space-y-1.5">
-                                            <label className="text-xs font-bold text-slate-900 flex items-center justify-between">
+                                            <label htmlFor="proposal-price" className="text-xs font-bold text-slate-900 flex items-center justify-between">
                                                 <span>Proposed Budget</span>
                                                 <span className="text-emerald-600 font-bold">(₹/mo)</span>
                                             </label>
                                             <div className="relative">
                                                 <span className="absolute left-3 top-2.5 text-xs sm:text-sm font-black text-slate-500">₹</span>
                                                 <input
+                                                    id="proposal-price"
+                                                    name="proposalPrice"
                                                     type="number"
                                                     required
                                                     min={1}
@@ -1528,6 +1538,7 @@ export default function PricingPage() {
 
                                     <div className="space-y-2 pt-1">
                                         <motion.button
+                                            id="submit-proposal-btn"
                                             whileHover={{ scale: 1.01 }}
                                             whileTap={{ scale: 0.99 }}
                                             type="submit"

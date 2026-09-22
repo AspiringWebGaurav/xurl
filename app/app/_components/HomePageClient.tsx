@@ -488,6 +488,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                     <div className="relative flex items-center">
                                         <Link2 className="absolute left-3.5 w-4 h-4 text-muted-foreground/60 pointer-events-none transition-colors" />
                                         <Input
+                                            id="url-input"
                                             ref={inputRef}
                                             type="url"
                                             placeholder="https://example.com/very-long-url"
@@ -620,6 +621,7 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                     </div>
                                 ) : (
                                     <Button
+                                        id="shorten-btn"
                                         onClick={handleShorten}
                                         disabled={!isValidUrl || isDisabled || loading || aliasStatus === "checking" || aliasStatus === "taken" || aliasStatus === "invalid"}
                                         className={premiumPrimaryButtonClass}

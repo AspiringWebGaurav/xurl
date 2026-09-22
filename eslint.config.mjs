@@ -32,6 +32,10 @@ const eslintConfig = defineConfig([
     "functions/lib/**",
     "scratch/**",
     "scripts/**",
+    "audit/**",
+    "audit-*.js",
+    "tests/**",
+    "test/**",
   ]),
 ]);
 

@@ -99,6 +99,9 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
 
     const isAppPage = 
         pathname === '/' ||
+        pathname === '/app' ||
+        pathname === '/mobile' ||
+        pathname.startsWith('/mobile') ||
         pathname === '/login' ||
         pathname === '/pricing' ||
         pathname === '/expired' ||
@@ -107,11 +110,14 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
         pathname === '/privacy' ||
         pathname === '/policy' ||
         pathname === '/acceptable-use' ||
+        pathname === '/emergency-policy' ||
+        pathname === '/guest-policy' ||
+        pathname === '/code-of-conduct' ||
+        pathname === '/data-export' ||
         pathname === '/profile' ||
         pathname === '/purchase-history' ||
         pathname.startsWith('/dashboard') ||
         pathname.startsWith('/admin') ||
-        pathname === '/guest-policy' ||
         pathname === '/analytics' ||
         pathname === '/analytics-preview' ||
         pathname === '/features' ||
@@ -133,11 +139,12 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
             const requestHeaders = new Headers(request.headers);
             requestHeaders.set('x-is-mobile-device', 'true');
             
-            const hasMobileRoute = pathname === '/login' || pathname.startsWith('/dashboard') || pathname === '/pricing' || pathname.startsWith('/pricing') || pathname === '/analytics';
+            const hasMobileRoute = pathname === '/login' || pathname === '/app' || pathname.startsWith('/dashboard') || pathname === '/pricing' || pathname.startsWith('/pricing') || pathname === '/analytics';
             
             if (hasMobileRoute) {
                 let mobilePathname = pathname;
                 if (pathname === '/pricing') mobilePathname = '/plan';
+                if (pathname === '/app') mobilePathname = '';
                 
                 return NextResponse.rewrite(new URL(`/mobile${mobilePathname}`, request.url), {
                     request: { headers: requestHeaders }
