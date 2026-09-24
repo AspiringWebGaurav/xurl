@@ -8,6 +8,8 @@ import { auth } from "@/lib/firebase/config";
 import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { isAdminEmail } from "@/lib/admin-config";
 
+import { formatAdminTransactionAmount } from "@/lib/currency";
+
 type Transaction = {
     id: string;
     action: string;
@@ -18,6 +20,7 @@ type Transaction = {
     orderId?: string;
     source?: string;
     amount?: number;
+    currency?: string;
 };
 
 export default function AdminPurchaseHistoryPage() {
@@ -178,8 +181,8 @@ export default function AdminPurchaseHistoryPage() {
                                             {transaction.linksAllocated > 0 ? `+${transaction.linksAllocated}` : transaction.linksAllocated}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap capitalize text-slate-500">{transaction.source || "-"}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-slate-500">
-                                            {transaction.amount !== undefined ? (transaction.amount === 0 ? "₹0" : `₹${transaction.amount / 100}`) : "-"}
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-slate-500 font-mono">
+                                            {formatAdminTransactionAmount(transaction.amount, transaction.currency)}
                                         </td>
                                     </tr>
                                 ))

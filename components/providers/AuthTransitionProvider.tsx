@@ -9,6 +9,11 @@ interface UserLike {
     displayName?: string | null;
     email?: string | null;
     photoURL?: string | null;
+    uid?: string | null;
+    metadata?: {
+        creationTime?: string;
+        lastSignInTime?: string;
+    };
 }
 
 interface AuthTransitionContextType {
@@ -45,25 +50,55 @@ export function AuthTransitionProvider({ children }: { children: React.ReactNode
             const isAdmin = isAdminEmail(user?.email);
             const transitionType = isAdmin ? "admin_login" : "user_login";
 
+            // Determine whether this is 1st time login vs 2nd time onwards (returning user)
+            const userKey = user?.email?.toLowerCase().trim() || user?.uid || "current_user";
+            let isFirstLogin = false;
+
+            if (typeof window !== "undefined" && userKey) {
+                const storageKey = `xurl_seen_login_${userKey}`;
+                const hasBeenSeen = localStorage.getItem(storageKey) === "true";
+                if (!hasBeenSeen) {
+                    isFirstLogin = true;
+                    try {
+                        localStorage.setItem(storageKey, "true");
+                    } catch {
+                        // ignore storage errors
+                    }
+                }
+            } else if (user?.metadata?.creationTime && user?.metadata?.lastSignInTime) {
+                const diff = Math.abs(
+                    new Date(user.metadata.lastSignInTime).getTime() -
+                    new Date(user.metadata.creationTime).getTime()
+                );
+                if (diff < 15000) {
+                    isFirstLogin = true;
+                }
+            }
+
             setTransition({
                 type: transitionType,
                 userName: user?.displayName || undefined,
                 userEmail: user?.email || undefined,
                 photoURL: user?.photoURL || null,
+                isFirstLogin,
                 statusText: isAdmin
-                    ? "Initializing administrative command telemetry & security controls..."
-                    : "Synchronizing your dashboard, banked links, and workspace...",
+                    ? (isFirstLogin
+                        ? "Initializing master administrator workspace..."
+                        : "Verifying administrative identity & security clearance...")
+                    : (isFirstLogin
+                        ? "Setting up your personalized link dashboard..."
+                        : "Synchronizing your dashboard, banked links, and workspace..."),
             });
 
-            // Allow the high-end animation and sound to play smoothly without page flash
-            const displayDuration = isAdmin ? 1400 : 1000;
+            // Allow the high-end animation to display at an enjoyable, readable pace
+            const displayDuration = isAdmin ? 3000 : 2500;
 
             await new Promise((resolve) => setTimeout(resolve, displayDuration));
 
             if (targetUrl) {
                 router.push(targetUrl);
                 // Hold overlay during router push so no white/black flash is visible
-                await new Promise((resolve) => setTimeout(resolve, 350));
+                await new Promise((resolve) => setTimeout(resolve, 500));
             }
 
             setTransition({ type: null });
@@ -91,8 +126,8 @@ export function AuthTransitionProvider({ children }: { children: React.ReactNode
                 console.error("Error during logout transition:", err);
             }
 
-            // Keep overlay for silky smooth exit
-            await new Promise((resolve) => setTimeout(resolve, 850));
+            // Keep overlay for silky smooth exit at readable pace
+            await new Promise((resolve) => setTimeout(resolve, 2000));
 
             setTransition({ type: null });
             isTransitioningRef.current = false;

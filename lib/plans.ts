@@ -11,7 +11,7 @@
 
 // ─── Plan Types ─────────────────────────────────────────────────────────────
 
-export type PlanType = "free" | "starter" | "pro" | "business" | "enterprise" | "bigenterprise" | "guest";
+export type PlanType = "free" | "starter" | "pro" | "business" | "enterprise" | "bigenterprise" | "guest" | "vip";
 
 /**
  * Legacy plan names that may exist in Firestore from older versions.
@@ -19,7 +19,6 @@ export type PlanType = "free" | "starter" | "pro" | "business" | "enterprise" | 
  */
 export const LEGACY_PLAN_MAP: Record<string, PlanType> = {
     freebie: "free",
-    vip: "enterprise",
 };
 
 // ─── Plan Config Shape ──────────────────────────────────────────────────────
@@ -150,6 +149,20 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
         hasUtmAnalytics: false,
         hasBotDetection: false,
         hasCsvExport: false,
+    },
+    vip: {
+        limit: 50000,
+        ttlMs: 0,                                 // Permanent
+        priceINR: 1,
+        slugAllowed: true,
+        label: "VIP Curated Plan",
+        badge: "VIP_APPROVED",
+        apiAccess: true,
+        apiQuotaTotal: 2000000,
+        analyticsRetentionDays: 365,
+        hasUtmAnalytics: true,
+        hasBotDetection: true,
+        hasCsvExport: true,
     }
 };
 

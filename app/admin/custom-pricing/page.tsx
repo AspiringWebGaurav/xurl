@@ -21,7 +21,6 @@ import {
     IndianRupee,
     MessageSquare,
     Filter,
-    ArrowRight,
     Edit3,
     RotateCcw,
     Calendar,
@@ -41,7 +40,7 @@ type CustomPricingRequest = {
     apiQuotaNeeded: number;
     proposedPriceINR: number;
     notes: string;
-    status: "pending" | "curated" | "rejected";
+    status: "pending" | "curated" | "consumed" | "redeemed" | "rejected";
     createdAt: number;
     curatedAt?: number | null;
     curatedBy?: string | null;
@@ -50,13 +49,17 @@ type CustomPricingRequest = {
     curatedApiQuota?: number | null;
     curatedOfferId?: string | null;
     adminNotes?: string | null;
+    consumedAt?: number | null;
+    consumedOrderId?: string | null;
+    consumedCount?: number;
+    usageLimit?: number;
 };
 
 export default function AdminCustomPricingPage() {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [requests, setRequests] = useState<CustomPricingRequest[]>([]);
-    const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "curated" | "rejected">("pending");
+    const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "curated" | "consumed" | "rejected">("pending");
     const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
     const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
 
@@ -118,12 +121,12 @@ export default function AdminCustomPricingPage() {
         setApprovedPrice(req.curatedPriceINR ?? req.proposedPriceINR ?? 1499);
         setApprovedLinks(req.curatedLinks ?? req.linksNeeded ?? 50000);
         setApprovedApiQuota(req.curatedApiQuota ?? req.apiQuotaNeeded ?? 2000000);
-        setCustomTitle(`Curated Enterprise Plan for ${req.email}`);
+        setCustomTitle(`Curated VIP Plan for ${req.email}`);
         setCurateNotes(
             req.adminNotes ||
             `Curated custom plan: ${(req.curatedLinks ?? req.linksNeeded ?? 50000).toLocaleString()} permanent links & ${(req.curatedApiQuota ?? req.apiQuotaNeeded ?? 2000000).toLocaleString()} API calls/mo.`
         );
-        setEligiblePlan("enterprise");
+        setEligiblePlan("vip");
         setExpiresInDays("none");
     };
 
@@ -262,6 +265,7 @@ export default function AdminCustomPricingPage() {
 
     const pendingCount = requests.filter((r) => r.status === "pending").length;
     const curatedCount = requests.filter((r) => r.status === "curated").length;
+    const consumedCount = requests.filter((r) => r.status === "consumed" || r.status === "redeemed").length;
     const rejectedCount = requests.filter((r) => r.status === "rejected").length;
 
     return (
@@ -321,7 +325,18 @@ export default function AdminCustomPricingPage() {
                     }`}
                 >
                     <CheckCircle2 className="h-4 w-4" />
-                    <span>Curated & Rendered ({curatedCount})</span>
+                    <span>Curated & Ready ({curatedCount})</span>
+                </button>
+                <button
+                    onClick={() => setFilterStatus("consumed")}
+                    className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
+                        filterStatus === "consumed"
+                            ? "bg-blue-500/20 text-blue-500 border border-blue-500/40"
+                            : "bg-muted/50 text-muted-foreground hover:text-foreground border border-transparent"
+                    }`}
+                >
+                    <Check className="h-4 w-4" />
+                    <span>Consumed ({consumedCount})</span>
                 </button>
                 <button
                     onClick={() => setFilterStatus("rejected")}
@@ -350,6 +365,7 @@ export default function AdminCustomPricingPage() {
                     {requests.map((req) => {
                         const isPending = req.status === "pending";
                         const isCurated = req.status === "curated";
+                        const isConsumed = req.status === "consumed" || req.status === "redeemed";
                         const isRejected = req.status === "rejected";
 
                         return (
@@ -360,6 +376,8 @@ export default function AdminCustomPricingPage() {
                                         ? "border-amber-500/30 bg-card/90"
                                         : isCurated
                                         ? "border-emerald-500/30 bg-card/90"
+                                        : isConsumed
+                                        ? "border-blue-500/30 bg-card/90"
                                         : "border-border/60 bg-muted/20 opacity-80"
                                 }`}
                             >
@@ -392,6 +410,11 @@ export default function AdminCustomPricingPage() {
                                             {isCurated && (
                                                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 flex items-center gap-1">
                                                     <CheckCircle2 className="h-3 w-3" /> Rendered on Account
+                                                </span>
+                                            )}
+                                            {isConsumed && (
+                                                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-500/10 text-blue-500 border border-blue-500/30 flex items-center gap-1">
+                                                    <CheckCircle2 className="h-3 w-3" /> Consumed ({req.consumedCount || 1}x redeemed · Plan Active)
                                                 </span>
                                             )}
                                             {isRejected && (
@@ -518,6 +541,19 @@ export default function AdminCustomPricingPage() {
                                                     <span>Revoke Offer</span>
                                                 </Button>
                                             </>
+                                        )}
+
+                                        {isConsumed && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => openCurateModal(req)}
+                                                disabled={actionLoadingId === req.id}
+                                                className="border-border text-foreground hover:bg-muted font-semibold cursor-pointer flex items-center gap-1.5"
+                                            >
+                                                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                                                <span>Curate New Proposal</span>
+                                            </Button>
                                         )}
 
                                         {isRejected && (
@@ -663,10 +699,11 @@ export default function AdminCustomPricingPage() {
                                         onChange={(e) => setEligiblePlan(e.target.value)}
                                         className="w-full h-10 px-3 rounded-xl border border-border bg-background text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                                     >
-                                        <option value="all">All Paid Plans</option>
+                                        <option value="vip">Curated VIP Plan (Dedicated Entity)</option>
                                         <option value="enterprise">Enterprise Tier Only</option>
                                         <option value="business">Business Tier Only</option>
                                         <option value="pro">Pro Tier Only</option>
+                                        <option value="all">All Paid Plans</option>
                                     </select>
                                 </div>
 

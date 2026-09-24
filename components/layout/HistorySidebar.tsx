@@ -35,6 +35,7 @@ export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: Histo
     const [copied, setCopied] = useState<string | null>(null);
     const [userPlan, setUserPlan] = useState<string | null>(null);
     const [userLimit, setUserLimit] = useState<number | null>(null);
+    const [isCurated, setIsCurated] = useState(false);
     const [forceSync, setForceSync] = useState(0);
     const [dynamicConfig, setDynamicConfig] = useState<any>(null);
     const linksRef = useRef<LinkItem[]>([]);
@@ -86,6 +87,9 @@ export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: Histo
                         if (typeof apiData.limit === "number") {
                             setUserLimit(apiData.limit);
                         }
+                        if (apiData.isCurated || apiData.plan === "vip") {
+                            setIsCurated(true);
+                        }
                         if (Array.isArray(apiData.links)) {
                             const apiLinks: LinkItem[] = apiData.links.map((link: any) => ({
                                 slug: link.slug,
@@ -122,6 +126,30 @@ export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: Histo
                         console.error("History sync error:", err);
                         setLoading(false);
                     });
+
+                    // Real-time listener for user document to keep plan & limits in sync
+                    const { doc: firestoreDoc } = await import("firebase/firestore");
+                    const userDocRef = firestoreDoc(db, "users", currentUser.uid);
+                    const unsubUser = onSnapshot(userDocRef as any, (userSnap: any) => {
+                        if (userSnap.exists()) {
+                            const uData = userSnap.data();
+                            if (uData.plan) {
+                                setUserPlan(uData.plan.toLowerCase());
+                            }
+                            if (uData.isCurated || uData.plan === "vip") {
+                                setIsCurated(true);
+                            }
+                            if (typeof uData.cumulativeQuota === "number") {
+                                setUserLimit(uData.cumulativeQuota);
+                            }
+                        }
+                    });
+
+                    const prevUnsub = unsub;
+                    unsub = () => {
+                        prevUnsub();
+                        unsubUser();
+                    };
                 } else {
                     setUserPlan("guest");
                     setUserLimit(currentPlanConfig.limit || 1);
@@ -177,6 +205,13 @@ export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: Histo
         setTimeout(() => setCopied(null), 2000);
     };
 
+    const isCuratedPlan = Boolean(isCurated || userPlan === "vip");
+    const displayPlanLabel = isCuratedPlan
+        ? "Admin-Curated"
+        : (currentPlanConfig.label || userPlan || "Standard");
+    const displayCapacityNumber = userLimit !== null && userLimit !== undefined ? userLimit : (currentPlanConfig.limit || 0);
+    const displayCapacityFormatted = displayCapacityNumber.toLocaleString();
+
     if (!mounted || isAdminPage) return null;
 
     return createPortal(
@@ -202,14 +237,17 @@ export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: Histo
                                 <h2 className="text-lg font-black tracking-tight text-slate-900">Recent Links</h2>
                                 {userPlan && userPlan !== "guest" && (
                                     <div className="mt-1 flex items-center gap-2">
-                                        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                                            userPlan === "free" ? "bg-slate-100 text-slate-700 border border-slate-200" :
-                                            "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xs"
+                                        <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+                                            isCuratedPlan
+                                                ? "bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/50 shadow-xs font-mono"
+                                                : userPlan === "free"
+                                                ? "bg-slate-100 text-slate-700 border border-slate-200"
+                                                : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xs"
                                         }`}>
-                                            {currentPlanConfig.label || userPlan} PLAN
+                                            {isCuratedPlan ? "ADMIN-CURATED PLAN" : `${displayPlanLabel} PLAN`}
                                         </span>
-                                        <span className="text-[11px] font-bold text-slate-500">
-                                            {links.length} / {userLimit !== null ? userLimit : (currentPlanConfig.limit || "∞")} links
+                                        <span className="text-[11px] font-bold text-slate-500 font-mono">
+                                            {links.length} / {displayCapacityFormatted} links
                                         </span>
                                     </div>
                                 )}
@@ -233,10 +271,10 @@ export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: Histo
                                     <h3 className="text-base font-black text-slate-900 mb-1">
                                         {userPlan === "guest" ? "No links found" : "Ready to shorten links?"}
                                     </h3>
-                                    <p className="text-xs font-semibold text-slate-500 mb-6 max-w-[220px] leading-relaxed">
+                                    <p className="text-xs font-semibold text-slate-500 mb-6 max-w-[260px] leading-relaxed">
                                         {userPlan === "guest" ? `Guests can create ${currentPlanConfig.limit} free temporary link. Try it out!` :
-                                         userPlan === "free" ? `You have ${currentPlanConfig.maxUses || currentPlanConfig.limit} free links available on Free plan.` :
-                                         `You have ${currentPlanConfig.limit} links capacity on your active ${currentPlanConfig.label} plan.`}
+                                         userPlan === "free" ? `You have ${(currentPlanConfig.maxUses || currentPlanConfig.limit).toLocaleString()} free links available on Free plan.` :
+                                         `You have ${displayCapacityFormatted} links capacity on your active ${displayPlanLabel} plan.`}
                                     </p>
                                     <Button 
                                         onClick={() => {
@@ -250,12 +288,13 @@ export function HistorySidebar({ isOpen, onClose, userId, onLinksChange }: Histo
                                         className={`rounded-2xl h-11 px-5 text-xs font-black shadow-sm transition-all hover:scale-105 active:scale-95 ${
                                             userPlan === "guest" ? "bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300" :
                                             userPlan === "free" ? "bg-slate-900 hover:bg-slate-800 text-white" :
+                                            isCuratedPlan ? "bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black shadow-amber-500/20" :
                                             "bg-gradient-to-r from-indigo-600 via-purple-600 to-emerald-600 hover:from-indigo-500 hover:to-emerald-500 text-white shadow-indigo-500/20"
                                         }`}
                                     >
                                         {userPlan === "guest" ? "Create your free link" :
-                                         userPlan === "free" ? `Create ${currentPlanConfig.maxUses || currentPlanConfig.limit} free links` :
-                                         `Create custom ${currentPlanConfig.label} link`}
+                                         userPlan === "free" ? `Create ${(currentPlanConfig.maxUses || currentPlanConfig.limit).toLocaleString()} free links` :
+                                         `Create custom ${displayPlanLabel} link`}
                                     </Button>
                                 </div>
                             ) : (

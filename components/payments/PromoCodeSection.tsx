@@ -26,7 +26,7 @@ interface PromoCodeSectionProps {
 }
 
 function formatInrPaise(amount: number): string {
-    return `Rs. ${(amount / 100).toFixed(2)}`;
+    return `₹${(amount / 100).toFixed(2)}`;
 }
 
 export function PromoCodeSection({ planId, onPromoChange, variant = "default" }: PromoCodeSectionProps) {
@@ -98,21 +98,24 @@ export function PromoCodeSection({ planId, onPromoChange, variant = "default" }:
     }, [resolvedPlan]);
 
     const summary = useMemo(() => {
-        let finalAmount = baseAmount;
+        const isCustomPriceDeal = resolvedPlan === "vip" || partialOffer?.discountType === "custom_price";
+        const effectiveBasePaise = isCustomPriceDeal && partialOffer?.discountValue !== undefined
+            ? Math.round(partialOffer.discountValue * 100)
+            : baseAmount;
 
-        if (partialOffer) {
+        let finalAmount = effectiveBasePaise;
+
+        if (partialOffer && !isCustomPriceDeal) {
             const priceINR = PLAN_CONFIGS[resolvedPlan].priceINR;
             let finalPrice = priceINR;
             if (partialOffer.discountType === "percentage") {
                 finalPrice = Math.max(0, priceINR * (1 - partialOffer.discountValue / 100));
             } else if (partialOffer.discountType === "flat") {
                 finalPrice = Math.max(0, priceINR - partialOffer.discountValue);
-            } else if (partialOffer.discountType === "custom_price") {
-                finalPrice = Math.max(0, partialOffer.discountValue);
             }
-            const partialDiscountPaise = baseAmount - Math.round(finalPrice * 100);
+            const partialDiscountPaise = effectiveBasePaise - Math.round(finalPrice * 100);
             finalAmount -= partialDiscountPaise;
-        } else if (globalOffer) {
+        } else if (globalOffer && !isCustomPriceDeal) {
             const priceINR = PLAN_CONFIGS[resolvedPlan].priceINR;
             let finalPrice = priceINR;
             if (globalOffer.type === "percentage") {
@@ -120,7 +123,7 @@ export function PromoCodeSection({ planId, onPromoChange, variant = "default" }:
             } else if (globalOffer.type === "flat") {
                 finalPrice = Math.max(0, priceINR - globalOffer.value);
             }
-            const globalDiscountPaise = baseAmount - Math.round(finalPrice * 100);
+            const globalDiscountPaise = effectiveBasePaise - Math.round(finalPrice * 100);
             finalAmount -= globalDiscountPaise;
         }
 
@@ -137,15 +140,15 @@ export function PromoCodeSection({ planId, onPromoChange, variant = "default" }:
             finalAmount -= promoDiscountPaise;
         }
 
-        const totalDiscountPaise = baseAmount - finalAmount;
+        const totalDiscountPaise = effectiveBasePaise - finalAmount;
         // Backward calculate GST since the final amount is inclusive
         const subtotalPaise = finalAmount === 0 ? 0 : Math.round(finalAmount / 1.18);
         const gstPaise = finalAmount === 0 ? 0 : finalAmount - subtotalPaise;
 
         let codeLabel = "";
-        if (partialOffer) {
+        if (!isCustomPriceDeal && partialOffer) {
             codeLabel = `Admin Special Deal (${partialOffer.title})`;
-        } else if (globalOffer) {
+        } else if (!isCustomPriceDeal && globalOffer) {
             codeLabel = `Global Offer (${globalOffer.name})`;
         }
 
@@ -155,7 +158,7 @@ export function PromoCodeSection({ planId, onPromoChange, variant = "default" }:
 
         return {
             code: codeLabel,
-            originalAmount: baseAmount,
+            originalAmount: effectiveBasePaise,
             discountAmount: totalDiscountPaise,
             subtotalAmount: subtotalPaise,
             gstAmount: gstPaise,
@@ -244,7 +247,11 @@ export function PromoCodeSection({ planId, onPromoChange, variant = "default" }:
                         </div>
                     </div>
                     <span className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md shrink-0">
-                        {partialOffer.discountType === "percentage" ? `${partialOffer.discountValue}% OFF` : `₹${partialOffer.discountValue} OFF`}
+                        {partialOffer.discountType === "percentage"
+                            ? `${partialOffer.discountValue}% OFF`
+                            : partialOffer.discountType === "custom_price"
+                            ? `Curated Deal: ₹${partialOffer.discountValue}`
+                            : `₹${partialOffer.discountValue} OFF`}
                     </span>
                 </div>
             )}
@@ -296,10 +303,12 @@ export function PromoCodeSection({ planId, onPromoChange, variant = "default" }:
                     <span>Original price</span>
                     <span className={`font-mono font-medium ${appliedPromo ? "line-through opacity-70" : "text-slate-900"}`}>{formatInrPaise(summary.originalAmount)}</span>
                 </div>
-                <div className="flex items-center justify-between text-slate-500">
-                    <span>{summary.code ? `Discount (${summary.code})` : "Discount"}</span>
-                    <span className="font-mono font-bold text-emerald-600">- {formatInrPaise(summary.discountAmount)}</span>
-                </div>
+                {summary.discountAmount > 0 && (
+                    <div className="flex items-center justify-between text-slate-500">
+                        <span>{summary.code ? `Discount (${summary.code})` : "Discount"}</span>
+                        <span className="font-mono font-bold text-emerald-600">- {formatInrPaise(summary.discountAmount)}</span>
+                    </div>
+                )}
                 {summary.gstAmount !== undefined && summary.gstAmount > 0 && (
                     <>
                         <div className="flex items-center justify-between text-slate-500">

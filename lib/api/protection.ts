@@ -40,6 +40,7 @@ const PLAN_MINUTE_LIMITS: Record<PlanType, number> = {
     business: 600,
     enterprise: 2000,
     bigenterprise: 5000,
+    vip: 10000,
 };
 
 /**

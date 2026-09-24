@@ -24,25 +24,34 @@ function GoogleGIcon() {
 export function DesktopCheckoutUI(props: CheckoutState) {
     const {
         user, isUpgrading, appliedPromo, setAppliedPromo, renewalData,
+        curatedOffer, isCuratedDeal, curatedLinks, curatedApiQuota,
         planKey, planContext, planDisplayName, handlePurchase, handleLogin, isLoggingIn, router
     } = props;
 
+    const isCurated = Boolean(isCuratedDeal && curatedOffer);
+    const displayLinkCount = isCurated && curatedLinks
+        ? `${curatedLinks.toLocaleString()} Permanent Links`
+        : (planContext?.linkCount || "2,500 Permanent Links");
+    const displayApiQuota = isCurated && curatedApiQuota
+        ? `${curatedApiQuota.toLocaleString()} API Calls/mo`
+        : "300,000 API Calls/mo";
+
     const finalPrice = planKey && planKey !== 'free' 
-        ? (appliedPromo ? appliedPromo.finalAmount / 100 : PLAN_CONFIGS[resolvePlanType(planKey)].priceINR)
+        ? (appliedPromo ? appliedPromo.finalAmount / 100 : (isCurated && curatedOffer?.discountType === "custom_price" ? curatedOffer.discountValue : PLAN_CONFIGS[resolvePlanType(planKey)].priceINR))
         : 0;
 
     return (
         <div className="flex h-full w-full bg-slate-50 overflow-hidden select-none">
             
             {/* LEFT PANEL: Deep Cosmic Pitch with Glass Accents */}
-            <section className="relative flex w-1/2 flex-col justify-between overflow-hidden bg-[#070913] px-10 xl:px-14 py-7 xl:py-9 text-slate-50 border-r border-slate-800/40">
+            <section className="relative flex w-1/2 flex-col justify-between overflow-y-auto bg-[#070913] px-10 xl:px-14 py-7 xl:py-9 text-slate-50 border-r border-slate-800/40 checkout-scrollbar">
                 {/* Vibrant ambient gradients */}
                 <div className="absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full bg-indigo-600/20 blur-[120px] pointer-events-none" />
                 <div className="absolute top-1/2 -right-20 w-[380px] h-[380px] rounded-full bg-emerald-500/15 blur-[120px] pointer-events-none" />
                 <div className="absolute -bottom-24 left-1/3 w-[350px] h-[350px] rounded-full bg-blue-600/15 blur-[100px] pointer-events-none" />
                 
                 {/* Header (Back & Brand) */}
-                <div className="relative z-10 flex items-center justify-between">
+                <div className="relative z-10 flex items-center justify-between shrink-0">
                     <button 
                         onClick={() => router.back()} 
                         className="inline-flex items-center gap-2 rounded-lg border border-slate-800/80 bg-slate-900/40 px-3 py-1.5 text-xs font-semibold text-slate-300 backdrop-blur-md transition-all hover:border-slate-700 hover:bg-slate-800/60 hover:text-white"
@@ -62,7 +71,7 @@ export function DesktopCheckoutUI(props: CheckoutState) {
                 </div>
 
                 {/* Center Pitch Content */}
-                <div className="relative z-10 my-auto flex w-full max-w-lg flex-col gap-5 py-2">
+                <div className="relative z-10 my-auto flex w-full max-w-lg flex-col gap-5 py-4">
                     <motion.div
                         initial={{ opacity: 0, y: -12 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -76,17 +85,28 @@ export function DesktopCheckoutUI(props: CheckoutState) {
                                     <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
                                 </span>
                                 <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-200">
-                                    {renewalData?.isRenewal ? `RENEW ${planContext.badgeName}` : planContext.badgeName}
+                                    {isCurated ? "👑 ADMIN CURATED VIP PLAN" : (renewalData?.isRenewal ? `RENEW ${planContext.badgeName}` : planContext.badgeName)}
                                 </span>
                             </div>
                         )}
 
                         {planContext ? (
                             <h1 className="text-4xl xl:text-[44px] font-black leading-[1.1] tracking-[-0.035em] text-white">
-                                {renewalData?.isRenewal ? "Renew " : "Upgrade to "} <br />
-                                <span className="bg-gradient-to-r from-indigo-300 via-emerald-300 to-amber-200 bg-clip-text text-transparent">
-                                    {planDisplayName}
-                                </span>
+                                {isCurated ? (
+                                    <>
+                                        Curated <br />
+                                        <span className="bg-gradient-to-r from-amber-300 via-emerald-300 to-indigo-300 bg-clip-text text-transparent">
+                                            VIP Plan
+                                        </span>
+                                    </>
+                                ) : (
+                                    <>
+                                        {renewalData?.isRenewal ? "Renew " : "Upgrade to "} <br />
+                                        <span className="bg-gradient-to-r from-indigo-300 via-emerald-300 to-amber-200 bg-clip-text text-transparent">
+                                            {planDisplayName}
+                                        </span>
+                                    </>
+                                )}
                             </h1>
                         ) : (
                             <h1 className="text-4xl xl:text-[44px] font-black leading-[1.1] tracking-[-0.035em] text-white">
@@ -95,7 +115,9 @@ export function DesktopCheckoutUI(props: CheckoutState) {
                         )}
                         
                         <p className="max-w-[42ch] text-xs xl:text-sm leading-relaxed text-slate-400">
-                            {user
+                            {isCurated
+                                ? `Signed in as ${user?.displayName || user?.email}. Approved proposal perks (${displayLinkCount} & ${displayApiQuota}) unlocked for ₹${curatedOffer?.discountValue || 1}/mo.`
+                                : user
                                 ? `Signed in as ${user.displayName || user.email}. Review your plan perks and complete your purchase below.`
                                 : "Everything included with your plan. Instant activation right after checkout."}
                         </p>
@@ -109,7 +131,7 @@ export function DesktopCheckoutUI(props: CheckoutState) {
                             className="space-y-3 pt-1"
                         >
                             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
-                                {renewalData?.isRenewal ? "Renewal Perks" : "Included Benefits"}
+                                {isCurated ? "Admin Curated Perks" : renewalData?.isRenewal ? "Renewal Perks" : "Included Benefits"}
                             </p>
                             
                             <div className="flex flex-col gap-2.5">
@@ -153,14 +175,31 @@ export function DesktopCheckoutUI(props: CheckoutState) {
                                             </div>
                                             <div>
                                                 <p className="text-xs font-semibold text-white">Massive Link Capacity</p>
-                                                <p className="text-[11px] text-slate-400">Create up to {planContext.linkCount}</p>
+                                                <p className="text-[11px] text-slate-400">Create up to {displayLinkCount}</p>
                                             </div>
                                         </div>
                                         <span className="rounded-md bg-indigo-500/15 px-2 py-0.5 text-[10px] font-mono font-bold text-indigo-300 border border-indigo-500/30">
-                                            {planContext.linkCount}
+                                            {displayLinkCount}
                                         </span>
                                     </div>
                                 )}
+
+                                {isCurated ? (
+                                    <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 backdrop-blur-sm transition-all hover:border-amber-500/50">
+                                        <div className="flex items-center gap-3">
+                                            <div className="rounded-lg bg-amber-500/20 p-2 text-amber-400 border border-amber-500/30">
+                                                <Zap className="h-4 w-4" />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-semibold text-amber-200">Dedicated API Quota</p>
+                                                <p className="text-[11px] text-amber-300/80">{displayApiQuota}</p>
+                                            </div>
+                                        </div>
+                                        <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-300 border border-amber-500/40">
+                                            {displayApiQuota}
+                                        </span>
+                                    </div>
+                                ) : null}
 
                                 <div className="flex items-center justify-between rounded-xl border border-slate-800/80 bg-slate-900/50 p-3 backdrop-blur-sm transition-all hover:border-slate-700/80">
                                     <div className="flex items-center gap-3">
@@ -170,12 +209,12 @@ export function DesktopCheckoutUI(props: CheckoutState) {
                                         <div>
                                             <p className="text-xs font-semibold text-white">Extended Validity</p>
                                             <p className="text-[11px] text-slate-400">
-                                                {getExpiryDisplay(planKey, renewalData?.isRenewal ?? false, renewalData?.planExpiry ?? null)}
+                                                {isCurated ? "Permanent Links (Never Expire)" : getExpiryDisplay(planKey, renewalData?.isRenewal ?? false, renewalData?.planExpiry ?? null)}
                                             </p>
                                         </div>
                                     </div>
                                     <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-300 border border-emerald-500/30">
-                                        30 Days
+                                        {isCurated ? "Permanent" : "30 Days"}
                                     </span>
                                 </div>
                             </div>
@@ -184,7 +223,7 @@ export function DesktopCheckoutUI(props: CheckoutState) {
                 </div>
 
                 {/* Footer Security Badges */}
-                <div className="relative z-10 flex items-center justify-between pt-2 text-[11px] text-slate-400 border-t border-slate-800/50">
+                <div className="relative z-10 flex items-center justify-between pt-2 text-[11px] text-slate-400 border-t border-slate-800/50 shrink-0">
                     <div className="flex items-center gap-1.5">
                         <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
                         <span>256-bit SSL Encryption</span>
@@ -198,23 +237,23 @@ export function DesktopCheckoutUI(props: CheckoutState) {
 
 
             {/* RIGHT PANEL: Crisp, Focused Checkout Container */}
-            <section className="flex w-1/2 flex-col justify-center items-center bg-slate-50/70 px-8 xl:px-12 py-6 xl:py-8 overflow-hidden">
+            <section className="flex w-1/2 flex-col items-center bg-slate-50/70 px-6 sm:px-8 xl:px-12 pt-6 xl:pt-8 pb-12 overflow-y-auto checkout-scrollbar">
                 <motion.div
                     initial={{ opacity: 0, x: 16 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.35, delay: 0.1, ease: "easeOut" }}
-                    className="w-full max-w-[430px] my-auto flex flex-col justify-center"
+                    className="w-full max-w-[430px] flex flex-col pt-1 pb-8"
                 >
                     {/* Header */}
                     <div className="mb-3.5 space-y-0.5 text-left">
                         <h2 className="text-2xl xl:text-[28px] font-extrabold tracking-tight text-slate-900">
                             {user
-                                ? (planContext ? "Checkout" : "Finish Setup")
+                                ? (isCurated ? "Curated Checkout" : planContext ? "Checkout" : "Finish Setup")
                                 : "Complete Purchase"}
                         </h2>
                         <p className="text-xs text-slate-500">
                             {user 
-                                ? "Review your total and confirm payment." 
+                                ? (isCurated ? "Review your curated perks and complete activation." : "Review your total and confirm payment.")
                                 : "Sign in to connect your account and activate your plan."}
                         </p>
                     </div>
@@ -241,7 +280,7 @@ export function DesktopCheckoutUI(props: CheckoutState) {
                             <button
                                 type="button"
                                 onClick={() => handleLogin()}
-                                className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors shrink-0 ml-2"
+                                className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors shrink-0 ml-2 cursor-pointer"
                             >
                                 Switch
                             </button>
@@ -271,12 +310,16 @@ export function DesktopCheckoutUI(props: CheckoutState) {
                         <div className="mb-2.5 rounded-xl bg-white border border-slate-200/80 p-3.5 shadow-xs transition-shadow hover:shadow-sm">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-0.5">Selected Plan</p>
+                                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-0.5">
+                                        {isCurated ? "Admin Curated VIP Plan" : "Selected Plan"}
+                                    </p>
                                     <h3 className="text-base xl:text-lg font-bold text-slate-900">
-                                        {renewalData?.isRenewal ? `Renew ${planContext.badgeName}` : planContext.badgeName}
+                                        {isCurated ? "Curated VIP Plan" : (renewalData?.isRenewal ? `Renew ${planContext.badgeName}` : planContext.badgeName)}
                                     </h3>
                                     <span className="text-[11px] font-medium text-slate-500">
-                                        {getExpiryDisplay(planKey, renewalData?.isRenewal ?? false, renewalData?.planExpiry ?? null)}
+                                        {isCurated 
+                                            ? `${displayLinkCount} · ${displayApiQuota}` 
+                                            : getExpiryDisplay(planKey, renewalData?.isRenewal ?? false, renewalData?.planExpiry ?? null)}
                                     </span>
                                 </div>
                                 
@@ -309,7 +352,7 @@ export function DesktopCheckoutUI(props: CheckoutState) {
                                                     className="flex flex-col items-end leading-none"
                                                 >
                                                     <span className="text-2xl font-black text-slate-900 font-mono tracking-tight">
-                                                        ₹{PLAN_CONFIGS[resolvePlanType(planKey)].priceINR}
+                                                        ₹{isCurated && curatedOffer?.discountType === "custom_price" ? curatedOffer.discountValue : PLAN_CONFIGS[resolvePlanType(planKey)].priceINR}
                                                     </span>
                                                 </motion.div>
                                             )
@@ -347,7 +390,7 @@ export function DesktopCheckoutUI(props: CheckoutState) {
                             <Button
                                 onClick={handlePurchase}
                                 disabled={isUpgrading}
-                                className="h-12 xl:h-13 w-full rounded-xl bg-slate-950 text-sm xl:text-base font-semibold text-white shadow-[0_8px_20px_-4px_rgba(15,23,42,0.25)] hover:bg-slate-900 hover:shadow-[0_12px_24px_-4px_rgba(15,23,42,0.3)] active:scale-[0.99] transition-all flex items-center justify-center"
+                                className="h-12 xl:h-13 w-full rounded-xl bg-slate-950 text-sm xl:text-base font-semibold text-white shadow-[0_8px_20px_-4px_rgba(15,23,42,0.25)] hover:bg-slate-900 hover:shadow-[0_12px_24px_-4px_rgba(15,23,42,0.3)] active:scale-[0.99] transition-all flex items-center justify-center cursor-pointer"
                             >
                                 {isUpgrading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                                 {isUpgrading ? (
@@ -365,7 +408,7 @@ export function DesktopCheckoutUI(props: CheckoutState) {
                             <Button
                                 onClick={handleLogin}
                                 disabled={isLoggingIn}
-                                className="h-12 xl:h-13 w-full rounded-xl bg-slate-950 text-sm xl:text-base font-semibold text-white shadow-[0_8px_20px_-4px_rgba(15,23,42,0.25)] hover:bg-slate-900 hover:shadow-[0_12px_24px_-4px_rgba(15,23,42,0.3)] active:scale-[0.99] transition-all flex items-center justify-center"
+                                className="h-12 xl:h-13 w-full rounded-xl bg-slate-950 text-sm xl:text-base font-semibold text-white shadow-[0_8px_20px_-4px_rgba(15,23,42,0.25)] hover:bg-slate-900 hover:shadow-[0_12px_24px_-4px_rgba(15,23,42,0.3)] active:scale-[0.99] transition-all flex items-center justify-center cursor-pointer"
                             >
                                 {isLoggingIn ? (
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

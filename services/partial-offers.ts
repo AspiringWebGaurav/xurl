@@ -334,13 +334,50 @@ export async function recordPartialOfferRedemption(params: {
 
             const offerData = offerSnap.data() as PartialOffer;
             const newCount = (offerData.redemptionCount || 0) + 1;
-            const isExhausted = offerData.usageLimit !== null && offerData.usageLimit !== undefined && newCount >= offerData.usageLimit;
+            const limit = offerData.usageLimit ?? 1;
+            const isExhausted = newCount >= limit;
 
             transaction.update(offerRef, {
                 redemptionCount: newCount,
                 isActive: isExhausted ? false : offerData.isActive,
+                status: isExhausted ? "consumed" : "active",
+                consumedAt: isExhausted ? now : null,
                 updatedAt: now,
             });
+
+            // Also find and mark linked custom_pricing_requests as consumed
+            const reqQuery = adminDb.collection("custom_pricing_requests")
+                .where("curatedOfferId", "==", params.offerId)
+                .limit(1);
+            const reqSnap = await transaction.get(reqQuery);
+            if (!reqSnap.empty) {
+                const reqDoc = reqSnap.docs[0];
+                const reqData = reqDoc.data();
+                transaction.update(reqDoc.ref, {
+                    status: "consumed",
+                    consumedAt: now,
+                    consumedOrderId: params.orderId,
+                    consumedCount: (Number(reqData.consumedCount) || 0) + 1,
+                    updatedAt: now,
+                });
+            } else if (params.userEmail) {
+                const emailQuery = adminDb.collection("custom_pricing_requests")
+                    .where("email", "==", params.userEmail.toLowerCase())
+                    .where("status", "==", "curated")
+                    .limit(1);
+                const emailSnap = await transaction.get(emailQuery);
+                if (!emailSnap.empty) {
+                    const reqDoc = emailSnap.docs[0];
+                    const reqData = reqDoc.data();
+                    transaction.update(reqDoc.ref, {
+                        status: "consumed",
+                        consumedAt: now,
+                        consumedOrderId: params.orderId,
+                        consumedCount: (Number(reqData.consumedCount) || 0) + 1,
+                        updatedAt: now,
+                    });
+                }
+            }
 
             transaction.set(redemptionRef, {
                 offerId: params.offerId,

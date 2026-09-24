@@ -351,6 +351,37 @@ export default function MobilePlanClient() {
         };
     }, [fetchUserState]);
 
+    // Restore persisted proposal for current profile if not dismissed
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const profileKey = (user?.email || customEmail || "").toLowerCase().trim();
+        if (!profileKey) return;
+
+        const isDismissed = sessionStorage.getItem(`xurl_proposal_dismissed_${profileKey}`) === "true";
+        if (isDismissed) return;
+
+        const stored = localStorage.getItem(`xurl_active_proposal_${profileKey}`);
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                if (parsed.links) setCustomLinks(parsed.links);
+                if (parsed.price) setCustomProposedPrice(parsed.price);
+                if (parsed.email) setCustomEmail(parsed.email);
+                setCustomSubmitted(true);
+                return;
+            } catch {
+                // ignore
+            }
+        }
+
+        if (userCustomRequest && userCustomRequest.status === "pending") {
+            if (userCustomRequest.linksNeeded) setCustomLinks(userCustomRequest.linksNeeded);
+            if (userCustomRequest.proposedPriceINR) setCustomProposedPrice(userCustomRequest.proposedPriceINR);
+            if (userCustomRequest.email) setCustomEmail(userCustomRequest.email);
+            setCustomSubmitted(true);
+        }
+    }, [user, userCustomRequest, customEmail]);
+
     useEffect(() => {
         let mounted = true;
         fetch("/api/exchange-rates")
@@ -442,6 +473,25 @@ export default function MobilePlanClient() {
                 toast.success("Custom pricing proposal submitted!", {
                     description: "Our admin team will review your proposal and curate your plan directly onto your account.",
                 });
+                const profileKey = emailToUse.toLowerCase().trim();
+                if (typeof window !== "undefined" && profileKey) {
+                    try {
+                        localStorage.setItem(
+                            `xurl_active_proposal_${profileKey}`,
+                            JSON.stringify({
+                                links: numericLinks,
+                                price: numericPrice,
+                                email: profileKey,
+                                company: customCompany.trim() || null,
+                                notes: customNotes.trim() || null,
+                                submittedAt: Date.now(),
+                            })
+                        );
+                        sessionStorage.removeItem(`xurl_proposal_dismissed_${profileKey}`);
+                    } catch {
+                        // ignore storage errors
+                    }
+                }
                 setCustomSubmitted(true);
             } else {
                 toast.error(data.message || "Failed to submit proposal.");
@@ -503,7 +553,7 @@ export default function MobilePlanClient() {
                 </div>
 
                 {/* Targeted VIP Admin Offer Banner (If Active) */}
-                {targetedOffer && (
+                {targetedOffer && (targetedOffer.discountType !== "custom_price" || (currentPlan !== "vip" && userCustomRequest?.status !== "consumed")) && (
                     <div className="px-4 mb-4 relative z-20">
                         <div className="relative overflow-hidden rounded-2xl border-2 border-indigo-500/60 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 text-white p-4 shadow-xl">
                             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-600/25 via-purple-600/15 to-transparent pointer-events-none" />
@@ -666,12 +716,20 @@ export default function MobilePlanClient() {
                         </Button>
                     </div>
 
-                    {/* Curated VIP Plan Card (When approved by admin) */}
+                    {/* Curated VIP Plan Card (When approved by admin & unconsumed) */}
                     {(() => {
-                        const hasCuratedVipOffer = Boolean(
-                            (targetedOffer && targetedOffer.discountType === "custom_price") ||
-                            (userCustomRequest && userCustomRequest.status === "curated")
+                        const isOfferAvailable = Boolean(
+                            targetedOffer &&
+                            targetedOffer.discountType === "custom_price" &&
+                            targetedOffer.isActive &&
+                            (!targetedOffer.usageLimit || (targetedOffer.redemptionCount || 0) < targetedOffer.usageLimit)
                         );
+                        const isRequestCurated = Boolean(
+                            userCustomRequest &&
+                            userCustomRequest.status === "curated" &&
+                            currentPlan !== "vip"
+                        );
+                        const hasCuratedVipOffer = (isOfferAvailable || isRequestCurated) && currentPlan !== "vip";
                         if (!hasCuratedVipOffer) return null;
 
                         const curatedVipPriceINR = targetedOffer?.discountType === "custom_price"
@@ -700,7 +758,7 @@ export default function MobilePlanClient() {
                                         Approved for {user?.email || targetedOffer?.targetEmail || "You"}
                                     </div>
                                     <h3 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white flex items-center justify-between">
-                                        <span>VIP Enterprise</span>
+                                        <span>Curated VIP Plan</span>
                                         <span className="text-[9px] font-black text-amber-700 dark:text-amber-300 bg-amber-200/60 dark:bg-amber-800/40 px-2 py-0.5 rounded-full uppercase tracking-wider">
                                             Exclusive
                                         </span>
@@ -757,7 +815,7 @@ export default function MobilePlanClient() {
                                     className="w-full rounded-xl py-5 font-black transition-all text-xs bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 text-slate-950 shadow-lg active:scale-98"
                                     onClick={() => {
                                         triggerHaptic(40);
-                                        handleUpgrade("enterprise");
+                                        handleUpgrade("vip");
                                     }}
                                 >
                                     <Crown className="w-4 h-4 mr-1.5 fill-slate-950" />
@@ -1137,9 +1195,16 @@ export default function MobilePlanClient() {
                                         size="sm"
                                         onClick={() => {
                                             triggerHaptic(20);
+                                            const profileKey = (user?.email || customEmail || "").toLowerCase().trim();
+                                            if (typeof window !== "undefined" && profileKey) {
+                                                try {
+                                                    localStorage.removeItem(`xurl_active_proposal_${profileKey}`);
+                                                    sessionStorage.setItem(`xurl_proposal_dismissed_${profileKey}`, "true");
+                                                } catch {}
+                                            }
                                             setCustomSubmitted(false);
                                         }}
-                                        className="w-full text-xs h-9 rounded-xl font-bold"
+                                        className="w-full text-xs h-9 rounded-xl font-bold cursor-pointer"
                                     >
                                         Submit Another Proposal
                                     </Button>
@@ -1148,11 +1213,19 @@ export default function MobilePlanClient() {
                                         size="sm"
                                         onClick={() => {
                                             triggerHaptic(20);
+                                            const profileKey = (user?.email || customEmail || "").toLowerCase().trim();
+                                            if (typeof window !== "undefined" && profileKey) {
+                                                try {
+                                                    localStorage.removeItem(`xurl_active_proposal_${profileKey}`);
+                                                    sessionStorage.setItem(`xurl_proposal_dismissed_${profileKey}`, "true");
+                                                } catch {}
+                                            }
+                                            setCustomSubmitted(false);
                                             if (scrollRef.current) {
                                                 scrollRef.current.scrollTo({ top: 0, behavior: "smooth" });
                                             }
                                         }}
-                                        className="w-full text-xs h-9 rounded-xl font-bold bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                                        className="w-full text-xs h-9 rounded-xl font-bold bg-slate-900 text-white dark:bg-white dark:text-slate-900 cursor-pointer"
                                     >
                                         Browse Standard Plans ↑
                                     </Button>
@@ -1200,6 +1273,23 @@ export default function MobilePlanClient() {
                                                     <span>1-Click Upgrade to Curated Plan</span>
                                                     <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
                                                 </Button>
+                                            </div>
+                                        )}
+
+                                        {userCustomRequest.status === "consumed" && (
+                                            <div className="p-3.5 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 text-xs space-y-1.5">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400">
+                                                        <ShieldCheck className="h-4 w-4" />
+                                                        <span>Curated Proposal Claimed & Consumed</span>
+                                                    </span>
+                                                    <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[9px] font-extrabold uppercase tracking-wide">
+                                                        Plan Active
+                                                    </span>
+                                                </div>
+                                                <p className="text-slate-600 dark:text-slate-300 text-[11px]">
+                                                    Your single-use custom curated plan was successfully redeemed ({userCustomRequest.consumedCount || 1} time) and is now active on your account with high-speed limits.
+                                                </p>
                                             </div>
                                         )}
 

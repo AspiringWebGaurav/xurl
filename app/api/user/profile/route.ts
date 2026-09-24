@@ -76,8 +76,14 @@ export async function GET(request: NextRequest) {
 
         const userData = userSnap.data()!;
         
+        const plan = userData.plan || "free";
+        const isCurated = Boolean(userData.isCurated || plan === "vip");
+
         return NextResponse.json({ 
             displayName: userData.displayName || fallbackDisplayName,
+            plan,
+            isCurated,
+            planSource: userData.planSource || null,
             banStatus: userData.banStatus,
             banScheduledAt: userData.banScheduledAt,
             unbanScheduledAt: userData.unbanScheduledAt,

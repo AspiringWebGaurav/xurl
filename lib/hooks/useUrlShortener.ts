@@ -141,6 +141,7 @@ export function useUrlShortener(initialGuestStatus: GuestQuotaResult) {
                         paidLinksCreated: d.paidLinksCreated,
                         limit: d.limit,
                         plan: d.plan || "free",
+                        isCurated: Boolean(d.isCurated || d.plan === "vip"),
                         planRenewals: d.planRenewals,
                         planTtlHours: d.planTtlHours,
                         expiredLinksCount: d.expiredLinksCount,

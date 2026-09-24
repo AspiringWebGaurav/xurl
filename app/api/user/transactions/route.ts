@@ -37,7 +37,12 @@ export async function GET(request: NextRequest) {
             ...doc.data()
         }));
 
-        return NextResponse.json({ transactions });
+        const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
+        const userData = userDoc.data();
+        const plan = userData?.plan || "free";
+        const isCurated = Boolean(userData?.isCurated || plan === "vip");
+
+        return NextResponse.json({ transactions, plan, isCurated });
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to fetch transactions";
         logger.error("api_transactions", message);

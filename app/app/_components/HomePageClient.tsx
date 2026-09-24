@@ -248,16 +248,37 @@ export function HomePageClient({ initialGuestStatus }: HomePageClientProps) {
                                             )}
 
                                             {/* Paid Plan Status (if any) */}
-                                            {quota.plan !== "free" && (
-                                                <div className={`${statusPillBase} bg-emerald-50/90 border-emerald-200/80 text-emerald-700`}>
-                                                    <Link2 className="w-3.5 h-3.5 text-emerald-500" />
-                                                    {quota.paidLinksCreated} / {quota.limit} {quota.plan} links
-                                                    {quota.planRenewals && quota.planRenewals > 1 ? ` (×${quota.planRenewals})` : ""}
-                                                    <span className="text-emerald-300 mx-0.5">|</span>
-                                                    <Clock className="w-3.5 h-3.5 text-emerald-500" />
-                                                    Expires in {quota.planTtlHours === "Unlimited" ? "never" : (quota.planTtlHours !== undefined && quota.planTtlHours < 1 ? `${Math.round(quota.planTtlHours * 60)}m` : `${quota.planTtlHours || 12}h`)}
-                                                </div>
-                                            )}
+                                            {quota.plan !== "free" && (() => {
+                                                const isCurated = Boolean(quota.isCurated || quota.plan === "vip");
+                                                const displayPlanName = isCurated ? "Admin-Curated" : quota.plan;
+                                                const isPermanent = !quota.planTtlHours || quota.planTtlHours === 0 || quota.planTtlHours === "Unlimited";
+
+                                                return (
+                                                    <div className={`${statusPillBase} ${
+                                                        isCurated
+                                                            ? "bg-amber-50/90 border-amber-300/80 text-amber-800 dark:text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)]"
+                                                            : "bg-emerald-50/90 border-emerald-200/80 text-emerald-700"
+                                                    }`}>
+                                                        <Link2 className={`w-3.5 h-3.5 ${isCurated ? "text-amber-600" : "text-emerald-500"}`} />
+                                                        <span>
+                                                            {quota.paidLinksCreated} / {quota.limit?.toLocaleString()} {displayPlanName} links
+                                                            {quota.planRenewals && quota.planRenewals > 1 ? ` (×${quota.planRenewals})` : ""}
+                                                        </span>
+                                                        <span className={isCurated ? "text-amber-300 mx-0.5" : "text-emerald-300 mx-0.5"}>|</span>
+                                                        <Clock className={`w-3.5 h-3.5 ${isCurated ? "text-amber-600" : "text-emerald-500"}`} />
+                                                        {isPermanent ? (
+                                                            <span className="font-bold inline-flex items-center gap-1">
+                                                                <span>Permanent</span>
+                                                                <span className="text-base leading-none font-black">∞</span>
+                                                            </span>
+                                                        ) : (
+                                                            <span>
+                                                                Expires in {quota.planTtlHours !== undefined && quota.planTtlHours < 1 ? `${Math.round(quota.planTtlHours * 60)}m` : `${quota.planTtlHours}h`}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
 
                                             {/* Expired Links Warning */}
                                             {quota.expiredLinksCount !== undefined && quota.expiredLinksCount > 0 && (

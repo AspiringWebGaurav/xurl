@@ -7,15 +7,18 @@ import { ensureUserDocument } from "@/lib/firebase/user-profile";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { HomeFooter } from "@/components/layout/HomeFooter";
 import { MobileFooter } from "@/components/mobile/MobileFooter";
-import { Loader2, CreditCard, ArrowLeft, Receipt, Gift, ChevronRight } from "lucide-react";
-import { format } from "date-fns";
+import { Loader2, CreditCard, ArrowLeft, Receipt, Gift, ChevronRight, Download, FileText, Clock } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { formatTransactionAmount } from "@/lib/currency";
+import { XurlInvoiceModal } from "@/components/payments/XurlInvoiceModal";
+import { downloadInvoicePdf } from "@/lib/invoice-pdf";
 
 type Transaction = {
     id: string;
+    userId?: string;
     action: string;
     planType: string;
     linksAllocated: number;
@@ -29,6 +32,9 @@ type Transaction = {
     orderId?: string;
     source?: string;
     amount?: number;
+    currency?: string;
+    recipientEmail?: string;
+    adminEmail?: string;
 };
 
 function PurchaseHistoryContent() {
@@ -38,6 +44,8 @@ function PurchaseHistoryContent() {
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [userPlan, setUserPlan] = useState("free");
+    const [isCurated, setIsCurated] = useState(false);
+    const [selectedInvoiceTx, setSelectedInvoiceTx] = useState<Transaction | null>(null);
     const searchParams = useSearchParams();
     const highlightId = useMemo(() => searchParams.get("highlight"), [searchParams]);
 
@@ -59,6 +67,9 @@ function PurchaseHistoryContent() {
                     if (data.plan) {
                         setUserPlan(data.plan);
                     }
+                    if (data.isCurated) {
+                        setIsCurated(true);
+                    }
                 } catch (e) {
                     console.error("Failed to fetch transactions", e);
                 }
@@ -74,6 +85,9 @@ function PurchaseHistoryContent() {
             const customEvent = e as CustomEvent;
             if (customEvent.detail?.plan) {
                 setUserPlan(customEvent.detail.plan);
+            }
+            if (customEvent.detail?.isCurated !== undefined) {
+                setIsCurated(Boolean(customEvent.detail.isCurated));
             }
             if (user) {
                 user.getIdToken()
@@ -125,10 +139,29 @@ function PurchaseHistoryContent() {
         switch (action) {
             case "upgrade": return { label: "Upgrade", class: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" };
             case "renew": return { label: "Renewal", class: "bg-primary/10 text-primary border-primary/20" };
+            case "curated_deal":
+            case "admin_curated": return { label: "Curated Plan", class: "bg-amber-500/15 text-amber-500 border-amber-500/30" };
             case "admin_grant": return { label: "Admin Gift", class: "bg-amber-500/10 text-amber-500 border-amber-500/20" };
             case "downgrade": return { label: "Downgrade", class: "bg-rose-500/10 text-rose-500 border-rose-500/20" };
             default: return { label: action, class: "bg-muted text-muted-foreground border-border" };
         }
+    };
+
+    const formatIST = (timestamp: number) => {
+        const d = new Date(timestamp);
+        const dateFormatted = d.toLocaleDateString("en-US", {
+            timeZone: "Asia/Kolkata",
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+        });
+        const timeFormatted = d.toLocaleTimeString("en-US", {
+            timeZone: "Asia/Kolkata",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+        });
+        return { date: dateFormatted, time: timeFormatted };
     };
 
     return (
@@ -179,9 +212,15 @@ function PurchaseHistoryContent() {
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-3">
                                         <h2 className="text-base sm:text-xl font-black text-foreground tracking-tight">Active Subscription</h2>
-                                        <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-mono">
-                                            {userPlan} Tier
-                                        </span>
+                                        {isCurated || userPlan === "vip" ? (
+                                            <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.25)] font-mono flex items-center gap-1">
+                                                ADMIN-CURATED Tier
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-mono">
+                                                {userPlan} Tier
+                                            </span>
+                                        )}
                                     </div>
                                     <p className="text-xs sm:text-sm text-muted-foreground">Managed via secure platform billing integration.</p>
                                 </div>
@@ -214,7 +253,7 @@ function PurchaseHistoryContent() {
                                 <div className="divide-y divide-border/60 max-h-60 overflow-y-auto pr-1">
                                     {transactions.map((tx) => {
                                         const badge = formatActionBadge(tx.action);
-                                        const dateStr = format(new Date(tx.createdAt), "MMM d, yyyy • HH:mm");
+                                        const ist = formatIST(tx.createdAt);
                                         const isHighlighted = highlightId === tx.id;
 
                                         return (
@@ -230,19 +269,54 @@ function PurchaseHistoryContent() {
                                                     </span>
                                                     <div className="flex flex-col min-w-0 leading-tight">
                                                         <span className="font-bold text-foreground capitalize truncate">
-                                                            {tx.planType} Plan ({tx.linksAllocated ? `${tx.linksAllocated} links` : "Standard"})
+                                                            {tx.planType === "vip" ? "Admin-Curated Plan" : `${tx.planType} Plan`} ({tx.linksAllocated ? `${tx.linksAllocated.toLocaleString()} links` : "Standard"})
                                                         </span>
-                                                        <span className="text-xs text-muted-foreground font-mono mt-0.5">{dateStr}</span>
+                                                        <div className="flex items-center gap-1.5 mt-1">
+                                                            <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs text-muted-foreground font-mono">
+                                                                <Clock className="h-3 w-3 text-muted-foreground/70 shrink-0" />
+                                                                <span>{ist.date}</span>
+                                                                <span className="text-muted-foreground/40">•</span>
+                                                                <span className="font-semibold text-foreground/80">{ist.time}</span>
+                                                            </span>
+                                                            <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25 tracking-wider">
+                                                                IST
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
 
-                                                <div className="flex items-center gap-4 shrink-0 font-mono text-right">
-                                                    <span className="font-black text-foreground text-sm sm:text-base">
-                                                        {tx.amount && tx.amount > 0 ? `$${(tx.amount / 100).toFixed(2)}` : "Free"}
-                                                    </span>
-                                                    <span className="text-xs text-emerald-500 font-bold hidden sm:inline">
-                                                        COMPLETED
-                                                    </span>
+                                                <div className="flex items-center gap-3 sm:gap-4 shrink-0 font-mono text-right">
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="font-black text-foreground text-sm sm:text-base">
+                                                            {formatTransactionAmount(tx.amount, tx.currency)}
+                                                        </span>
+                                                        <span className="text-[10px] text-emerald-500 font-bold hidden sm:inline">
+                                                            COMPLETED
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-1 sm:gap-1.5">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => downloadInvoicePdf(tx, user)}
+                                                            className="h-8 sm:h-8.5 px-3 sm:px-3.5 text-xs font-bold rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 transition shadow-sm cursor-pointer shrink-0"
+                                                            title="Direct Download Official PDF Invoice"
+                                                        >
+                                                            <Download className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                                                            <span className="font-sans font-semibold">Download Invoice</span>
+                                                        </Button>
+
+                                                        <Button
+                                                            size="icon"
+                                                            variant="ghost"
+                                                            onClick={() => setSelectedInvoiceTx(tx)}
+                                                            className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/60 cursor-pointer hidden sm:flex"
+                                                            title="Preview Invoice on Screen"
+                                                        >
+                                                            <FileText className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
@@ -268,6 +342,15 @@ function PurchaseHistoryContent() {
                     </motion.div>
                 )}
             </main>
+
+            {/* Invoice Preview Modal */}
+            {selectedInvoiceTx && (
+                <XurlInvoiceModal
+                    transaction={selectedInvoiceTx}
+                    user={user}
+                    onClose={() => setSelectedInvoiceTx(null)}
+                />
+            )}
 
             {/* Footer */}
             <div className="shrink-0 hidden md:block">

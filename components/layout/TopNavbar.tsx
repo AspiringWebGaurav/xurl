@@ -81,6 +81,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
     const notificationOpenRef = useRef(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [plan, setPlan] = useState<string>("free");
+    const [isCuratedUser, setIsCuratedUser] = useState(false);
     const [quota, setQuota] = useState<{ limit: number, currentActive: number, ttlHours: number | "Unlimited" } | null>(null);
     const [pricingLabelIndex, setPricingLabelIndex] = useState(0);
     const [isPricingHovered, setIsPricingHovered] = useState(false);
@@ -134,6 +135,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
             const data = await res.json();
             
             setPlan(data.plan || "free");
+            setIsCuratedUser(Boolean(data.isCurated || data.plan === "vip"));
             
             const currentActive = (data.freeLinksCreated || 0) + (data.paidLinksCreated || 0);
             if (typeof data.limit === "number") {
@@ -297,6 +299,16 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                         if (userData.plan) {
                             setPlan(String(userData.plan).toLowerCase());
                         }
+                        const isCurated = Boolean(
+                            userData.isCurated ||
+                            userData.plan === "vip" ||
+                            userData.plan === "admin_curated" ||
+                            userData.promoInfo?.discountType === "custom_price" ||
+                            userData.planSource === "admin_grant" ||
+                            userData.planSource === "partial_offer" ||
+                            userData.planSource === "curated_deal"
+                        );
+                        setIsCuratedUser(isCurated);
                         void syncUserHistoryState(u);
                         
                         if (newDocSig !== prevDocSig) {
@@ -310,6 +322,7 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
             } else {
                 setForceSync(f => f + 1);
                 setPlan("free");
+                setIsCuratedUser(false);
                 setQuota(null);
             }
         });
@@ -573,7 +586,10 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
         setHasGuestHistory(count > 0);
     }, []);
 
-    const getPlanBadgeStyle = (p: string) => {
+    const getPlanBadgeStyle = (p: string, isCurated?: boolean) => {
+        if (isCurated || p.toLowerCase() === 'vip' || p.toLowerCase() === 'admin_curated') {
+            return "bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 text-amber-950 border-amber-400 shadow-sm font-black";
+        }
         switch (p.toLowerCase()) {
             case 'starter': return "bg-gradient-to-r from-amber-200 to-yellow-400 text-amber-900 border-amber-300/50";
             case 'pro': return "bg-gradient-to-r from-sky-200 to-blue-400 text-blue-900 border-blue-300/50";
@@ -628,8 +644,11 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                 )}
                 {plan && plan !== "free" && (
                     <div className="relative group flex items-center">
-                        <Link href={`/pricing?plan=${plan}`} className={`hidden sm:flex items-center px-2 py-0.5 rounded border shadow-sm text-[10px] font-bold tracking-widest uppercase transition-all duration-300 hover:brightness-105 hover:scale-105 cursor-pointer ${getPlanBadgeStyle(plan)}`}>
-                            {plan}
+                        <Link 
+                            href={`/pricing?plan=${plan}`} 
+                            className={`hidden sm:flex items-center px-2 py-0.5 rounded border shadow-sm text-[10px] font-bold tracking-widest uppercase transition-all duration-300 hover:brightness-105 hover:scale-105 cursor-pointer ${getPlanBadgeStyle(plan, isCuratedUser)}`}
+                        >
+                            {isCuratedUser || plan.toLowerCase() === "vip" ? "ADMIN-CURATED" : plan}
                         </Link>
 
                         {/* Hover Tooltip Card */}
@@ -640,7 +659,9 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                                     <div className="absolute -top-1.5 left-5 w-3 h-3 bg-white border-l border-t border-slate-200/60 transform rotate-45"></div>
 
                                     <div className="flex justify-between items-center text-slate-900 border-b border-slate-100 pb-2 mb-2 relative z-10 bg-white">
-                                        <span className="font-bold text-[13px] capitalize tracking-tight">{plan} Plan</span>
+                                        <span className="font-bold text-[13px] capitalize tracking-tight">
+                                            {isCuratedUser || plan.toLowerCase() === "vip" ? "Admin-Curated Plan" : `${plan} Plan`}
+                                        </span>
                                         <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-sm ${quota.ttlHours === "Unlimited" ? "bg-slate-100 text-slate-600" : "bg-blue-50 text-blue-600"}`}>
                                             {quota.ttlHours === "Unlimited" ? "No Expiry" : (quota.ttlHours < 1 ? `${Math.round(quota.ttlHours * 60)}m TTL` : `${quota.ttlHours}h TTL`)}
                                         </span>
@@ -960,13 +981,15 @@ export function TopNavbar({ isCreateDisabled = false }: TopNavbarProps) {
                                                 <div className="flex items-center justify-between gap-1">
                                                     <p className="font-bold text-xs text-foreground truncate">{user.displayName || "User Account"}</p>
                                                     <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full border shrink-0 font-mono ${
-                                                        plan === "enterprise" || plan === "business"
+                                                        isCuratedUser || plan === "vip"
+                                                            ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40"
+                                                            : plan === "enterprise" || plan === "business"
                                                             ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
                                                             : plan === "pro" || plan === "starter"
                                                             ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                                                             : "bg-primary/10 text-primary border-primary/20"
                                                     }`}>
-                                                        {plan}
+                                                        {isCuratedUser || plan === "vip" ? "ADMIN-CURATED" : plan}
                                                     </span>
                                                 </div>
                                                 <p className="truncate text-[11px] text-muted-foreground mt-0.5 font-mono">{user.email}</p>

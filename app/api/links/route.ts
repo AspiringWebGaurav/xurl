@@ -348,6 +348,7 @@ export async function GET(request: NextRequest) {
             activeGiftQuotas,
             limit: effectiveLimit,
             plan,
+            isCurated: Boolean(userData?.isCurated || plan === "vip" || userData?.promoInfo?.discountType === "custom_price" || userData?.planSource === "admin_grant" || userData?.planSource === "partial_offer" || userData?.planSource === "curated_deal"),
             planExpiry: userData?.planExpiry || null,
             planRenewals,
             planTtlHours,

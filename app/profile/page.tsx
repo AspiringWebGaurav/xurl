@@ -25,6 +25,7 @@ export default function ProfilePage() {
     const [displayName, setDisplayName] = useState("");
     const [saving, setSaving] = useState(false);
     const [userPlan, setUserPlan] = useState("free");
+    const [isCurated, setIsCurated] = useState(false);
     const [curatedOffer, setCuratedOffer] = useState<any>(null);
     const [deletionRequest, setDeletionRequest] = useState<any>(null);
     const [showDeletionModal, setShowDeletionModal] = useState(false);
@@ -83,6 +84,9 @@ export default function ProfilePage() {
                     if (data.plan) {
                         setUserPlan(data.plan);
                     }
+                    if (data.isCurated) {
+                        setIsCurated(true);
+                    }
                     await fetchDeletionStatus(u);
                     await fetchCuratedOffer(u);
                 } catch (e) {
@@ -100,6 +104,9 @@ export default function ProfilePage() {
             const customEvent = e as CustomEvent;
             if (customEvent.detail?.plan) {
                 setUserPlan(customEvent.detail.plan);
+            }
+            if (customEvent.detail?.isCurated !== undefined) {
+                setIsCurated(Boolean(customEvent.detail.isCurated));
             }
         };
 
@@ -240,7 +247,7 @@ export default function ProfilePage() {
                         </div>
 
                         {/* Curated Custom Plan Ready Banner */}
-                        {curatedOffer && (
+                        {curatedOffer && !isCurated && userPlan !== "vip" && (
                             <div className="p-4 sm:p-5 rounded-3xl border-2 border-indigo-500/50 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 text-white shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in">
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
@@ -289,15 +296,22 @@ export default function ProfilePage() {
                                     </div>
 
                                     <div className="flex flex-wrap items-center justify-center gap-2 pt-1 w-full">
-                                        <span className={`text-xs font-black uppercase px-3 py-1 rounded-full border font-mono tracking-wider ${
-                                            userPlan === "enterprise" || userPlan === "business"
-                                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
-                                                : userPlan === "pro" || userPlan === "starter"
-                                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                                                : "bg-primary/10 text-primary border-primary/20"
-                                        }`}>
-                                            {userPlan} Tier
-                                        </span>
+                                        {isCurated || userPlan === "vip" ? (
+                                            <span className="text-xs font-black uppercase px-3 py-1 rounded-full border font-mono tracking-wider bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.25)] flex items-center gap-1.5">
+                                                <Sparkles className="h-3 w-3 text-amber-500 fill-amber-500 animate-pulse" />
+                                                ADMIN-CURATED Tier
+                                            </span>
+                                        ) : (
+                                            <span className={`text-xs font-black uppercase px-3 py-1 rounded-full border font-mono tracking-wider ${
+                                                userPlan === "enterprise" || userPlan === "business"
+                                                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"
+                                                    : userPlan === "pro" || userPlan === "starter"
+                                                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                                    : "bg-primary/10 text-primary border-primary/20"
+                                            }`}>
+                                                {userPlan} Tier
+                                            </span>
+                                        )}
 
                                         <span className="text-xs font-semibold text-muted-foreground px-3 py-1 rounded-full bg-muted border border-border flex items-center gap-1.5">
                                             <Calendar className="h-3.5 w-3.5" />

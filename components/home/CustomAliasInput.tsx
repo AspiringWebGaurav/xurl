@@ -85,13 +85,18 @@ export function CustomAliasInput({
                         );
                     }
                     if (quota && quota.plan !== 'free') {
+                        const isCurated = Boolean(quota.isCurated || quota.plan === 'vip');
                         return (
                             <motion.span
                                 initial={{ opacity: 0, scale: 0.9 }}
                                 animate={{ opacity: 1, scale: 1 }}
-                                className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-sm border border-emerald-200/50"
+                                className={`flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm border ${
+                                    isCurated
+                                        ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40 font-mono"
+                                        : "bg-emerald-50 text-emerald-600 border border-emerald-200/50"
+                                }`}
                             >
-                                <Check className="w-2.5 h-2.5" /> {quota.plan}
+                                <Check className="w-2.5 h-2.5" /> {isCurated ? "ADMIN-CURATED" : quota.plan}
                             </motion.span>
                         );
                     }

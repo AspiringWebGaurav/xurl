@@ -326,6 +326,25 @@ export default function PricingPage() {
                 toast.success("Custom pricing proposal submitted!", {
                     description: "Our admin team will review your proposal and curate your plan directly onto your account.",
                 });
+                const profileKey = emailToUse.toLowerCase().trim();
+                if (typeof window !== "undefined" && profileKey) {
+                    try {
+                        localStorage.setItem(
+                            `xurl_active_proposal_${profileKey}`,
+                            JSON.stringify({
+                                links: numericLinks,
+                                price: numericPrice,
+                                email: profileKey,
+                                company: customCompany.trim() || null,
+                                notes: customNotes.trim() || null,
+                                submittedAt: Date.now(),
+                            })
+                        );
+                        sessionStorage.removeItem(`xurl_proposal_dismissed_${profileKey}`);
+                    } catch {
+                        // ignore storage errors
+                    }
+                }
                 setCustomSubmitted(true);
             } else {
                 toast.error(data.message || "Failed to submit proposal.");
@@ -462,7 +481,35 @@ export default function PricingPage() {
                 fetchUserState(u);
             } else {
                 setCurrentPlan("free");
-                setTargetedOffer(null);
+                if (typeof window !== "undefined") {
+                    const searchEmail = new URLSearchParams(window.location.search).get("email");
+                    if (searchEmail) {
+                        try {
+                            const [resOffers, resCustom] = await Promise.all([
+                                fetch(`/api/user/partial-offers?email=${encodeURIComponent(searchEmail)}`),
+                                fetch(`/api/custom-pricing-request?email=${encodeURIComponent(searchEmail)}`).catch(() => null),
+                            ]);
+                            if (resOffers && resOffers.ok) {
+                                const dataOffers = await resOffers.json();
+                                if (Array.isArray(dataOffers.offers) && dataOffers.offers.length > 0) {
+                                    setTargetedOffer(dataOffers.offers[0]);
+                                }
+                            }
+                            if (resCustom && resCustom.ok) {
+                                const dataCustom = await resCustom.json();
+                                if (Array.isArray(dataCustom.requests) && dataCustom.requests.length > 0) {
+                                    setUserCustomRequest(dataCustom.requests[0]);
+                                }
+                            }
+                        } catch {
+                            // ignore
+                        }
+                    } else {
+                        setTargetedOffer(null);
+                    }
+                } else {
+                    setTargetedOffer(null);
+                }
             }
         });
 
@@ -481,6 +528,37 @@ export default function PricingPage() {
             window.removeEventListener("linkGenerated", handleRealtimeUpdate);
         };
     }, []);
+
+    // Restore persisted proposal for current profile if not dismissed
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const profileKey = (user?.email || customEmail || "").toLowerCase().trim();
+        if (!profileKey) return;
+
+        const isDismissed = sessionStorage.getItem(`xurl_proposal_dismissed_${profileKey}`) === "true";
+        if (isDismissed) return;
+
+        const stored = localStorage.getItem(`xurl_active_proposal_${profileKey}`);
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                if (parsed.links) setCustomLinks(parsed.links);
+                if (parsed.price) setCustomProposedPrice(parsed.price);
+                if (parsed.email) setCustomEmail(parsed.email);
+                setCustomSubmitted(true);
+                return;
+            } catch {
+                // ignore
+            }
+        }
+
+        if (userCustomRequest && userCustomRequest.status === "pending") {
+            if (userCustomRequest.linksNeeded) setCustomLinks(userCustomRequest.linksNeeded);
+            if (userCustomRequest.proposedPriceINR) setCustomProposedPrice(userCustomRequest.proposedPriceINR);
+            if (userCustomRequest.email) setCustomEmail(userCustomRequest.email);
+            setCustomSubmitted(true);
+        }
+    }, [user, userCustomRequest, customEmail]);
 
     useEffect(() => {
         let mounted = true;
@@ -902,12 +980,20 @@ export default function PricingPage() {
                         </div>
                     </motion.div>
 
-                    {/* Curated VIP Plan (Rendered when custom proposal is approved by admin) */}
+                    {/* Curated VIP Plan (Rendered when custom proposal is approved by admin & unconsumed) */}
                     {(() => {
-                        const hasCuratedVipOffer = Boolean(
-                            (targetedOffer && targetedOffer.discountType === "custom_price") ||
-                            (userCustomRequest && userCustomRequest.status === "curated")
+                        const isOfferAvailable = Boolean(
+                            targetedOffer &&
+                            targetedOffer.discountType === "custom_price" &&
+                            targetedOffer.isActive &&
+                            (!targetedOffer.usageLimit || (targetedOffer.redemptionCount || 0) < targetedOffer.usageLimit)
                         );
+                        const isRequestCurated = Boolean(
+                            userCustomRequest &&
+                            userCustomRequest.status === "curated" &&
+                            currentPlan !== "vip"
+                        );
+                        const hasCuratedVipOffer = (isOfferAvailable || isRequestCurated) && currentPlan !== "vip";
                         if (!hasCuratedVipOffer) return null;
 
                         const curatedVipPriceINR = targetedOffer?.discountType === "custom_price"
@@ -915,7 +1001,7 @@ export default function PricingPage() {
                             : (userCustomRequest?.curatedPriceINR ?? 1);
                         const curatedVipLinks = ((userCustomRequest?.curatedLinks || targetedOffer?.customLinks || 50000) as number);
                         const curatedVipApiQuota = ((userCustomRequest?.curatedApiQuota || targetedOffer?.customApiQuota || 2000000) as number);
-                        const isVipFocused = focusPlan === "vip" || focusPlan === "enterprise";
+                        const isVipFocused = focusPlan === "vip";
 
                         return (
                             <motion.div
@@ -923,12 +1009,12 @@ export default function PricingPage() {
                                 variants={cardVariants}
                                 className={cn(
                                     cardBase,
-                                    "border-amber-400/80 bg-gradient-to-b from-amber-50/70 via-white to-amber-50/30 ring-2 ring-amber-400/50 shadow-[0_20px_50px_-15px_rgba(245,158,11,0.3)] hover:shadow-[0_25px_60px_-15px_rgba(245,158,11,0.45)] relative overflow-hidden",
+                                    "border-amber-400/80 bg-gradient-to-b from-amber-50/70 via-white to-amber-50/30 ring-2 ring-amber-400/50 shadow-[0_20px_50px_-15px_rgba(245,158,11,0.3)] hover:shadow-[0_25px_60px_-15px_rgba(245,158,11,0.45)] relative overflow-visible pt-2",
                                     isVipFocused && "ring-4 ring-amber-500 shadow-[0_0_50px_rgba(245,158,11,0.5)]"
                                 )}
                             >
                                 {/* Top Floating VIP Pill */}
-                                <div className="absolute -top-3.5 left-0 right-0 flex justify-center">
+                                <div className="absolute -top-3.5 left-0 right-0 flex justify-center z-10 pointer-events-none">
                                     <span className="rounded-full bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 px-4 py-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-slate-950 shadow-lg flex items-center gap-1.5 animate-pulse">
                                         <Crown className="w-3.5 h-3.5 fill-slate-950" />
                                         Curated VIP Plan (Approved)
@@ -941,10 +1027,10 @@ export default function PricingPage() {
                                         Approved for {user?.email || targetedOffer?.targetEmail || "Your Account"}
                                     </div>
                                     <h3 className="mb-1 flex items-center gap-2 text-[26px] font-black tracking-[-0.04em] text-slate-900">
-                                        VIP Enterprise
+                                        Curated VIP Plan
                                     </h3>
                                     <p className="text-[12px] leading-4 text-slate-600 font-medium">
-                                        Admin-curated custom enterprise quota & approved fixed rate.
+                                        Admin-curated custom quota & approved fixed rate.
                                     </p>
                                 </div>
 
@@ -1017,7 +1103,7 @@ export default function PricingPage() {
                                             ctaBase,
                                             "bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 text-slate-950 font-black hover:from-amber-400 hover:to-yellow-500 shadow-[0_12px_24px_-10px_rgba(245,158,11,0.5)]"
                                         )}
-                                        onClick={() => handleUpgrade("enterprise")}
+                                        onClick={() => handleUpgrade("vip")}
                                     >
                                         <Crown className="w-4 h-4 mr-2 fill-slate-950" />
                                         Claim VIP Plan ({currencySymbols[currency]}{formatPrice(curatedVipPriceINR)})
@@ -1417,7 +1503,16 @@ export default function PricingPage() {
                                         <Button
                                             type="button"
                                             variant="outline"
-                                            onClick={() => setCustomSubmitted(false)}
+                                            onClick={() => {
+                                                const profileKey = (user?.email || customEmail || "").toLowerCase().trim();
+                                                if (typeof window !== "undefined" && profileKey) {
+                                                    try {
+                                                        localStorage.removeItem(`xurl_active_proposal_${profileKey}`);
+                                                        sessionStorage.setItem(`xurl_proposal_dismissed_${profileKey}`, "true");
+                                                    } catch {}
+                                                }
+                                                setCustomSubmitted(false);
+                                            }}
                                             className="w-full sm:w-auto text-xs h-10 px-5 rounded-xl font-bold cursor-pointer"
                                         >
                                             Submit Another Proposal
@@ -1425,6 +1520,14 @@ export default function PricingPage() {
                                         <Button
                                             type="button"
                                             onClick={() => {
+                                                const profileKey = (user?.email || customEmail || "").toLowerCase().trim();
+                                                if (typeof window !== "undefined" && profileKey) {
+                                                    try {
+                                                        localStorage.removeItem(`xurl_active_proposal_${profileKey}`);
+                                                        sessionStorage.setItem(`xurl_proposal_dismissed_${profileKey}`, "true");
+                                                    } catch {}
+                                                }
+                                                setCustomSubmitted(false);
                                                 const grid = document.getElementById("pricing-cards-grid");
                                                 if (grid) grid.scrollIntoView({ behavior: "smooth", block: "start" });
                                             }}
@@ -1468,6 +1571,23 @@ export default function PricingPage() {
                                                     >
                                                         View & Claim Curated Plan Above ↑
                                                     </Button>
+                                                </div>
+                                            )}
+
+                                            {(userCustomRequest.status === "consumed" || userCustomRequest.status === "redeemed") && (
+                                                <div className="p-4 sm:p-5 rounded-2xl border border-blue-500/30 bg-blue-500/10 text-xs sm:text-sm space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-extrabold text-slate-900 flex items-center gap-1.5 text-blue-900">
+                                                            <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                                                            <span>Curated Proposal Claimed & Consumed</span>
+                                                        </span>
+                                                        <span className="px-2 py-0.5 rounded-full bg-blue-600 text-white text-[10px] font-extrabold uppercase">
+                                                            Single-Use Plan Active
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-slate-600">
+                                                        Your curated plan ({(userCustomRequest.curatedLinks || userCustomRequest.linksNeeded)?.toLocaleString()} links & {(userCustomRequest.curatedApiQuota || userCustomRequest.apiQuotaNeeded)?.toLocaleString()} API calls/mo) has been successfully activated on your account.
+                                                    </p>
                                                 </div>
                                             )}
 

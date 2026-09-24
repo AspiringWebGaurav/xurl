@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
             await applyPlanUpgrade(planId, userId, orderId, paymentId, undefined, {
                 source: "razorpay",
                 amountPaise: Number(orderData.amount) || undefined,
+                currency: orderData.currency || "INR",
             });
 
             if (orderData.partialOfferId) {

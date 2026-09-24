@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { type AppliedPromo } from "@/components/payments/PromoCodeSection";
 import { PLAN_DATA } from "./shared";
 import { useAuthTransition } from "@/components/providers/AuthTransitionProvider";
+import type { PartialOffer } from "@/services/partial-offers";
 
 export type PaymentState = "idle" | "upgrading" | "processing" | "success" | "free_success" | "failed" | "cancelled";
 
@@ -33,6 +34,7 @@ export function useCheckout() {
     const [paymentState, setPaymentState] = useState<PaymentState>("idle");
     const paymentStateRef = useRef(paymentState);
     const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
+    const [curatedOffer, setCuratedOffer] = useState<PartialOffer | null>(null);
     const [renewalData, setRenewalData] = useState<RenewalData | null>(null);
     const [killSwitchActive, setKillSwitchActive] = useState(false);
 
@@ -120,33 +122,63 @@ export function useCheckout() {
                             headers: { "Authorization": `Bearer ${token}` }
                         }).catch(() => {});
                         
-                        const res = await fetch("/api/links?pageSize=1", { headers: { "Authorization": `Bearer ${token}` } });
-                        const data = await res.json();
-                        if (data.plan && planKey && data.plan === planKey && planKey !== 'free') {
-                            const planConfig = { starter: 5, pro: 25, business: 100, enterprise: 300, bigenterprise: 600 };
-                            const newAddition = planConfig[planKey as keyof typeof planConfig] || 0;
-                            setRenewalData({
-                                isRenewal: true,
-                                currentPlan: data.plan,
-                                linksUsed: data.paidLinksCreated || 0,
-                                currentLimit: data.limit || 0,
-                                newAddition,
-                                newTotal: (data.limit || 0) + newAddition,
-                                totalLinksEver: data.totalLinksEver || 0,
-                                expiredLinksCount: data.expiredLinksCount || 0,
-                                planExpiry: data.planExpiry || null,
-                            });
+                        const [resLinks, resOffers] = await Promise.all([
+                            fetch("/api/links?pageSize=1", { headers: { "Authorization": `Bearer ${token}` } }).catch(() => null),
+                            fetch("/api/user/partial-offers", { headers: { "Authorization": `Bearer ${token}` } }).catch(() => null),
+                        ]);
+
+                        if (resOffers && resOffers.ok) {
+                            try {
+                                const dataOffers = await resOffers.json();
+                                if (Array.isArray(dataOffers.offers) && dataOffers.offers.length > 0) {
+                                    const matchingOffer = (dataOffers.offers as PartialOffer[]).find((o) =>
+                                        (planKey && o.plans.includes(planKey.toLowerCase())) ||
+                                        (planKey === "vip" && o.discountType === "custom_price") ||
+                                        o.plans.includes("all")
+                                    ) || null;
+                                    setCuratedOffer(matchingOffer);
+                                } else {
+                                    setCuratedOffer(null);
+                                }
+                            } catch {
+                                setCuratedOffer(null);
+                            }
+                        } else {
+                            setCuratedOffer(null);
+                        }
+
+                        if (resLinks && resLinks.ok) {
+                            const data = await resLinks.json();
+                            if (data.plan && planKey && data.plan === planKey && planKey !== 'free') {
+                                const planConfig = { starter: 5, pro: 25, business: 100, enterprise: 300, bigenterprise: 600 };
+                                const newAddition = planConfig[planKey as keyof typeof planConfig] || 0;
+                                setRenewalData({
+                                    isRenewal: true,
+                                    currentPlan: data.plan,
+                                    linksUsed: data.paidLinksCreated || 0,
+                                    currentLimit: data.limit || 0,
+                                    newAddition,
+                                    newTotal: (data.limit || 0) + newAddition,
+                                    totalLinksEver: data.totalLinksEver || 0,
+                                    expiredLinksCount: data.expiredLinksCount || 0,
+                                    planExpiry: data.planExpiry || null,
+                                });
+                            } else {
+                                setRenewalData(null);
+                            }
                         } else {
                             setRenewalData(null);
                         }
                     } catch {
                         setRenewalData(null);
+                        setCuratedOffer(null);
                     }
                 }
             } else {
                 setUser(null);
                 setAuthLoading(false);
                 setRenewalData(null);
+                setCuratedOffer(null);
             }
         });
         return () => unsubscribe();
@@ -201,7 +233,7 @@ export function useCheckout() {
             key: keyId,
             amount: amount,
             currency: currency,
-            name: "xurl.eu.cc",
+            name: process.env.NEXT_PUBLIC_BUSINESS_NAME || "XURL",
             description: `Upgrade to ${planName}`,
             order_id: orderId,
             handler: async function (response: { razorpay_payment_id: string; razorpay_signature: string }) {
@@ -235,6 +267,14 @@ export function useCheckout() {
         });
         rzp.open();
     };
+
+    const isCuratedDeal = Boolean(
+        curatedOffer && (
+            curatedOffer.discountType === "custom_price" ||
+            (planKey && curatedOffer.plans.includes(planKey.toLowerCase())) ||
+            curatedOffer.plans.includes("all")
+        )
+    );
 
     const handlePurchase = async () => {
         if (!user || !plan) return;
@@ -289,7 +329,10 @@ export function useCheckout() {
                         return;
                     }
 
-                    loadRazorpayOptions(data.orderId, data.amount, data.currency, planContext?.badgeName || "Paid Plan");
+                    const activeTitle = isCuratedDeal 
+                        ? (curatedOffer?.title || "Curated VIP Plan") 
+                        : (planContext?.badgeName || "Paid Plan");
+                    loadRazorpayOptions(data.orderId, data.amount, data.currency, activeTitle);
                 } else {
                     setPaymentState("failed");
                     setIsUpgrading(false);
@@ -335,6 +378,10 @@ export function useCheckout() {
         appliedPromo,
         setAppliedPromo,
         renewalData,
+        curatedOffer,
+        isCuratedDeal,
+        curatedLinks: curatedOffer?.customLinks ?? null,
+        curatedApiQuota: curatedOffer?.customApiQuota ?? null,
         plan,
         planKey,
         planContext,

@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
 import { Sparkles, ArrowRight, X } from "lucide-react";
 import { PartialOffer } from "@/services/partial-offers";
 
 export function PartialOfferNotificationBanner() {
+    const pathname = usePathname();
     const [activeOffer, setActiveOffer] = useState<PartialOffer | null>(null);
     const [dismissed, setDismissed] = useState(false);
 
@@ -54,6 +56,7 @@ export function PartialOfferNotificationBanner() {
     }, []);
 
     if (!activeOffer || dismissed) return null;
+    if (pathname?.startsWith("/login") || pathname?.startsWith("/mobile/login")) return null;
 
     return (
         <div className="relative z-40 bg-gradient-to-r from-indigo-600 via-purple-600 to-emerald-600 px-4 py-2.5 text-white shadow-md animate-fade-in">

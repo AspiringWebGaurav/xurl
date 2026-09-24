@@ -1,5 +1,4 @@
 import React from "react";
-import { motion } from "framer-motion";
 import { Loader2, ArrowRight, Link2, Clock, ShieldCheck, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PromoCodeSection } from "@/components/payments/PromoCodeSection";
@@ -14,16 +13,25 @@ type CheckoutState = ReturnType<typeof useCheckout>;
 
 export function MobileCheckoutUI(props: CheckoutState) {
     const {
-        user, isUpgrading, paymentState, appliedPromo, setAppliedPromo,
-        renewalData, planKey, planContext, planDisplayName, handlePurchase, handleLogin, isLoggingIn, router
+        user, isUpgrading, appliedPromo, setAppliedPromo,
+        renewalData, curatedOffer, isCuratedDeal, curatedLinks, curatedApiQuota,
+        planKey, planContext, planDisplayName, handlePurchase, handleLogin, isLoggingIn, router
     } = props;
 
+    const isCurated = Boolean(isCuratedDeal && curatedOffer);
+    const displayLinkCount = isCurated && curatedLinks
+        ? `${curatedLinks.toLocaleString()} Permanent Links`
+        : (planContext?.linkCount || "2,500 Permanent Links");
+    const displayApiQuota = isCurated && curatedApiQuota
+        ? `${curatedApiQuota.toLocaleString()} API/mo`
+        : null;
+
     const finalPrice = planKey && planKey !== 'free' 
-        ? (appliedPromo ? appliedPromo.finalAmount / 100 : PLAN_CONFIGS[resolvePlanType(planKey)].priceINR)
+        ? (appliedPromo ? appliedPromo.finalAmount / 100 : (isCurated && curatedOffer?.discountType === "custom_price" ? curatedOffer.discountValue : PLAN_CONFIGS[resolvePlanType(planKey)].priceINR))
         : 0;
 
     return (
-        <div className="flex h-[100dvh] w-full flex-col bg-slate-50 overflow-hidden">
+        <div className="flex flex-1 min-h-0 h-full w-full flex-col bg-slate-50 overflow-hidden">
             <UpgradeNavbar
                 backLabel="Back"
                 logoHref="/"
@@ -32,18 +40,18 @@ export function MobileCheckoutUI(props: CheckoutState) {
                 contentClassName="max-w-none px-4"
             />
 
-            <main className="flex flex-1 flex-col items-center justify-between px-4 pb-4 overflow-hidden">
+            <main className="flex flex-1 flex-col items-center px-4 pt-1 pb-6 overflow-y-auto checkout-scrollbar w-full min-h-0">
                 {/* Top Section */}
-                <div className="w-full flex flex-col gap-4 overflow-hidden pt-2">
+                <div className="w-full flex flex-col gap-3 pt-1">
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                {renewalData?.isRenewal ? "Renewing" : "Upgrading to"}
+                                {isCurated ? "👑 Admin Curated VIP Plan" : renewalData?.isRenewal ? "Renewing" : "Upgrading to"}
                             </p>
-                            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 mt-0.5">
+                            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 mt-0.5">
                                 <span className="bg-[linear-gradient(90deg,#6366f1,#22c55e,#f59e0b)] bg-clip-text text-transparent">
-                                    {planDisplayName || "Checkout"}
+                                    {isCurated ? "Curated VIP Plan" : (planDisplayName || "Checkout")}
                                 </span>
                             </h1>
                         </div>
@@ -61,7 +69,7 @@ export function MobileCheckoutUI(props: CheckoutState) {
                                         </div>
                                     ) : (
                                         <span className="text-xl font-bold text-slate-900">
-                                            ₹{PLAN_CONFIGS[resolvePlanType(planKey)].priceINR}
+                                            ₹{isCurated && curatedOffer?.discountType === "custom_price" ? curatedOffer.discountValue : PLAN_CONFIGS[resolvePlanType(planKey)].priceINR}
                                         </span>
                                     )
                                 )}
@@ -71,7 +79,7 @@ export function MobileCheckoutUI(props: CheckoutState) {
                                 <div className={`mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 ${planContext.badgeStyle}`}>
                                     <Clock className="w-2.5 h-2.5" />
                                     <span className="text-[8px] font-bold uppercase tracking-wider">
-                                        {getExpiryDisplay(planKey, renewalData?.isRenewal ?? false, renewalData?.planExpiry ?? null).replace('Valid for ', '')}
+                                        {isCurated ? "Permanent" : getExpiryDisplay(planKey, renewalData?.isRenewal ?? false, renewalData?.planExpiry ?? null).replace('Valid for ', '')}
                                     </span>
                                 </div>
                             </div>
@@ -103,15 +111,29 @@ export function MobileCheckoutUI(props: CheckoutState) {
                                     </div>
                                 </>
                             ) : (
-                                <div className="flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
-                                    <div className={`${planContext.linkBgColor} rounded-md p-1.5`}>
-                                        <Link2 className={`h-3.5 w-3.5 ${planContext.linkIconColor}`} />
+                                <>
+                                    <div className="flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                                        <div className={`${planContext.linkBgColor} rounded-md p-1.5`}>
+                                            <Link2 className={`h-3.5 w-3.5 ${planContext.linkIconColor}`} />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Capacity</span>
+                                            <span className="text-xs font-semibold text-slate-900">{displayLinkCount}</span>
+                                        </div>
                                     </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Capacity</span>
-                                        <span className="text-xs font-semibold text-slate-900">{planContext.linkCount}</span>
-                                    </div>
-                                </div>
+
+                                    {displayApiQuota && (
+                                        <div className="flex shrink-0 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 shadow-sm">
+                                            <div className="rounded-md bg-amber-100 p-1.5">
+                                                <Zap className="h-3.5 w-3.5 text-amber-600" />
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">API Quota</span>
+                                                <span className="text-xs font-semibold text-slate-900">{displayApiQuota}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     )}
@@ -125,7 +147,7 @@ export function MobileCheckoutUI(props: CheckoutState) {
                 </div>
 
                 {/* Bottom Docked Section */}
-                <div className="w-full shrink-0 flex flex-col gap-3 pt-3 border-t border-slate-200">
+                <div className="w-full shrink-0 flex flex-col gap-3 pt-3 mt-3 border-t border-slate-200">
                     {user ? (
                         <>
                             <div className="flex items-center justify-between px-1">
@@ -142,7 +164,7 @@ export function MobileCheckoutUI(props: CheckoutState) {
                             <Button
                                 onClick={handlePurchase}
                                 disabled={isUpgrading}
-                                className="h-14 w-full rounded-[16px] bg-slate-900 text-base font-semibold text-slate-50 shadow-lg shadow-slate-900/20 active:scale-[0.98]"
+                                className="h-14 w-full rounded-[16px] bg-slate-900 text-base font-semibold text-slate-50 shadow-lg shadow-slate-900/20 active:scale-[0.98] cursor-pointer"
                             >
                                 {isUpgrading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
                                 {isUpgrading ? (
@@ -162,7 +184,7 @@ export function MobileCheckoutUI(props: CheckoutState) {
                             <Button
                                 onClick={handleLogin}
                                 disabled={isLoggingIn}
-                                className="h-14 w-full rounded-[16px] bg-slate-900 text-base font-semibold text-slate-50 shadow-lg shadow-slate-900/20 active:scale-[0.98]"
+                                className="h-14 w-full rounded-[16px] bg-slate-900 text-base font-semibold text-slate-50 shadow-lg shadow-slate-900/20 active:scale-[0.98] cursor-pointer"
                             >
                                 {isLoggingIn ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
                                 {isLoggingIn ? "Connecting..." : "Sign in with Google to Checkout"} 

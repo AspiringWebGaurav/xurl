@@ -37,6 +37,8 @@ export interface PlanUpgradeResult {
     apiKeyLastRotatedAt?: number | null;
     updatedAt: number;
     transactionId?: string | null;
+    isCurated?: boolean;
+    planSource?: string;
     promoInfo?: {
         code: string;
         discountType: string;
@@ -59,6 +61,10 @@ export interface PlanUpgradeOptions {
      * For non-monetary upgrades (admin grants, dev-mode), this should usually be 0.
      */
     amountPaise?: number;
+    /**
+     * Optional currency code (defaults to "INR").
+     */
+    currency?: string;
     /**
      * Optional human-readable reason to store alongside the transaction.
      */
@@ -135,6 +141,9 @@ export async function applyPlanUpgrade(
         let customLinkLimit: number | null = null;
         let customApiQuota: number | null = null;
         let customReqRef: FirebaseFirestore.DocumentReference | null = null;
+        let customReqExistingConsumedCount = 0;
+        let offerRefToConsume: FirebaseFirestore.DocumentReference | null = null;
+        let offerDataToConsume: PartialOffer | null = null;
 
         if (orderData?.promoCodeId) {
             try {
@@ -142,6 +151,8 @@ export async function applyPlanUpgrade(
                 const offerSnap = await transaction.get(offerRef);
                 if (offerSnap.exists) {
                     const offerData = offerSnap.data() as PartialOffer;
+                    offerRefToConsume = offerRef;
+                    offerDataToConsume = offerData;
                     if (offerData.discountType === "custom_price") {
                         if (offerData.customLinks) customLinkLimit = Number(offerData.customLinks);
                         if (offerData.customApiQuota) customApiQuota = Number(offerData.customApiQuota);
@@ -152,25 +163,37 @@ export async function applyPlanUpgrade(
             }
         }
 
-        if (!customLinkLimit) {
-            const userEmail = (existingUser?.email || options?.recipientEmail || "").trim().toLowerCase();
-            if (userEmail) {
-                try {
-                    const customReqQuery = adminDb.collection("custom_pricing_requests")
+        // Always check custom pricing request by offer ID or user email
+        const userEmail = (existingUser?.email || options?.recipientEmail || "").trim().toLowerCase();
+        if (userEmail) {
+            try {
+                let customReqQuery = orderData?.promoCodeId
+                    ? adminDb.collection("custom_pricing_requests").where("curatedOfferId", "==", orderData.promoCodeId).limit(1)
+                    : null;
+                let customReqSnap = customReqQuery ? await transaction.get(customReqQuery) : null;
+                
+                if (!customReqSnap || customReqSnap.empty) {
+                    customReqQuery = adminDb.collection("custom_pricing_requests")
                         .where("email", "==", userEmail)
                         .where("status", "==", "curated")
                         .limit(1);
-                    const customReqSnap = await transaction.get(customReqQuery);
-                    if (!customReqSnap.empty) {
-                        const reqDoc = customReqSnap.docs[0];
-                        const reqData = reqDoc.data();
-                        customLinkLimit = Number(reqData.curatedLinks) || Number(reqData.linksNeeded) || null;
-                        customApiQuota = Number(reqData.curatedApiQuota) || Number(reqData.apiQuotaNeeded) || null;
-                        customReqRef = reqDoc.ref;
-                    }
-                } catch {
-                    // Ignore query error in transaction
+                    customReqSnap = await transaction.get(customReqQuery);
                 }
+
+                if (customReqSnap && !customReqSnap.empty) {
+                    const reqDoc = customReqSnap.docs[0];
+                    const reqData = reqDoc.data();
+                    if (!customLinkLimit) {
+                        customLinkLimit = Number(reqData.curatedLinks) || Number(reqData.linksNeeded) || null;
+                    }
+                    if (!customApiQuota) {
+                        customApiQuota = Number(reqData.curatedApiQuota) || Number(reqData.apiQuotaNeeded) || null;
+                    }
+                    customReqRef = reqDoc.ref;
+                    customReqExistingConsumedCount = Number(reqData.consumedCount) || 0;
+                }
+            } catch {
+                // Ignore query error in transaction
             }
         }
 
@@ -264,17 +287,46 @@ export async function applyPlanUpgrade(
             result.planEraStart = now;
         }
 
-        // --- ALL WRITES MUST HAPPEN AFTER ALL READS ---
-        
+        const isCuratedUpgrade = Boolean(
+            planId === "vip" ||
+            customReqRef ||
+            offerDataToConsume?.discountType === "custom_price" ||
+            (orderData?.promoDiscountType as string) === "custom_price" ||
+            options?.source === "admin_grant" ||
+            options?.source === "partial_offer"
+        );
+
+        if (isCuratedUpgrade) {
+            result.plan = "vip";
+            result.isCurated = true;
+            result.planSource = options?.source || "admin_curated";
+        }
+
         // Apply user updates
         transaction.set(userRef, result, { merge: true });
 
-        // If a curated proposal was redeemed, mark it as redeemed in Firestore
+        // If a curated proposal was redeemed, mark it as consumed in Firestore & track consumption count
         if (customReqRef) {
             transaction.update(customReqRef, {
-                status: "redeemed",
-                redeemedAt: now,
-                redeemedOrderId: orderId || null,
+                status: "consumed",
+                consumedAt: now,
+                consumedOrderId: orderId || null,
+                consumedCount: customReqExistingConsumedCount + 1,
+                usageLimit: 1,
+                updatedAt: now,
+            });
+        }
+
+        // Also consume the partial offer if single use
+        if (offerRefToConsume && offerDataToConsume) {
+            const nextRedemptions = (offerDataToConsume.redemptionCount || 0) + 1;
+            const limit = offerDataToConsume.usageLimit ?? 1;
+            const isExhausted = nextRedemptions >= limit;
+            transaction.update(offerRefToConsume, {
+                redemptionCount: nextRedemptions,
+                isActive: isExhausted ? false : offerDataToConsume.isActive,
+                status: isExhausted ? "consumed" : "active",
+                consumedAt: isExhausted ? now : null,
                 updatedAt: now,
             });
         }
@@ -349,6 +401,7 @@ export async function applyPlanUpgrade(
                 paymentId,
                 source: options?.source,
                 amount: options?.amountPaise,
+                currency: options?.currency || "INR",
                 reason: options?.reason,
                 recipientEmail: options?.recipientEmail ?? existingUser?.email ?? null,
                 adminEmail: options?.adminEmail ?? null,

@@ -71,7 +71,7 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en" suppressHydrationWarning>
-            <body className={`${inter.className} bg-background text-foreground`} suppressHydrationWarning>
+            <body className={`${inter.className} min-h-dvh flex flex-col bg-background text-foreground`} suppressHydrationWarning>
                 <ClientTelemetryProvider>
                     <AuthTransitionProvider>
                         <RouteLoaderProvider />
@@ -80,7 +80,9 @@ export default function RootLayout({
                             <ConfirmLinkProvider>
                                 <BanGuard>
                                     <PartialOfferNotificationBanner />
-                                    {children}
+                                    <div className="flex-1 min-h-0 flex flex-col w-full">
+                                        {children}
+                                    </div>
                                 </BanGuard>
                             </ConfirmLinkProvider>
                         </KillSwitchGuard>

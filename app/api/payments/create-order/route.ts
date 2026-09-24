@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { razorpayService } from "@/services/payments/razorpay";
-import { getPricePaise, isPaidPlan, resolvePlanType } from "@/lib/plans";
+import { isPaidPlan, resolvePlanType } from "@/lib/plans";
 import { getComputedPlanConfig, getBestActiveOffer, calculateDiscountedPrice } from "@/lib/services/dynamic-config";
 import type { OrderDocument } from "@/types";
 import { logger } from "@/lib/utils/logger";
@@ -111,21 +111,24 @@ export async function POST(request: NextRequest) {
             getApplicablePartialOfferForUser(userEmail, planId)
         ]);
 
-        const dynamicPriceINR = dynamicPlanConfig.priceINR;
-        const baseAmountPaise = Math.round(dynamicPriceINR * 100);
+        const isCustomPriceDeal = planId === "vip" || partialOffer?.discountType === "custom_price";
+        const effectivePriceINR = isCustomPriceDeal && partialOffer?.discountValue !== undefined
+            ? partialOffer.discountValue
+            : dynamicPlanConfig.priceINR;
+        const baseAmountPaise = Math.round(effectivePriceINR * 100);
 
-        const globalOffer = await getBestActiveOffer(dynamicPriceINR);
+        const globalOffer = !isCustomPriceDeal ? await getBestActiveOffer(effectivePriceINR) : null;
 
         let finalAmountPaise = baseAmountPaise;
         let globalDiscountPaise = 0;
         let partialOfferDiscountPaise = 0;
         
-        if (partialOffer) {
-            const { finalPriceINR } = calculatePartialOfferPrice(dynamicPriceINR, partialOffer);
+        if (partialOffer && !isCustomPriceDeal) {
+            const { finalPriceINR } = calculatePartialOfferPrice(effectivePriceINR, partialOffer);
             partialOfferDiscountPaise = baseAmountPaise - Math.round(finalPriceINR * 100);
             finalAmountPaise -= partialOfferDiscountPaise;
-        } else if (globalOffer) {
-            const discountedINR = calculateDiscountedPrice(dynamicPriceINR, globalOffer);
+        } else if (globalOffer && !isCustomPriceDeal) {
+            const discountedINR = calculateDiscountedPrice(effectivePriceINR, globalOffer);
             globalDiscountPaise = baseAmountPaise - Math.round(discountedINR * 100);
             finalAmountPaise -= globalDiscountPaise;
         }
@@ -202,6 +205,7 @@ export async function POST(request: NextRequest) {
             await applyPlanUpgrade(planId, decoded.uid, syntheticOrderId, `devmode-${now}`, undefined, {
                 source: "developer_mode",
                 amountPaise: 0,
+                currency: "INR",
             });
 
             logger.info(
@@ -256,6 +260,7 @@ export async function POST(request: NextRequest) {
             await applyPlanUpgrade(planId, decoded.uid, syntheticOrderId, `free-${now}`, undefined, {
                 source: partialOffer ? "partial_offer" : "promo_free",
                 amountPaise: 0,
+                currency: "INR",
             });
 
             if (partialOffer && partialOffer.id) {

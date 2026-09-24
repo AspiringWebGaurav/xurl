@@ -33,7 +33,7 @@ function LoginContent() {
     }
 
     return (
-        <div id="login-root" className="flex flex-col h-[100dvh] w-full overflow-hidden bg-slate-50 relative">
+        <div id="login-root" className="flex flex-col flex-1 min-h-0 h-full w-full overflow-hidden bg-slate-50 relative">
             <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
 
             {checkoutState.killSwitchActive && (
@@ -202,11 +202,11 @@ function LoginContent() {
             </AnimatePresence>
 
             {/* Render distinct components based on viewport */}
-            <div className="hidden lg:flex w-full h-full flex-1 overflow-hidden">
+            <div className="hidden lg:flex w-full h-full min-h-0 flex-1 overflow-hidden">
                 <DesktopCheckoutUI {...checkoutState} />
             </div>
             
-            <div className="flex lg:hidden w-full h-full flex-1 overflow-hidden">
+            <div className="flex lg:hidden w-full h-full min-h-0 flex-1 overflow-hidden">
                 <MobileCheckoutUI {...checkoutState} />
             </div>
         </div>

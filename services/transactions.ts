@@ -19,6 +19,7 @@ export interface PlanTransaction {
     action: TransactionAction;
     linksAllocated: number;
     amount?: number;
+    currency?: string;
     source?: TransactionSource;
     reason?: string;
     recipientEmail?: string | null;

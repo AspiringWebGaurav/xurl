@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
 import { applyPlanUpgrade } from "@/services/plan-upgrade";
 import { resolvePlanType } from "@/lib/plans";
-import { getDevModeForUser, isDevEnvironment, isDeveloperEmail } from "@/lib/dev-mode";
+import { isDevEnvironment, isDeveloperEmail } from "@/lib/dev-mode";
 import { recordPartialOfferRedemption } from "@/services/partial-offers";
 import { logger } from "@/lib/utils/logger";
 import crypto from "crypto";
@@ -92,6 +92,7 @@ export async function POST(request: NextRequest) {
                 {
                     source: "razorpay",
                     amountPaise: Number(orderData.amount) || undefined,
+                    currency: orderData.currency || "INR",
                 }
             );
 

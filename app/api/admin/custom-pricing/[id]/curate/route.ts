@@ -146,13 +146,13 @@ export async function POST(
     const finalLinks = Number(approvedLinks) > 0 ? Number(approvedLinks) : (Number(reqData.linksNeeded) || 50000);
     const finalApiQuota = Number(approvedApiQuota) > 0 ? Number(approvedApiQuota) : (Number(reqData.apiQuotaNeeded) || 2000000);
     const targetEmail = reqData.email.trim().toLowerCase();
-    const offerTitle = (customTitle || "").trim() || `Curated Enterprise Plan for ${targetEmail}`;
+    const offerTitle = (customTitle || "").trim() || `Curated VIP Plan for ${targetEmail}`;
     const offerDescription = (notes || "").trim() ||
         `Curated custom plan: ${finalLinks.toLocaleString()} permanent links & ${finalApiQuota.toLocaleString()} API calls/mo at ₹${finalPriceINR.toLocaleString()}/mo.`;
 
     const plansToAssign = Array.isArray(eligiblePlans) && eligiblePlans.length > 0 && !eligiblePlans.includes("all") 
         ? eligiblePlans 
-        : ["enterprise"];
+        : ["vip"];
     const expiryTimestamp = expiresInDays && Number(expiresInDays) > 0 ? now + Number(expiresInDays) * 24 * 60 * 60 * 1000 : null;
 
     try {
@@ -229,6 +229,8 @@ export async function POST(
             curatedBy: admin.email || admin.uid,
             curatedOfferId: offerId,
             adminNotes: notes || null,
+            usageLimit: 1,
+            consumedCount: 0,
             updatedAt: now,
         });
 
